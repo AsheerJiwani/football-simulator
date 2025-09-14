@@ -25,6 +25,10 @@ export interface Player {
   blockingTarget?: string; // ID of defender being blocked
   blockingPosition?: Vector2D; // default blocking position when no blitzer
   isBlocked?: boolean; // defender is being blocked (for blitzers)
+  hasBall?: boolean; // player has the ball
+  routeSegmentIndex?: number; // current segment in route waypoints
+  coverageAssignment?: string; // zone name or man assignment
+  speed?: number; // current speed
 }
 
 export type PlayerType = 'QB' | 'RB' | 'WR' | 'TE' | 'FB' | 'CB' | 'S' | 'LB' | 'NB';
@@ -45,6 +49,13 @@ export interface Route {
   waypoints: Vector2D[]; // relative to starting position
   timing: number[]; // time to reach each waypoint
   depth: number; // yards downfield
+  points?: RoutePoint[]; // detailed route points with break indicators
+}
+
+export interface RoutePoint {
+  position: Vector2D;
+  isBreak?: boolean; // indicates route break point
+  timing: number;
 }
 
 export type RouteType = 'slant' | 'flat' | 'go' | 'curl' | 'out' | 'in' | 'post' | 'comeback' | 'fade';

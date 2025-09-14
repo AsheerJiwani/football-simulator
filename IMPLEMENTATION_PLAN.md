@@ -151,8 +151,10 @@ THE ABOVE TASKS ARE HANDLED IN PHASE_4_TASKS.md
 - Perfect defensive coverage concepts (man: cushion/press, zone: find ways to perfect realistic nfl-mechanics, match: find ways to perfect realistic nfl-mechanics, rotations)
 - Build Challenge Mode
 - Integrate authentication
+- Training mode: User selects play, defense is auto-picked to counter
 - Easy mode vs hard mode (easy: no rotations in coverage; hard: rotations in coverage occur with nfl-realism)
 - Add subscription tiers to unlock easy mode past one month and to unlock hard mode separately
+- Final UI Redesign
 - Implement analytics per-user
 
 ## Development Timeline Estimate

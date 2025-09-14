@@ -217,3 +217,63 @@ export const Route = {
     return waypoints[waypoints.length - 1];
   },
 };
+
+// Bezier curve utilities for smooth movement
+export const Bezier = {
+  // Calculate point on quadratic Bezier curve
+  quadratic: (p0: Vector2D, p1: Vector2D, p2: Vector2D, t: number): Vector2D => {
+    const oneMinusT = 1 - t;
+    return {
+      x: oneMinusT * oneMinusT * p0.x + 2 * oneMinusT * t * p1.x + t * t * p2.x,
+      y: oneMinusT * oneMinusT * p0.y + 2 * oneMinusT * t * p1.y + t * t * p2.y,
+    };
+  },
+
+  // Calculate point on cubic Bezier curve
+  cubic: (p0: Vector2D, p1: Vector2D, p2: Vector2D, p3: Vector2D, t: number): Vector2D => {
+    const oneMinusT = 1 - t;
+    const oneMinusTSquared = oneMinusT * oneMinusT;
+    const oneMinusTCubed = oneMinusTSquared * oneMinusT;
+    const tSquared = t * t;
+    const tCubed = tSquared * t;
+
+    return {
+      x: oneMinusTCubed * p0.x + 3 * oneMinusTSquared * t * p1.x +
+         3 * oneMinusT * tSquared * p2.x + tCubed * p3.x,
+      y: oneMinusTCubed * p0.y + 3 * oneMinusTSquared * t * p1.y +
+         3 * oneMinusT * tSquared * p2.y + tCubed * p3.y,
+    };
+  },
+
+  // Generate control point for smooth turn
+  generateControlPoint: (from: Vector2D, to: Vector2D, curveFactor: number = 0.3): Vector2D => {
+    const midpoint = {
+      x: (from.x + to.x) / 2,
+      y: (from.y + to.y) / 2,
+    };
+
+    // Perpendicular vector for curve
+    const perpendicular = {
+      x: -(to.y - from.y) * curveFactor,
+      y: (to.x - from.x) * curveFactor,
+    };
+
+    return {
+      x: midpoint.x + perpendicular.x,
+      y: midpoint.y + perpendicular.y,
+    };
+  },
+
+  // Create smooth path between two points
+  createSmoothPath: (from: Vector2D, to: Vector2D, steps: number = 20): Vector2D[] => {
+    const control = Bezier.generateControlPoint(from, to);
+    const path: Vector2D[] = [];
+
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      path.push(Bezier.quadratic(from, control, to, t));
+    }
+
+    return path;
+  },
+};

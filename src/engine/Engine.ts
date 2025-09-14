@@ -29,6 +29,7 @@ import {
   generateDefensiveAssignments,
   analyzeFormation
 } from './alignment';
+import { DefensiveMovement } from './movement';
 
 export class FootballEngine {
   private gameState: GameState;
@@ -36,6 +37,7 @@ export class FootballEngine {
   private animationFrameId?: number;
   private lastTickTime: number = 0;
   private isRunning: boolean = false;
+  private defensiveMovement: DefensiveMovement;
 
   constructor(config?: Partial<GameConfig>) {
     this.config = this.getDefaultConfig();
@@ -44,6 +46,7 @@ export class FootballEngine {
     }
 
     this.gameState = this.initializeGameState();
+    this.defensiveMovement = new DefensiveMovement();
   }
 
   private getDefaultConfig(): GameConfig {
@@ -649,6 +652,7 @@ export class FootballEngine {
   public reset(): void {
     this.stopGameLoop();
     this.gameState = this.initializeGameState();
+    this.defensiveMovement.reset();
   }
 
   // Game Loop Methods
@@ -870,25 +874,39 @@ export class FootballEngine {
 
     // Get current coverage type from gameState
     const currentCoverage = this.gameState.currentCoverage || this.gameState.coverage;
+    if (!currentCoverage) return;
+
+    // Initialize defender state if needed
+    if (player.coverageResponsibility.type === 'man' && player.coverageResponsibility.target) {
+      const target = this.gameState.players.find(p => p.id === player.coverageResponsibility!.target);
+      if (target) {
+        this.defensiveMovement.initializeDefender(player, currentCoverage, target);
+      }
+    } else {
+      this.defensiveMovement.initializeDefender(player, currentCoverage);
+    }
+
+    // Get adjusted speed from movement system
+    const adjustedSpeed = this.defensiveMovement.getMovementSpeed(player, speed);
 
     // Execute coverage-specific logic
     switch (currentCoverage?.name) {
       case 'Cover 4':
       case 'Quarters':
-        this.executeCover4PatternMatch(player, deltaTime, speed);
+        this.executeCover4PatternMatch(player, deltaTime, adjustedSpeed);
         break;
       case 'Tampa 2':
-        this.executeTampa2Coverage(player, deltaTime, speed);
+        this.executeTampa2Coverage(player, deltaTime, adjustedSpeed);
         break;
       case 'Cover 6':
-        this.executeCover6SplitField(player, deltaTime, speed);
+        this.executeCover6SplitField(player, deltaTime, adjustedSpeed);
         break;
       case 'Cover 0':
-        this.executeCover0Blitz(player, deltaTime, speed);
+        this.executeCover0Blitz(player, deltaTime, adjustedSpeed);
         break;
       default:
         // Standard man/zone execution for other coverages
-        this.executeStandardCoverage(player, deltaTime, speed);
+        this.executeStandardCoverage(player, deltaTime, adjustedSpeed);
         break;
     }
   }
@@ -896,25 +914,45 @@ export class FootballEngine {
   private executeStandardCoverage(player: Player, deltaTime: number, speed: number): void {
     if (!player.coverageResponsibility) return;
 
-    let targetPosition = player.position;
+    const currentCoverage = this.gameState.currentCoverage || this.gameState.coverage;
+    if (!currentCoverage) return;
 
     if (player.coverageResponsibility.type === 'man' && player.coverageResponsibility.target) {
-      const target = this.gameState.players.find(p => p.id === player.coverageResponsibility?.target);
+      // Use improved man coverage movement
+      const target = this.gameState.players.find(p => p.id === player.coverageResponsibility!.target);
       if (target) {
-        targetPosition = target.position;
+        const newPosition = this.defensiveMovement.updateManCoverage(player, target, deltaTime);
+
+        // Update velocity for animation
+        player.velocity = {
+          x: (newPosition.x - player.position.x) / deltaTime,
+          y: (newPosition.y - player.position.y) / deltaTime
+        };
+        player.position = newPosition;
+        player.currentSpeed = Vector.magnitude(player.velocity);
       }
     } else if (player.coverageResponsibility.type === 'zone' && player.coverageResponsibility.zone) {
-      targetPosition = this.getZoneTargetPosition(player);
+      // Use improved zone coverage movement
+      const zoneLandmark = this.getZoneTargetPosition(player);
+      const ballCarrier = this.gameState.players.find(p => p.hasBall);
+      const newPosition = this.defensiveMovement.updateZoneCoverage(player, zoneLandmark, deltaTime, ballCarrier);
+
+      // Update velocity for animation
+      player.velocity = {
+        x: (newPosition.x - player.position.x) / deltaTime,
+        y: (newPosition.y - player.position.y) / deltaTime
+      };
+      player.position = newPosition;
+      player.currentSpeed = Vector.magnitude(player.velocity);
     } else if (player.coverageResponsibility.type === 'blitz') {
       // Blitzing - rush the QB
       const qb = this.gameState.players.find(p => p.playerType === 'QB');
       if (qb) {
-        targetPosition = qb.position;
-        speed *= 1.1; // Blitzers get slight speed boost
+        const targetPosition = qb.position;
+        const boostedSpeed = speed * 1.1; // Blitzers get slight speed boost
+        this.moveDefenderToTarget(player, targetPosition, deltaTime, boostedSpeed);
       }
     }
-
-    this.moveDefenderToTarget(player, targetPosition, deltaTime, speed);
   }
 
   private executeCover4PatternMatch(player: Player, deltaTime: number, speed: number): void {
