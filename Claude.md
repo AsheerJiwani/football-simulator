@@ -17,7 +17,64 @@ The default LOS is on the offensive side (closer to bottom of field, away from d
 
 First down marker 10 yards ahead of the LOS indicated by yellow line
 
-ALL receiver postion alignments, defender position alignments, and offensive/defensive movement mechanics should be based on real nfl game mechanics and positions and relative to the LOS in terms of the y axis, keeping in mind that LOS is at y = 0 and y = -5 is on the OFFENSIVE side of the ball, below the LOS where no defenders should be pre-snap.
+**Game Mechanics for USER AUTONOMY: IMPORTANT**
+
+Coverage Selection:
+
+The defensive coverage concept only changes when the user selects a new coverage.
+
+Defensive coverages render appropriately when the user chooses it in the top bar
+
+Offensive receiver routes, personnel, and alignment render appropriately when the receiver chooses a new play in the top bar
+
+The chosen coverage re-renders automatically whenever the offense updates its formation, personnel, or motions, so alignments and assignments adjust correctly.
+
+Offensive Adjustments:
+
+When the user selects a new play concept, the offense updates to its default routes, personnel, and formation.
+
+Any pre-selected defensive coverage re-renders dynamically based on the new formation/personnel.
+
+When the user changes motions, personnel, formation, or drag-and-drop positions, the offense updates accordingly, and the defense adjusts alignments and responsibilities within the already-selected coverage.
+
+Autonomy & Integration:
+
+The user should have full autonomy to adjust offensive plays, motions, personnel, formations, and positions.
+
+The defense should always render dynamically in response to offensive changes, but only within the framework of the currently chosen coverage.
+
+Coverage logic, route mechanics, motions, and alignments should always reflect real NFL rules and coaching mechanics.
+
+Consistency:
+
+Snap logic, throws, openness, and outcomes should never break when adjustments are made pre-snap.
+
+### 1. **setPlayConcept() Chain**
+```
+User selects new play → setupPlayers() → realignDefense() → UI re-render
+```
+
+### 2. **setPersonnel() Chain**
+```
+User changes personnel → setupPlayers() → getOptimalDefensivePersonnel() → setupDefense() → UI re-render
+```
+
+### 3. **sendInMotion() Chain**
+```
+User sends motion → handleMotionAdjustments() → realignDefense() → UI re-render
+```
+
+### 4. **updatePlayerPosition() Chain**
+```
+User drags player → analyzeFormation() → realignDefense() → UI re-render
+```
+
+### 5. **setCoverage() Chain**
+```
+User selects coverage → setupDefense() → generateCoverageAlignment() → UI re-render
+
+All changes (offense and defense) must be seamless and feel integrated into one coherent simulation.
+ALL pre-snap and post-snap receiver postion alignments, defender position alignments, and offensive/defensive movement mechanics should be based on real nfl game mechanics and positions and relative to the LOS in terms of the y axis, keeping in mind that LOS is at y = 0 and y = -5 is on the OFFENSIVE side of the ball, below the LOS where no defenders should be pre-snap.
 
 Gameplay with drives (4 downs, first down line 10 yards ahead of default start position [30 yard line], if 4 downs are reached and user does not complete a first down, they should have to reset at the 30 yard line.) with ongoing plays starting from where the last one ended based on the hashmarks and last play result
 

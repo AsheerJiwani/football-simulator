@@ -614,12 +614,13 @@ export class FootballEngine {
     return bunched;
   }
 
-  private analyzeFormationComprehensive(offensePlayers: Player[]): any {
+  private analyzeFormationComprehensive(offensePlayers?: Player[]): any {
+    const players = offensePlayers || this.gameState.players.filter(p => p.team === 'offense');
     const centerX = 26.665;
     const losY = this.gameState.lineOfScrimmage;
-    const receivers = offensePlayers.filter(p => p.isEligible);
-    const te = offensePlayers.find(p => p.playerType === 'TE');
-    const rb = offensePlayers.find(p => p.playerType === 'RB');
+    const receivers = players.filter(p => p.isEligible);
+    const te = players.find(p => p.playerType === 'TE');
+    const rb = players.find(p => p.playerType === 'RB');
 
     // Count receivers by side
     const leftReceivers = receivers.filter(r => r.position.x < centerX - 5);
@@ -633,7 +634,7 @@ export class FootballEngine {
     const tripsSide = leftReceivers.length >= 3 ? 'left' : (rightReceivers.length >= 3 ? 'right' : null);
 
     // Bunch formation: 3+ receivers within 3 yards of each other
-    const bunchGroups = this.detectBunchFormation(offensePlayers);
+    const bunchGroups = this.detectBunchFormation(players);
     const isBunch = bunchGroups.length >= 3;
 
     // Stack formation: 2+ receivers vertically aligned (same X coordinate ±1 yard)
@@ -644,7 +645,7 @@ export class FootballEngine {
     const isSpread = receivers.length >= 4 && !isTrips && !isBunch;
 
     // Personnel package detection
-    const personnel = this.getPersonnelPackage(offensePlayers);
+    const personnel = this.getPersonnelPackage(players);
 
     return {
       isTrips,
@@ -1884,7 +1885,12 @@ export class FootballEngine {
       };
 
       if (progress < 1) {
-        requestAnimationFrame(updateMotion);
+        // Use requestAnimationFrame if available (browser), otherwise use setTimeout (Node/test)
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(updateMotion);
+    } else {
+      setTimeout(updateMotion, 16); // ~60fps
+    }
       } else {
         // Motion complete
         this.gameState.isMotionActive = false;
@@ -1892,7 +1898,12 @@ export class FootballEngine {
       }
     };
 
-    requestAnimationFrame(updateMotion);
+    // Use requestAnimationFrame if available (browser), otherwise use setTimeout (Node/test)
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(updateMotion);
+    } else {
+      setTimeout(updateMotion, 16); // ~60fps
+    }
   }
 
   public snap(): boolean {
@@ -1966,19 +1977,38 @@ export class FootballEngine {
       this.tick(deltaTime);
 
       if (this.gameState.phase !== 'play-over') {
-        this.animationFrameId = requestAnimationFrame(gameLoop);
+        // Use requestAnimationFrame if available, otherwise setTimeout
+        if (typeof requestAnimationFrame !== 'undefined') {
+          // Use requestAnimationFrame if available, otherwise setTimeout
+    if (typeof requestAnimationFrame !== 'undefined') {
+      this.animationFrameId = requestAnimationFrame(gameLoop);
+    } else {
+      this.animationFrameId = setTimeout(gameLoop, 16) as any;
+    }
+        } else {
+          this.animationFrameId = setTimeout(gameLoop, 16) as any;
+        }
       } else {
         this.stopGameLoop();
       }
     };
 
-    this.animationFrameId = requestAnimationFrame(gameLoop);
+    // Use requestAnimationFrame if available, otherwise setTimeout
+    if (typeof requestAnimationFrame !== 'undefined') {
+      this.animationFrameId = requestAnimationFrame(gameLoop);
+    } else {
+      this.animationFrameId = setTimeout(gameLoop, 16) as any;
+    }
   }
 
   private stopGameLoop(): void {
     this.isRunning = false;
     if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
+      if (typeof cancelAnimationFrame !== 'undefined') {
+        cancelAnimationFrame(this.animationFrameId);
+      } else {
+        clearTimeout(this.animationFrameId);
+      }
       this.animationFrameId = undefined;
     }
   }
@@ -3046,17 +3076,31 @@ export class FootballEngine {
     formation: any,
     optimalPersonnel: any
   ): any[] {
-    const adjustedResponsibilities = [...originalResponsibilities];
+    let adjustedResponsibilities = [...originalResponsibilities];
 
-    // Add additional defenders based on personnel needs
+    // Ensure we maintain exactly 7 defenders
+    // If we need to add nickel backs, we need to remove other defenders
     if (optimalPersonnel.NB && optimalPersonnel.NB > 0) {
-      // Add nickel backs for slot coverage
-      for (let i = 0; i < optimalPersonnel.NB; i++) {
-        const nbId = i === 0 ? 'NB1' : `NB${i + 1}`;
+      // Check if nickel backs already exist
+      const existingNBCount = adjustedResponsibilities.filter(r => r.defenderId.startsWith('NB')).length;
+      const nbNeeded = optimalPersonnel.NB - existingNBCount;
 
-        // Check if NB already exists in coverage
-        const existingNB = adjustedResponsibilities.find(r => r.defenderId === nbId);
-        if (!existingNB && formation.slotReceivers > i) {
+      if (nbNeeded > 0) {
+        // Remove linebackers to make room for nickel backs
+        const lbsToRemove = adjustedResponsibilities
+          .filter(r => r.defenderId.startsWith('LB'))
+          .slice(0, nbNeeded);
+
+        lbsToRemove.forEach(lb => {
+          const index = adjustedResponsibilities.findIndex(r => r.defenderId === lb.defenderId);
+          if (index >= 0) {
+            adjustedResponsibilities.splice(index, 1);
+          }
+        });
+
+        // Add nickel backs
+        for (let i = existingNBCount; i < optimalPersonnel.NB && i < 2; i++) {
+          const nbId = i === 0 ? 'NB1' : `NB${i + 1}`;
           adjustedResponsibilities.push({
             defenderId: nbId,
             type: 'man' as const,
@@ -3066,6 +3110,9 @@ export class FootballEngine {
         }
       }
     }
+
+    // Ensure we have exactly 7 defenders
+    adjustedResponsibilities = adjustedResponsibilities.slice(0, 7);
 
     // Adjust linebacker responsibilities based on formation
     if (formation.personnel === '12' || formation.personnel === '21') {

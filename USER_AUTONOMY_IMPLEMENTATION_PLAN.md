@@ -65,6 +65,7 @@ Implement seamless integration between offensive user controls and defensive AI 
 - [ ] Validate personnel package adjustments (Nickel, Dime, Base packages)
 
 **Step 5.3: Edge Case & Stress Testing**
+- [ ] Concepts load default personnel and that is integrated appropriately everywhere that play concepts are called
 - [ ] Multiple rapid user changes (stress test state management)
 - [ ] Simultaneous offensive changes (personnel + formation + motion)
 - [ ] Invalid user inputs and graceful error handling
