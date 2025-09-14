@@ -281,15 +281,15 @@ export default function FieldCanvas({
   // Render route paths for offensive players
   const renderRoutes = () => {
     if (!isShowingRoutes) return null;
-    if (!gameState.playConcept) return null;
 
     return players
       .filter(player => player.team === 'offense' && player.isEligible)
       .map(player => {
-        // Get the route from the play concept
-        const route = gameState.playConcept?.routes[player.id];
-        if (!route || !route.waypoints) return null;
+        // Get the route from the player object (includes audibles and adjustments)
+        const route = player.route;
+        if (!route || !route.waypoints || route.waypoints.length === 0) return null;
 
+        // Start from player's current position (accounts for motion)
         const startPos = fieldToSvg(player.position.x, player.position.y);
         const pathPoints = route.waypoints.map(waypoint =>
           fieldToSvg(waypoint.x, waypoint.y)
