@@ -417,7 +417,11 @@ export default function EnhancedFieldCanvas({
             })}
 
           {/* Players */}
-          {players.map(renderEnhancedPlayer)}
+          {players.map((player) => (
+            <g key={`${player.id}-${player.position.x.toFixed(1)}-${player.position.y.toFixed(1)}`}>
+              {renderEnhancedPlayer(player)}
+            </g>
+          ))}
 
           {/* Ball */}
           <circle

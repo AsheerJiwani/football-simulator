@@ -97,7 +97,7 @@ The simulator features a sophisticated defensive AI that automatically responds 
 5. **Strength Determination**: Analyzes offensive formation to set defensive strength for proper alignment
 
 **Consistency Guarantees:**
-- Always maintains exactly 7 defenders with proper assignments
+- UI Always renders exactly 7 defenders with proper assignments
 - Defensive positions update smoothly without breaking game state
 - Handles rapid sequential changes (tested with 10+ changes in <100ms)
 - All adjustments preserve 60fps performance through optimized calculations
@@ -112,15 +112,13 @@ If Claude utilizes the research subagent, ensure that it is utilized after "plan
 
 Only differences from real NFL:
 
-After the "break" point in a route where the receiver makes their last move, they should continue running the same direction until reaching the sideline.
+After the final 'break' in their route, receivers should continue running in the same direction until they reach the back of the endzone (y = 120 yards) or either sideline.
 
 No offensive or defensive line.
 
 Always 7 defenders in coverage (some may blitz or spy).
 
 No penalties or flags.
-
-After the final 'break' in their route, receivers should continue running in the same direction until they reach the back of the endzone (y = 120 yards) or either sideline.
 
 🏈 Core User Controls
 
@@ -130,7 +128,7 @@ Personnel & Formations: Adjust RB/TE/WR counts; each concept has a default forma
 
 Defensive Coverage: User selects coverage (Cover 0–6, Quarters, Tampa 2, etc.); defense auto-aligns based on formation/personnel.
 
-Throw: After the snap, QB may throw to any non-pass-pro eligible.
+Throw: After the snap, QB may throw to any non-pass-pro eligible at any time before he gets sacked
 
 Next Play: User can advance to the next play, beginning from the same y position on the field if the last play was an incomplete pass, or from where the QB was in y value when he was sacked, or where the receiver was when they were tackled if they caught the ball, or from the default starting position (30 yard line) if they scored a touchdown.
 

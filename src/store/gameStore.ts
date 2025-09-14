@@ -25,6 +25,7 @@ interface GameStore {
   // Update tracking for UI re-rendering
   lastRouteUpdate?: number;
   lastDefenseUpdate?: number;
+  stateVersion: number;
 
   // Actions
   setConcept: (conceptName: string) => void;
@@ -108,20 +109,30 @@ export const useGameStore = create<GameStore>()(
           outcome: null
         },
         customPositions: new Map(),
+        stateVersion: 0,
 
       // Actions
       setConcept: (conceptName: string) => {
         const concept = DataLoader.getConcept(conceptName);
-        if (!concept) return;
+        if (!concept) {
+          console.warn(`Concept ${conceptName} not found`);
+          return;
+        }
 
         const { engine } = get();
-        if (!engine) return;
+        if (!engine) {
+          console.warn('Engine not initialized');
+          return;
+        }
+
         engine.setPlayConcept(concept);
+        const newState = engine.getGameState();
 
         set((state) => ({
           ...state,
           selectedConcept: conceptName,
-          gameState: engine.getGameState(),
+          gameState: newState,
+          stateVersion: state.stateVersion + 1,
           // Force re-render of routes and defense by updating timestamps
           lastRouteUpdate: Date.now(),
           lastDefenseUpdate: Date.now()
@@ -130,16 +141,25 @@ export const useGameStore = create<GameStore>()(
 
       setCoverage: (coverageName: string) => {
         const coverage = DataLoader.getCoverage(coverageName);
-        if (!coverage) return;
+        if (!coverage) {
+          console.warn(`Coverage ${coverageName} not found`);
+          return;
+        }
 
         const { engine } = get();
-        if (!engine) return;
+        if (!engine) {
+          console.warn('Engine not initialized');
+          return;
+        }
+
         engine.setCoverage(coverage);
+        const newState = engine.getGameState();
 
         set((state) => ({
           ...state,
           selectedCoverage: coverageName,
-          gameState: engine.getGameState(),
+          gameState: newState,
+          stateVersion: state.stateVersion + 1,
           // Force re-render of defense by updating timestamp
           lastDefenseUpdate: Date.now()
         }));

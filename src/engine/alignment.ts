@@ -165,7 +165,7 @@ export function getCover1FreeSafety(formation: FormationAnalysis, los: number): 
 
   return {
     x: centerX + xAdjustment,
-    y: los - depth, // Position on defensive side of LOS
+    y: los + depth, // Position on defensive side of LOS
   };
 }
 
@@ -184,20 +184,20 @@ export function getCover1Cornerback(receiver: Player, leverage: Leverage, los: n
 
   return {
     x: receiver.position.x + xOffset,
-    y: los - depth, // On defensive side of LOS
+    y: los + depth, // On defensive side of LOS
   };
 }
 
 /**
  * Calculate Cover 1 Strong Safety position
  */
-export function getCover1StrongSafety(targetReceiver: Player, _los: number): Vector2D {
+export function getCover1StrongSafety(targetReceiver: Player, los: number): Vector2D {
   const depth = COVER_1_CONSTANTS.SS_DEPTH_VS_TE;
 
   // 2 yards outside the target receiver
   return {
     x: targetReceiver.position.x + 2,
-    y: targetReceiver.position.y - depth,
+    y: los + depth, // Position on defensive side of LOS
   };
 }
 
@@ -211,14 +211,14 @@ export function getCover1Linebacker(targetReceiver: Player, los: number, role: '
     // Spy stays in middle of field to watch QB
     return {
       x: 26.665,
-      y: los - depth,
+      y: los + depth, // On defensive side of LOS
     };
   }
 
   // Coverage linebacker aligns over target at x position, 5 yards on defensive side
   return {
     x: targetReceiver.position.x,
-    y: los - depth,  // 5 yards on defensive side of LOS
+    y: los + depth,  // 5 yards on defensive side of LOS
   };
 }
 
@@ -478,29 +478,29 @@ export function generateCover4Alignment(
       case 'CB':
         // CBs take outside quarters
         if (defender.id === 'CB1') {
-          positions[defender.id] = { x: 8, y: los - 7 }; // Left outside quarter, 7 yards on defensive side
+          positions[defender.id] = { x: 8, y: los + 7 }; // Left outside quarter, 7 yards on defensive side
         } else if (defender.id === 'CB2') {
-          positions[defender.id] = { x: 45, y: los - 7 }; // Right outside quarter
+          positions[defender.id] = { x: 45, y: los + 7 }; // Right outside quarter
         }
         break;
 
       case 'S':
         // Safeties take inside quarters
         if (defender.id === 'S1') {
-          positions[defender.id] = { x: 18, y: los - 12 }; // Left inside quarter, 12 yards on defensive side
+          positions[defender.id] = { x: 18, y: los + 12 }; // Left inside quarter, 12 yards on defensive side
         } else if (defender.id === 'S2') {
-          positions[defender.id] = { x: 35, y: los - 12 }; // Right inside quarter
+          positions[defender.id] = { x: 35, y: los + 12 }; // Right inside quarter
         }
         break;
 
       case 'LB':
         // Three linebackers in underneath coverage
         if (defender.id === 'LB1') {
-          positions[defender.id] = { x: 20, y: los - 4 }; // Left flat, 4 yards on defensive side
+          positions[defender.id] = { x: 20, y: los + 4 }; // Left flat, 4 yards on defensive side
         } else if (defender.id === 'LB2') {
-          positions[defender.id] = { x: 26.665, y: los - 5 }; // Middle hook, 5 yards on defensive side
+          positions[defender.id] = { x: 26.665, y: los + 5 }; // Middle hook, 5 yards on defensive side
         } else if (defender.id === 'LB3') {
-          positions[defender.id] = { x: 33, y: los - 4 }; // Right flat
+          positions[defender.id] = { x: 33, y: los + 4 }; // Right flat
         }
         break;
     }
@@ -524,31 +524,31 @@ export function generateCover2Alignment(
       case 'CB':
         // CBs play press or bail technique
         if (defender.id === 'CB1') {
-          positions[defender.id] = { x: 8, y: los - 5 }; // Bail technique, 5 yards on defensive side
+          positions[defender.id] = { x: 8, y: los + 5 }; // Bail technique, 5 yards on defensive side
         } else if (defender.id === 'CB2') {
-          positions[defender.id] = { x: 45, y: los - 5 };
+          positions[defender.id] = { x: 45, y: los + 5 };
         }
         break;
 
       case 'S':
         // Safeties play deep halves
         if (defender.id === 'S1') {
-          positions[defender.id] = { x: 13, y: los - 13 }; // Left deep half, 13 yards on defensive side
+          positions[defender.id] = { x: 13, y: los + 13 }; // Left deep half, 13 yards on defensive side
         } else if (defender.id === 'S2') {
-          positions[defender.id] = { x: 40, y: los - 13 }; // Right deep half
+          positions[defender.id] = { x: 40, y: los + 13 }; // Right deep half
         }
         break;
 
       case 'LB':
         // Linebackers play underneath zones
         if (defender.id === 'LB1') {
-          positions[defender.id] = { x: 10, y: los - 5 }; // Left flat, 5 yards on defensive side
+          positions[defender.id] = { x: 10, y: los + 5 }; // Left flat, 5 yards on defensive side
         } else if (defender.id === 'LB2') {
-          positions[defender.id] = { x: 26.665, y: los - 6 }; // Middle hole, 6 yards on defensive side
+          positions[defender.id] = { x: 26.665, y: los + 6 }; // Middle hole, 6 yards on defensive side
         } else if (defender.id === 'LB3') {
-          positions[defender.id] = { x: 43, y: los - 5 }; // Right flat
+          positions[defender.id] = { x: 43, y: los + 5 }; // Right flat
         } else if (defender.id === 'LB4') {
-          positions[defender.id] = { x: 20, y: los - 5 }; // Left hook
+          positions[defender.id] = { x: 20, y: los + 5 }; // Left hook
         }
         break;
     }
@@ -572,31 +572,31 @@ export function generateCover3Alignment(
       case 'CB':
         // CBs play deep outside thirds
         if (defender.id === 'CB1') {
-          positions[defender.id] = { x: 8, y: los - 8 }; // Deep third, 8 yards on defensive side
+          positions[defender.id] = { x: 8, y: los + 8 }; // Deep third, 8 yards on defensive side
         } else if (defender.id === 'CB2') {
-          positions[defender.id] = { x: 45, y: los - 8 };
+          positions[defender.id] = { x: 45, y: los + 8 };
         }
         break;
 
       case 'S':
         // FS plays deep middle third, SS plays in the box
         if (defender.id === 'S1' || defender.id === 'FS') {
-          positions[defender.id] = { x: 26.665, y: los - 12 }; // Deep middle third, 12 yards on defensive side
+          positions[defender.id] = { x: 26.665, y: los + 12 }; // Deep middle third, 12 yards on defensive side
         } else if (defender.id === 'S2' || defender.id === 'SS') {
-          positions[defender.id] = { x: 20, y: los - 4 }; // Strong side curl/flat, 4 yards on defensive side
+          positions[defender.id] = { x: 20, y: los + 4 }; // Strong side curl/flat, 4 yards on defensive side
         }
         break;
 
       case 'LB':
         // Four underneath defenders
         if (defender.id === 'LB1') {
-          positions[defender.id] = { x: 10, y: los - 5 }; // Strong side curl
+          positions[defender.id] = { x: 10, y: los + 5 }; // Strong side curl
         } else if (defender.id === 'LB2') {
-          positions[defender.id] = { x: 26.665, y: los - 6 }; // Middle hook
+          positions[defender.id] = { x: 26.665, y: los + 6 }; // Middle hook
         } else if (defender.id === 'LB3') {
-          positions[defender.id] = { x: 43, y: los - 5 }; // Weak side curl
+          positions[defender.id] = { x: 43, y: los + 5 }; // Weak side curl
         } else if (defender.id === 'LB4') {
-          positions[defender.id] = { x: 35, y: los - 4 }; // Weak side flat
+          positions[defender.id] = { x: 35, y: los + 4 }; // Weak side flat
         }
         break;
     }
@@ -736,7 +736,7 @@ export function generateCover0Alignment(
           const receiver = sortedReceivers[cbIdx++];
           positions[defender.id] = {
             x: receiver.position.x,
-            y: los - 1 // Press coverage, 1 yard on defensive side of LOS
+            y: los + 1 // Press coverage, 1 yard on defensive side of LOS
           };
         }
         break;
@@ -744,26 +744,26 @@ export function generateCover0Alignment(
       case 'S':
         // Safeties blitz from depth
         if (defender.id === 'S1') {
-          positions[defender.id] = { x: 20, y: los - 2 }; // A gap blitz, 2 yards on defensive side
+          positions[defender.id] = { x: 20, y: los + 2 }; // A gap blitz, 2 yards on defensive side
         } else if (defender.id === 'S2') {
-          positions[defender.id] = { x: 33, y: los - 2 }; // B gap blitz
+          positions[defender.id] = { x: 33, y: los + 2 }; // B gap blitz
         }
         break;
 
       case 'LB':
         if (responsibility?.type === 'blitz') {
           // Blitzing linebacker
-          positions[defender.id] = { x: 26.665, y: los - 3 }; // A gap, 3 yards on defensive side
+          positions[defender.id] = { x: 26.665, y: los + 3 }; // A gap, 3 yards on defensive side
         } else {
           // Coverage linebacker on RB
           const rb = offensivePlayers.find(p => p.playerType === 'RB');
           if (rb) {
             positions[defender.id] = {
               x: rb.position.x,
-              y: los - 5  // 5 yards on defensive side of LOS
+              y: los + 5  // 5 yards on defensive side of LOS
             };
           } else {
-            positions[defender.id] = { x: 23, y: los - 2 };
+            positions[defender.id] = { x: 23, y: los + 2 };
           }
         }
         break;

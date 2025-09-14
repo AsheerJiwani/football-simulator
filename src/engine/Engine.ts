@@ -296,9 +296,13 @@ export class FootballEngine {
 
     // Calculate new field position based on outcome
     if (type === 'catch') {
-      newLOS += yards;
+      // For catch, yards is the yardLine where catch happened, not yards gained
+      // Calculate actual yards gained from current LOS
+      const yardsGained = yards - this.gameState.lineOfScrimmage;
+      newLOS += yardsGained;
     } else if (type === 'sack') {
-      newLOS += yards; // Negative yards for sack
+      // For sack, yards is negative (yards lost)
+      newLOS += yards;
     }
     // Incomplete pass stays at same spot
 
@@ -2182,7 +2186,16 @@ export class FootballEngine {
 
     // Check for sack
     if (this.gameState.phase === 'post-snap' && this.gameState.timeElapsed >= this.gameState.sackTime) {
-      this.endPlay({ type: 'sack', yards: 0, openness: 0, catchProbability: 0 });
+      // QB gets sacked, loses yards (typically 5-8 yards)
+      const qb = this.gameState.players.find(p => p.playerType === 'QB');
+      const yardsLost = qb ? -(Math.abs(qb.position.y - this.gameState.lineOfScrimmage)) : -7;
+      this.endPlay({
+        type: 'sack',
+        yards: Math.max(yardsLost, -15), // Cap maximum loss at 15 yards
+        openness: 0,
+        catchProbability: 0,
+        endPosition: qb?.position
+      });
       return;
     }
 
@@ -2678,7 +2691,7 @@ export class FootballEngine {
           outcome = {
             type: 'interception',
             defender: closestDefender?.id,
-            yards: Field.coordsToYards(receiver.position).yardLine,
+            yards: receiver.position.y, // Use y directly as yardLine
             openness,
             catchProbability,
           };
@@ -2697,9 +2710,10 @@ export class FootballEngine {
         outcome = {
           type: 'catch',
           receiver: receiver.id,
-          yards: Field.coordsToYards(receiver.position).yardLine,
+          yards: receiver.position.y, // Use y directly as yardLine
           openness,
           catchProbability,
+          endPosition: receiver.position
         };
       } else {
         // Dropped pass
@@ -2761,8 +2775,9 @@ export class FootballEngine {
     if (!this.gameState.playConcept) return;
 
     const concept = this.gameState.playConcept;
-    // Only clear offensive players, preserve defense
-    this.gameState.players = this.gameState.players.filter(p => p.team === 'defense');
+    // Create a new array with only defensive players to ensure immutability
+    const defensivePlayers = this.gameState.players.filter(p => p.team === 'defense');
+    const newOffensivePlayers: Player[] = [];
 
     // Set personnel based on formation's personnel data
     if (concept.formation.personnel) {
@@ -2829,8 +2844,11 @@ export class FootballEngine {
         isBlocking: false,
       };
 
-      this.gameState.players.push(player);
+      newOffensivePlayers.push(player);
     });
+
+    // Create a completely new players array
+    this.gameState.players = [...newOffensivePlayers, ...defensivePlayers];
   }
 
   private setupDefense(previousCoverage?: Coverage): void {
@@ -2853,8 +2871,8 @@ export class FootballEngine {
       return;
     }
 
-    // Otherwise, recreate defense from scratch
-    this.gameState.players = this.gameState.players.filter(p => p.team === 'offense');
+    // Otherwise, recreate defense from scratch - create new array
+    let newDefensivePlayers: Player[] = [];
 
     // Enhanced: Apply dynamic personnel substitution for ALL coverage types
     // Analyze offensive formation and personnel
@@ -2867,7 +2885,8 @@ export class FootballEngine {
       const assignments = generateDefensiveAssignments(legacyFormation, optimalPersonnel);
 
       // Create defensive players based on dynamic assignments
-      const defensivePlayers: Player[] = assignments.map(assignment => {
+      // Build new defensive players from assignments
+      newDefensivePlayers = assignments.map(assignment => {
         const playerType = assignment.playerType as PlayerType;
 
         // Create coverage responsibility based on assignment
@@ -2899,10 +2918,10 @@ export class FootballEngine {
       });
 
       // Apply dynamic alignment
-      const alignmentPositions = generateCover1Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+      const alignmentPositions = generateCover1Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
 
       // Update defender positions with calculated alignments
-      defensivePlayers.forEach(defender => {
+      newDefensivePlayers.forEach(defender => {
         const calculatedPosition = alignmentPositions[defender.id];
         if (calculatedPosition) {
           defender.position = calculatedPosition;
@@ -2914,13 +2933,13 @@ export class FootballEngine {
 
       // Ensure we have exactly 7 defenders for Cover 1
       // Add missing safeties if needed
-      while (defensivePlayers.length < 7) {
-        const safetyCount = defensivePlayers.filter(d => d.playerType === 'S').length;
+      while (newDefensivePlayers.length < 7) {
+        const safetyCount = newDefensivePlayers.filter(d => d.playerType === 'S').length;
         const safetyId = safetyCount === 0 ? 'S1' : `S${safetyCount + 1}`;
 
         const safetyCoverage: Player = {
           id: safetyId,
-          position: { x: 26.665, y: this.gameState.lineOfScrimmage - 15 },
+          position: { x: 26.665, y: this.gameState.lineOfScrimmage + 15 },
           velocity: { x: 0, y: 0 },
           team: 'defense',
           playerType: 'S',
@@ -2928,10 +2947,10 @@ export class FootballEngine {
             defenderId: safetyId,
             type: 'zone',
             zone: {
-              center: { x: 26.665, y: this.gameState.lineOfScrimmage - 15 },
+              center: { x: 26.665, y: this.gameState.lineOfScrimmage + 15 },
               width: 30,
               height: 40,
-              depth: 'deep'
+              depth: 15
             }
           },
           isEligible: false,
@@ -2944,11 +2963,11 @@ export class FootballEngine {
           isBlocking: false,
         };
 
-        defensivePlayers.push(safetyCoverage);
+        newDefensivePlayers.push(safetyCoverage);
       }
 
-      // Add defensive players to game state
-      this.gameState.players.push(...defensivePlayers);
+      // Create completely new players array
+      this.gameState.players = [...offensivePlayers, ...newDefensivePlayers];
 
     } else {
       // Enhanced: For other coverages, apply personnel-based adjustments
@@ -2959,7 +2978,7 @@ export class FootballEngine {
       );
 
 
-      const defensivePlayers: Player[] = [];
+      // Continue building new defensive players array
       adjustedResponsibilities.forEach((responsibility) => {
         const playerType = this.getPlayerTypeFromId(responsibility.defenderId);
 
@@ -2992,7 +3011,7 @@ export class FootballEngine {
           isBlocking: false,
         };
 
-        defensivePlayers.push(defender);
+        newDefensivePlayers.push(defender);
       });
 
 
@@ -3001,27 +3020,27 @@ export class FootballEngine {
 
       switch (coverage.type) {
         case 'cover-0':
-          alignmentPositions = generateCover0Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+          alignmentPositions = generateCover0Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
         case 'cover-2':
-          alignmentPositions = generateCover2Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+          alignmentPositions = generateCover2Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
         case 'cover-3':
-          alignmentPositions = generateCover3Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+          alignmentPositions = generateCover3Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
         case 'tampa-2':
-          alignmentPositions = generateTampa2Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+          alignmentPositions = generateTampa2Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
         case 'cover-4':
         case 'quarters':
-          alignmentPositions = generateCover4Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+          alignmentPositions = generateCover4Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
         case 'cover-6':
-          alignmentPositions = generateCover6Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+          alignmentPositions = generateCover6Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
         default:
           // For coverages without specific alignment functions, use fallback positioning
-          defensivePlayers.forEach(defender => {
+          newDefensivePlayers.forEach(defender => {
             defender.position = this.getDefensivePosition(defender.id, coverage);
           });
           break;
@@ -3029,7 +3048,7 @@ export class FootballEngine {
 
       // Update defender positions with calculated alignments
       if (Object.keys(alignmentPositions).length > 0) {
-        defensivePlayers.forEach(defender => {
+        newDefensivePlayers.forEach(defender => {
           const calculatedPosition = alignmentPositions[defender.id];
           if (calculatedPosition) {
             defender.position = calculatedPosition;
@@ -3040,8 +3059,8 @@ export class FootballEngine {
         });
       }
 
-      // Add defensive players to game state
-      this.gameState.players.push(...defensivePlayers);
+      // Create completely new players array
+      this.gameState.players = [...offensivePlayers, ...newDefensivePlayers];
     }
   }
 
@@ -3427,7 +3446,7 @@ export class FootballEngine {
               center: { x: i === 0 ? 16 : 37, y: 13 },
               width: 26.665,
               height: 40,
-              depth: 'deep'
+              depth: 15
             }
           });
         }
@@ -3504,7 +3523,7 @@ export class FootballEngine {
             center: { x: 26.665, y: 5 },
             width: 15,
             height: 10,
-            depth: 'intermediate'
+            depth: 10
           }
         });
       }
