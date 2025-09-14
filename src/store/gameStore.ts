@@ -80,6 +80,9 @@ const createInitialEngine = () => {
   }
   engine.setSackTime(defaults.sackTime);
 
+  // Validate that both offense and defense are properly set up
+  engine.validateSetup();
+
   return { engine, defaults };
 };
 
@@ -279,7 +282,9 @@ export const useGameStore = create<GameStore>()(
           return {
             ...state,
             customPositions: newPositions,
-            gameState: engine?.getGameState() || state.gameState
+            gameState: engine?.getGameState() || state.gameState,
+            // Force re-render when player positions change
+            lastDefenseUpdate: Date.now()
           };
         });
       },

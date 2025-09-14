@@ -148,9 +148,17 @@ export class FootballEngine {
   public setPlayConcept(concept: PlayConcept): void {
     this.gameState.playConcept = concept;
     this.setupPlayers();
-    // Re-setup defense to adjust to new offensive formation/personnel
+
+    // Ensure defense exists and realigns to new offensive formation
     if (this.gameState.coverage) {
-      this.setupDefense();
+      const hasDefense = this.gameState.players.some(p => p.team === 'defense');
+      if (!hasDefense) {
+        // No defense exists, set it up from scratch
+        this.setupDefense();
+      } else {
+        // Defense exists, just realign to new formation
+        this.realignDefense();
+      }
     }
   }
 
@@ -206,12 +214,21 @@ export class FootballEngine {
 
   public setPersonnel(personnel: PersonnelPackage): void {
     this.gameState.personnel = personnel;
-    // TODO: Update formations and plays based on personnel
-    // Re-setup players with new personnel
+
+    // Re-setup offensive players with new personnel
     if (this.gameState.playConcept) {
       this.setupPlayers();
-      if (this.gameState.coverage) {
+    }
+
+    // Realign defense to new offensive personnel
+    if (this.gameState.coverage) {
+      const hasDefense = this.gameState.players.some(p => p.team === 'defense');
+      if (!hasDefense) {
+        // No defense exists, set it up from scratch
         this.setupDefense();
+      } else {
+        // Defense exists, realign to new personnel grouping
+        this.realignDefense();
       }
     }
   }
@@ -433,26 +450,28 @@ export class FootballEngine {
     if (this.gameState.phase !== 'pre-snap') return false;
 
     const player = this.gameState.players.find(p => p.id === playerId);
-    if (!player || player.team !== 'offense') return false;
+    if (!player) return false;
 
     // Update the player's position
     player.position = { ...position };
 
-    // Analyze the new formation for trips, bunch, etc.
-    const offensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
-    const formation = analyzeFormation(offensivePlayers);
+    // Only realign defense if an offensive player moved
+    if (player.team === 'offense' && this.gameState.coverage) {
+      // Analyze the new formation for trips, bunch, etc.
+      const offensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
+      const formation = analyzeFormation(offensivePlayers);
 
-    // Update formation metadata in game state (for debugging/display)
-    if (formation.isTrips) {
-      console.log(`Formation: Trips ${formation.tripsSide}`);
-    }
-    if (this.detectBunchFormation(offensivePlayers).length >= 3) {
-      console.log('Bunch formation detected');
-    }
+      // Update formation metadata in game state (for debugging/display)
+      if (formation.isTrips) {
+        console.log(`Formation: Trips ${formation.tripsSide}`);
+      }
+      if (this.detectBunchFormation(offensivePlayers).length >= 3) {
+        console.log('Bunch formation detected');
+      }
 
-    // Realign defense based on new offensive formation
-    // This will reassign coverage responsibilities and update positions
-    this.realignDefense();
+      // Realign defense based on new offensive formation
+      this.realignDefense();
+    }
 
     return true;
   }
@@ -881,6 +900,25 @@ export class FootballEngine {
         lb.position.x -= 2;
       }
     });
+  }
+
+
+  public validateSetup(): void {
+    // Ensure we have offense if play concept is set
+    if (this.gameState.playConcept) {
+      const hasOffense = this.gameState.players.some(p => p.team === 'offense');
+      if (!hasOffense) {
+        this.setupPlayers();
+      }
+    }
+
+    // Ensure we have defense if coverage is set
+    if (this.gameState.coverage) {
+      const hasDefense = this.gameState.players.some(p => p.team === 'defense');
+      if (!hasDefense) {
+        this.setupDefense();
+      }
+    }
   }
 
   public audibleRoute(playerId: string, newRouteType: RouteType): boolean {
@@ -1737,7 +1775,8 @@ export class FootballEngine {
     if (!this.gameState.playConcept) return;
 
     const concept = this.gameState.playConcept;
-    this.gameState.players = [];
+    // Only clear offensive players, preserve defense
+    this.gameState.players = this.gameState.players.filter(p => p.team === 'defense');
 
     // Calculate hash offset for offensive alignment
     let hashOffset = 0;
