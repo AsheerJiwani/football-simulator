@@ -112,7 +112,7 @@ export default function ZoneBubbles({ coverage, fieldToSvg }: ZoneBubbleProps) {
   }
 
   // Get zone definitions for current coverage
-  const zones = getZoneDefinitions(coverage.id);
+  const zones = getZoneDefinitions(coverage.type);
 
   // Adjust zones based on LOS
   const los = gameState.lineOfScrimmage;

@@ -13,6 +13,10 @@ Movements should be fluid, defender tracking based on man/match/zone concepts hi
 
 Field should be 120 yards long (100 yards + 10 yards for each endzone) & vertical instead of horizontal
 
+The default LOS is on the offensive side (closer to bottom of field in UI) at 30 yard line, changes based on last play, indicated by a blue line
+
+First down marker 10 yards ahead of the LOS indicated by yellow line
+
 Gameplay with drives (4 downs, first down line 10 yards ahead of default start position [30 yard line], if 4 downs are reached and user does not complete a first down, they should have to reset at the 30 yard line.) with ongoing plays starting from where the last one ended based on the hashmarks and last play result
 
 Directive: Whenever implementing, modifying, or expanding any NFL mechanic (coverages, alignments, motions, player speeds, ball physics, openness/tackle logic, zone bubbles, or new concepts), Claude must first call the Research Subagent to gather factual, cited evidence before coding. For each coverage, the agent should return JSON Structured data describing each positions' role in the coverage system as well as the adjustments made when offensive personnel and formations changes occur.

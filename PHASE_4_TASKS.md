@@ -171,6 +171,8 @@ Each task includes requirements, implementation steps, and completion criteria.
 
 ### Requirements
 - Field takes up 50%+ of screen
+- Field is visually appealing with 3D aspects and based on real nfl field designs
+- Endzones marked with sharp red line across it, 'pylons' for decoration, field goal posts behind defensive endzone
 - Sidebar for play controls
 - Top panel for game settings
 - Mobile responsive design
