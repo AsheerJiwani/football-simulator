@@ -22,6 +22,9 @@ interface GameStore {
   // Custom positions for drag-and-drop
   customPositions: Map<string, { x: number; y: number }>;
 
+  // Route update tracking
+  lastRouteUpdate?: number;
+
   // Actions
   setConcept: (conceptName: string) => void;
   setCoverage: (coverageName: string) => void;
@@ -114,7 +117,9 @@ export const useGameStore = create<GameStore>()(
         set((state) => ({
           ...state,
           selectedConcept: conceptName,
-          gameState: engine.getGameState()
+          gameState: engine.getGameState(),
+          // Force re-render of routes by updating a timestamp
+          lastRouteUpdate: Date.now()
         }));
       },
 
@@ -187,7 +192,9 @@ export const useGameStore = create<GameStore>()(
 
         set((state) => ({
           ...state,
-          gameState: engine.getGameState()
+          gameState: engine.getGameState(),
+          // Force route recalculation when showing routes
+          lastRouteUpdate: show ? Date.now() : state.lastRouteUpdate
         }));
       },
 
@@ -210,7 +217,9 @@ export const useGameStore = create<GameStore>()(
         if (success) {
           set((state) => ({
             ...state,
-            gameState: engine.getGameState()
+            gameState: engine.getGameState(),
+            // Force re-render of routes by updating a timestamp
+            lastRouteUpdate: Date.now()
           }));
         }
       },
@@ -234,7 +243,9 @@ export const useGameStore = create<GameStore>()(
         if (success) {
           set((state) => ({
             ...state,
-            gameState: engine.getGameState()
+            gameState: engine.getGameState(),
+            // Force re-render of routes by updating a timestamp
+            lastRouteUpdate: Date.now()
           }));
         }
       },
@@ -335,7 +346,9 @@ export const useGameStore = create<GameStore>()(
         set((state) => ({
           ...state,
           isPlaying: false,
-          gameState: engine.getGameState()
+          gameState: engine.getGameState(),
+          // Force route refresh on reset
+          lastRouteUpdate: Date.now()
         }));
       },
 
@@ -355,7 +368,9 @@ export const useGameStore = create<GameStore>()(
         set((state) => ({
           ...state,
           isPlaying: false,
-          gameState: engine.getGameState()
+          gameState: engine.getGameState(),
+          // Force route refresh on new play
+          lastRouteUpdate: Date.now()
         }));
       },
 

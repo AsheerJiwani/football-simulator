@@ -1563,25 +1563,7 @@ export class FootballEngine {
           waypoints: concept.routes[playerId].waypoints?.map(wp => ({
             x: wp.x + hashOffset,
             y: wp.y + this.gameState.lineOfScrimmage  // Routes use y=0 as LOS
-          })),
-          // Also adjust any option route stop points if they exist
-          options: concept.routes[playerId].options ?
-            Object.fromEntries(
-              Object.entries(concept.routes[playerId].options).map(([key, opt]: [string, any]) => [
-                key,
-                {
-                  ...opt,
-                  stopAt: opt.stopAt ? {
-                    x: opt.stopAt.x + hashOffset,
-                    y: opt.stopAt.y + this.gameState.lineOfScrimmage
-                  } : undefined,
-                  bendTo: opt.bendTo ? {
-                    x: opt.bendTo.x + hashOffset,
-                    y: opt.bendTo.y + this.gameState.lineOfScrimmage
-                  } : undefined
-                }
-              ])
-            ) : undefined
+          }))
         };
       }
 

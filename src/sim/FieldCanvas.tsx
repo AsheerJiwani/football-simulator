@@ -293,11 +293,13 @@ export default function FieldCanvas({
         const startPos = fieldToSvg(player.position.x, player.position.y);
 
         // Transform route waypoints to display coordinates
+        // Route waypoints are absolute field coordinates, so transform them directly
         const pathPoints = route.waypoints.map(waypoint =>
           fieldToSvg(waypoint.x, waypoint.y)
         );
 
         // Add continuation path after final waypoint
+        // Routes should continue upfield (towards defensive endzone, higher Y values)
         if (route.waypoints.length >= 2) {
           const lastWaypoint = route.waypoints[route.waypoints.length - 1];
           const secondLastWaypoint = route.waypoints[route.waypoints.length - 2];
@@ -317,7 +319,8 @@ export default function FieldCanvas({
 
             // Clamp to field boundaries
             endX = Math.max(0, Math.min(53.33, endX));
-            endY = Math.max(lastWaypoint.y, Math.min(120, endY)); // Don't go backward, max at back of endzone
+            // For upfield routes, ensure we don't go backwards and max at back of endzone (120 yards)
+            endY = Math.max(lastWaypoint.y, Math.min(120, endY));
 
             // Add the continuation point
             const continuationPoint = fieldToSvg(endX, endY);
@@ -326,8 +329,10 @@ export default function FieldCanvas({
         }
 
         // Create SVG path string starting from player position
-        // Always start from the player's current position
+        // Always start from the player's current position (accounts for motion)
         let pathString = `M ${startPos.x} ${startPos.y}`;
+
+        // Connect to route waypoints in order
         pathPoints.forEach(point => {
           pathString += ` L ${point.x} ${point.y}`;
         });
@@ -342,16 +347,24 @@ export default function FieldCanvas({
               fill="none"
               opacity="0.7"
             />
-            {/* Add route depth indicator at the break point (second to last) */}
-            {pathPoints.length >= 2 && (
+            {/* Add route depth indicator at the final break point */}
+            {pathPoints.length >= 1 && (
               <circle
-                cx={pathPoints[pathPoints.length - 2]?.x}
-                cy={pathPoints[pathPoints.length - 2]?.y}
+                cx={pathPoints[pathPoints.length - 1]?.x}
+                cy={pathPoints[pathPoints.length - 1]?.y}
                 r="4"
                 fill="#00FF00"
                 opacity="0.8"
               />
             )}
+            {/* Add starting position indicator */}
+            <circle
+              cx={startPos.x}
+              cy={startPos.y}
+              r="3"
+              fill="#00FF00"
+              opacity="0.6"
+            />
           </g>
         );
       });
