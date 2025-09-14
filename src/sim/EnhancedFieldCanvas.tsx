@@ -86,19 +86,50 @@ export default function EnhancedFieldCanvas({
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
+    const { active, delta } = event;
     setActiveId(null);
     setDraggedPlayer(null);
 
-    if (!over) return;
-
     const playerId = active.id as string;
-    const anchorId = over.id as string;
-    const anchor = anchors.find(a => a.id === anchorId);
+    const player = players.find(p => p.id === playerId);
+    if (!player || player.team !== 'offense') return;
 
-    if (anchor && !occupiedAnchors.has(anchorId)) {
+    // Calculate the dropped position in field coordinates
+    const currentSvgPos = fieldToSvg(player.position.x, player.position.y);
+    const droppedSvgX = currentSvgPos.x + (delta?.x || 0);
+    const droppedSvgY = currentSvgPos.y + (delta?.y || 0);
+
+    // Convert back to field coordinates
+    const droppedFieldX = droppedSvgX / scaleX;
+    const droppedFieldY = 120 - (droppedSvgY / scaleY);
+    const droppedPosition = { x: droppedFieldX, y: droppedFieldY };
+
+    // Find the nearest available anchor within snapping distance
+    let nearestAnchor: FormationAnchor | null = null;
+    let minDistance = Infinity;
+    const snapDistance = 3; // Snap within 3 yards
+
+    anchors.forEach(anchor => {
+      // Skip occupied anchors
+      if (occupiedAnchors.has(anchor.id)) return;
+
+      const dist = Math.sqrt(
+        Math.pow(droppedPosition.x - anchor.position.x, 2) +
+        Math.pow(droppedPosition.y - anchor.position.y, 2)
+      );
+
+      if (dist < snapDistance && dist < minDistance) {
+        minDistance = dist;
+        nearestAnchor = anchor;
+      }
+    });
+
+    // If we found a nearby anchor, snap to it
+    if (nearestAnchor !== null) {
       // Update the custom position which will trigger engine update
-      setCustomPosition(playerId, anchor.position);
+      const foundAnchor = nearestAnchor as FormationAnchor;
+      const anchorPosition = foundAnchor.position;
+      setCustomPosition(playerId, anchorPosition);
 
       // Trigger defensive realignment after offensive position change
       // This will be handled by the engine when updatePlayerPosition is called
@@ -108,13 +139,16 @@ export default function EnhancedFieldCanvas({
         .filter(p => p.team === 'offense')
         .map(p => {
           if (p.id === playerId) {
-            return { position: anchor.position, isEligible: p.isEligible };
+            return { position: anchorPosition, isEligible: p.isEligible };
           }
           return { position: p.position, isEligible: p.isEligible };
         });
 
       const validation = validateFormation(offensePlayers);
       setFormationErrors(validation.errors);
+    } else {
+      // If no anchor is near enough, snap back to original position
+      // This is handled automatically by not updating the position
     }
   };
 

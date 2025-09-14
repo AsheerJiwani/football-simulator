@@ -35,11 +35,11 @@ export type Leverage = 'inside' | 'outside' | 'head-up';
 
 // NFL Cover 1 alignment constants (based on research)
 export const COVER_1_CONSTANTS = {
-  CB_DEPTH_SOFT: 6,        // 6 yards off LOS for soft coverage
-  CB_DEPTH_PRESS: 1,       // 1 yard off LOS for press coverage
-  FS_DEPTH: 16,            // 16 yards centerfield
+  CB_DEPTH_SOFT: 7,        // 7-8 yards off LOS for soft coverage
+  CB_DEPTH_PRESS: 1,       // 1-2 yards off LOS for press coverage
+  FS_DEPTH: 14,            // 14-16 yards centerfield
   SS_DEPTH_VS_TE: 9,       // 9 yards when covering TE
-  LB_DEPTH: 5,             // 5 yards off LOS
+  LB_DEPTH: 5,             // 4-6 yards off LOS
   BOUNDARY_SWITCH: 6,      // Inside leverage if receiver within 6 yards of sideline
   ROUTE_BREAK_DEPTH: 13,   // Anticipate route breaks at this depth
 } as const;
@@ -524,31 +524,31 @@ export function generateCover2Alignment(
       case 'CB':
         // CBs play press or bail technique
         if (defender.id === 'CB1') {
-          positions[defender.id] = { x: 8, y: los + 2 }; // Press coverage, 2 yards behind LOS (defensive side)
+          positions[defender.id] = { x: 8, y: los + 5 }; // Bail technique, 5 yards behind LOS on defensive side
         } else if (defender.id === 'CB2') {
-          positions[defender.id] = { x: 45, y: los + 2 };
+          positions[defender.id] = { x: 45, y: los + 5 };
         }
         break;
 
       case 'S':
         // Safeties play deep halves
         if (defender.id === 'S1') {
-          positions[defender.id] = { x: 13, y: los + 15 }; // Left deep half, 15 yards behind LOS (defensive side)
+          positions[defender.id] = { x: 13, y: los + 13 }; // Left deep half, 13 yards behind LOS on defensive side
         } else if (defender.id === 'S2') {
-          positions[defender.id] = { x: 40, y: los + 15 }; // Right deep half
+          positions[defender.id] = { x: 40, y: los + 13 }; // Right deep half
         }
         break;
 
       case 'LB':
         // Linebackers play underneath zones
         if (defender.id === 'LB1') {
-          positions[defender.id] = { x: 10, y: los + 5 }; // Left flat, 5 yards behind LOS (defensive side)
+          positions[defender.id] = { x: 10, y: los + 5 }; // Left flat, 5 yards behind LOS on defensive side
         } else if (defender.id === 'LB2') {
-          positions[defender.id] = { x: 26.665, y: los + 7 }; // Middle hole, 7 yards behind LOS (defensive side)
+          positions[defender.id] = { x: 26.665, y: los + 6 }; // Middle hole, 6 yards behind LOS on defensive side
         } else if (defender.id === 'LB3') {
           positions[defender.id] = { x: 43, y: los + 5 }; // Right flat
         } else if (defender.id === 'LB4') {
-          positions[defender.id] = { x: 20, y: los + 6 }; // Left hook
+          positions[defender.id] = { x: 20, y: los + 5 }; // Left hook
         }
         break;
     }

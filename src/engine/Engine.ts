@@ -329,8 +329,8 @@ export class FootballEngine {
         path = [startPos, endPos];
         break;
       case 'orbit':
-        // Behind QB then out
-        const behindQB = { x: 26.665, y: 62 };
+        // Behind QB then out (2 yards behind LOS on offensive side)
+        const behindQB = { x: 26.665, y: this.gameState.lineOfScrimmage - 2 };
         endPos = {
           x: player.position.x > 26.665 ? 10 : 43,
           y: this.gameState.lineOfScrimmage
@@ -383,8 +383,8 @@ export class FootballEngine {
     if (player.route && player.route.waypoints.length > 0) {
       // Adjust route to start from motion end position
       const routeAdjustment = {
-        x: endPos.x - startPos.x,
-        y: endPos.y - startPos.y
+        x: endPos.x - player.route.waypoints[0].x,
+        y: endPos.y - player.route.waypoints[0].y
       };
 
       player.route.waypoints = player.route.waypoints.map((wp, idx) => {
@@ -1553,15 +1553,45 @@ export class FootballEngine {
       // Adjust position relative to current LOS and hash
       const adjustedPosition = {
         x: position.x + hashOffset, // Apply hash offset to x position
-        y: position.y - 60 + this.gameState.lineOfScrimmage
+        y: position.y + this.gameState.lineOfScrimmage // Position is now relative to LOS (y=0)
       };
+      // Adjust route waypoints relative to current LOS
+      let adjustedRoute = undefined;
+      if (concept.routes[playerId]) {
+        adjustedRoute = {
+          ...concept.routes[playerId],
+          waypoints: concept.routes[playerId].waypoints?.map(wp => ({
+            x: wp.x + hashOffset,
+            y: wp.y + this.gameState.lineOfScrimmage  // Routes use y=0 as LOS
+          })),
+          // Also adjust any option route stop points if they exist
+          options: concept.routes[playerId].options ?
+            Object.fromEntries(
+              Object.entries(concept.routes[playerId].options).map(([key, opt]: [string, any]) => [
+                key,
+                {
+                  ...opt,
+                  stopAt: opt.stopAt ? {
+                    x: opt.stopAt.x + hashOffset,
+                    y: opt.stopAt.y + this.gameState.lineOfScrimmage
+                  } : undefined,
+                  bendTo: opt.bendTo ? {
+                    x: opt.bendTo.x + hashOffset,
+                    y: opt.bendTo.y + this.gameState.lineOfScrimmage
+                  } : undefined
+                }
+              ])
+            ) : undefined
+        };
+      }
+
       const player: Player = {
         id: playerId,
         position: adjustedPosition,
         velocity: { x: 0, y: 0 },
         team: 'offense',
         playerType,
-        route: concept.routes[playerId],
+        route: adjustedRoute,
         isEligible: this.isEligibleReceiver(playerType),
         maxSpeed: this.getPlayerSpeed(playerType),
         currentSpeed: 0,
@@ -1659,13 +1689,25 @@ export class FootballEngine {
       coverage.responsibilities.forEach((responsibility) => {
         const playerType = this.getPlayerTypeFromId(responsibility.defenderId);
 
+        // Adjust zone centers to be relative to current LOS
+        const adjustedResponsibility = { ...responsibility };
+        if (adjustedResponsibility.zone) {
+          adjustedResponsibility.zone = {
+            ...adjustedResponsibility.zone,
+            center: {
+              x: adjustedResponsibility.zone.center.x,
+              y: adjustedResponsibility.zone.center.y + this.gameState.lineOfScrimmage
+            }
+          };
+        }
+
         const defender: Player = {
           id: responsibility.defenderId,
           position: { x: 0, y: 0 }, // Will be set by alignment system
           velocity: { x: 0, y: 0 },
           team: 'defense',
           playerType,
-          coverageResponsibility: responsibility,
+          coverageResponsibility: adjustedResponsibility,
           isEligible: false,
           maxSpeed: this.getPlayerSpeed(playerType),
           currentSpeed: 0,
@@ -1734,10 +1776,11 @@ export class FootballEngine {
     const coveragePosition = coverage.positions?.[defenderId];
 
     if (coveragePosition) {
-      // Coverage positions assume LOS at y=60, so adjust relative to actual LOS
+      // Coverage positions are now LOS-relative (y=0 is LOS)
+      // Positive y = upfield/defensive side, negative y = offensive backfield
       return {
         x: coveragePosition.x,
-        y: coveragePosition.y - 60 + los
+        y: coveragePosition.y + los
       };
     }
 
@@ -1745,15 +1788,15 @@ export class FootballEngine {
     const playerType = this.getPlayerTypeFromId(defenderId);
     switch (playerType) {
       case 'CB':
-        return defenderId === 'CB1' ? { x: 8, y: los - 5 } :
-               defenderId === 'CB2' ? { x: 45, y: los - 5 } : { x: 38, y: los - 3 };
+        return defenderId === 'CB1' ? { x: 8, y: los + 7 } :
+               defenderId === 'CB2' ? { x: 45, y: los + 7 } : { x: 38, y: los + 6 };
       case 'S':
-        return { x: 26.665, y: los - 12 }; // 12 yards behind LOS
+        return { x: 26.665, y: los + 12 }; // 12 yards behind LOS on defensive side
       case 'LB':
-        return defenderId === 'LB1' ? { x: 20, y: los - 4 } :
-               defenderId === 'LB2' ? { x: 26.665, y: los - 5 } : { x: 33, y: los - 4 };
+        return defenderId === 'LB1' ? { x: 20, y: los + 5 } :
+               defenderId === 'LB2' ? { x: 26.665, y: los + 5 } : { x: 33, y: los + 5 };
       default:
-        return { x: 26.665, y: los - 5 };
+        return { x: 26.665, y: los + 5 };
     }
   }
 

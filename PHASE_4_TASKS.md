@@ -166,7 +166,7 @@ Each task includes requirements, implementation steps, and completion criteria.
 ### Success Criteria
 - ✅ Players can be dragged smoothly without disappearing
 - ✅ Green lines connect to valid drop positions
-- ✅ Positions snap to legal spots
+- ✅ Positions snap to legal spots (proximity-based snapping within 3 yards)
 - ✅ Invalid formations show clear warnings
 - ✅ Positions persist until snap
 - ✅ Reset clears custom positions properly
