@@ -1,0 +1,53 @@
+{
+  "trips-right": {
+    "name": "Trips Right",
+    "positions": {
+      "QB1": { "x": 60, "y": 26.665 },
+      "RB1": { "x": 58, "y": 26.665 },
+      "WR1": { "x": 60, "y": 45 },
+      "WR2": { "x": 60, "y": 40 },
+      "WR3": { "x": 60, "y": 35 }
+    },
+    "personnel": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 3,
+      "TE": 0,
+      "FB": 0
+    }
+  },
+  "singleback": {
+    "name": "Singleback",
+    "positions": {
+      "QB1": { "x": 60, "y": 26.665 },
+      "RB1": { "x": 56, "y": 26.665 },
+      "WR1": { "x": 60, "y": 10 },
+      "WR2": { "x": 60, "y": 43 },
+      "TE1": { "x": 60, "y": 32 }
+    },
+    "personnel": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 2,
+      "TE": 1,
+      "FB": 0
+    }
+  },
+  "empty": {
+    "name": "Empty Backfield",
+    "positions": {
+      "QB1": { "x": 60, "y": 26.665 },
+      "WR1": { "x": 60, "y": 10 },
+      "WR2": { "x": 60, "y": 20 },
+      "WR3": { "x": 60, "y": 35 },
+      "WR4": { "x": 60, "y": 43 }
+    },
+    "personnel": {
+      "QB": 1,
+      "RB": 0,
+      "WR": 4,
+      "TE": 0,
+      "FB": 0
+    }
+  }
+}

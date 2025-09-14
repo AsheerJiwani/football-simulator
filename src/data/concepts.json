@@ -1,0 +1,90 @@
+{
+  "slant-flat": {
+    "name": "Slant-Flat",
+    "description": "Quick game concept with slant and flat routes to stress underneath coverage",
+    "difficulty": "easy",
+    "formation": "trips-right",
+    "routes": {
+      "WR1": {
+        "type": "slant",
+        "waypoints": [
+          { "x": 60, "y": 45 },
+          { "x": 62, "y": 45 },
+          { "x": 65, "y": 42 }
+        ],
+        "timing": [0, 0.5, 1.0],
+        "depth": 5
+      },
+      "WR2": {
+        "type": "flat",
+        "waypoints": [
+          { "x": 60, "y": 40 },
+          { "x": 61, "y": 40 },
+          { "x": 63, "y": 47 },
+          { "x": 66, "y": 47 }
+        ],
+        "timing": [0, 0.3, 0.9, 1.3],
+        "depth": 3
+      },
+      "WR3": {
+        "type": "go",
+        "waypoints": [
+          { "x": 60, "y": 35 },
+          { "x": 75, "y": 35 },
+          { "x": 85, "y": 35 }
+        ],
+        "timing": [0, 1.8, 3.0],
+        "depth": 25
+      },
+      "RB1": {
+        "type": "flat",
+        "waypoints": [
+          { "x": 58, "y": 26.665 },
+          { "x": 59, "y": 26.665 },
+          { "x": 60, "y": 18 },
+          { "x": 62, "y": 18 }
+        ],
+        "timing": [0, 0.2, 0.9, 1.3],
+        "depth": 2
+      }
+    }
+  },
+  "smash": {
+    "name": "Smash",
+    "description": "High-low concept with corner route over speed out",
+    "difficulty": "medium",
+    "formation": "singleback",
+    "routes": {
+      "WR1": {
+        "type": "out",
+        "waypoints": [
+          { "x": 60, "y": 10 },
+          { "x": 68, "y": 10 },
+          { "x": 70, "y": 5 }
+        ],
+        "timing": [0, 1.2, 1.6],
+        "depth": 10
+      },
+      "WR2": {
+        "type": "comeback",
+        "waypoints": [
+          { "x": 60, "y": 43 },
+          { "x": 72, "y": 43 },
+          { "x": 68, "y": 43 }
+        ],
+        "timing": [0, 1.8, 2.4],
+        "depth": 8
+      },
+      "TE1": {
+        "type": "slant",
+        "waypoints": [
+          { "x": 60, "y": 32 },
+          { "x": 62, "y": 32 },
+          { "x": 64, "y": 29 }
+        ],
+        "timing": [0, 0.4, 0.8],
+        "depth": 4
+      }
+    }
+  }
+}

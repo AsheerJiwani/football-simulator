@@ -1,0 +1,219 @@
+import type { Vector2D } from '@/engine/types';
+
+// Vector Math Utilities for Football Simulator
+
+export const Vector = {
+  // Create a new vector
+  create: (x: number, y: number): Vector2D => ({ x, y }),
+
+  // Vector addition
+  add: (a: Vector2D, b: Vector2D): Vector2D => ({
+    x: a.x + b.x,
+    y: a.y + b.y,
+  }),
+
+  // Vector subtraction
+  subtract: (a: Vector2D, b: Vector2D): Vector2D => ({
+    x: a.x - b.x,
+    y: a.y - b.y,
+  }),
+
+  // Scalar multiplication
+  multiply: (v: Vector2D, scalar: number): Vector2D => ({
+    x: v.x * scalar,
+    y: v.y * scalar,
+  }),
+
+  // Vector magnitude (length)
+  magnitude: (v: Vector2D): number => {
+    return Math.sqrt(v.x * v.x + v.y * v.y);
+  },
+
+  // Vector distance between two points
+  distance: (a: Vector2D, b: Vector2D): number => {
+    const diff = Vector.subtract(b, a);
+    return Vector.magnitude(diff);
+  },
+
+  // Normalize vector to unit length
+  normalize: (v: Vector2D): Vector2D => {
+    const mag = Vector.magnitude(v);
+    if (mag === 0) return { x: 0, y: 0 };
+    return {
+      x: v.x / mag,
+      y: v.y / mag,
+    };
+  },
+
+  // Get direction vector from point A to point B
+  direction: (from: Vector2D, to: Vector2D): Vector2D => {
+    const diff = Vector.subtract(to, from);
+    return Vector.normalize(diff);
+  },
+
+  // Dot product
+  dot: (a: Vector2D, b: Vector2D): number => {
+    return a.x * b.x + a.y * b.y;
+  },
+
+  // Linear interpolation between two vectors
+  lerp: (a: Vector2D, b: Vector2D, t: number): Vector2D => {
+    return {
+      x: a.x + (b.x - a.x) * t,
+      y: a.y + (b.y - a.y) * t,
+    };
+  },
+
+  // Clamp vector magnitude to max length
+  clampMagnitude: (v: Vector2D, maxLength: number): Vector2D => {
+    const mag = Vector.magnitude(v);
+    if (mag <= maxLength) return v;
+    return Vector.multiply(Vector.normalize(v), maxLength);
+  },
+
+  // Zero vector
+  zero: (): Vector2D => ({ x: 0, y: 0 }),
+
+  // Check if two vectors are approximately equal
+  approximately: (a: Vector2D, b: Vector2D, epsilon = 0.001): boolean => {
+    return Math.abs(a.x - b.x) < epsilon && Math.abs(a.y - b.y) < epsilon;
+  },
+};
+
+// Physics and game-specific math utilities
+export const Physics = {
+  // Calculate time for ball to reach target at constant speed
+  timeToReach: (from: Vector2D, to: Vector2D, speed: number): number => {
+    const distance = Vector.distance(from, to);
+    return distance / speed;
+  },
+
+  // Calculate position after time with constant velocity
+  positionAfterTime: (position: Vector2D, velocity: Vector2D, deltaTime: number): Vector2D => {
+    return Vector.add(position, Vector.multiply(velocity, deltaTime));
+  },
+
+  // Check if point is within radius of target
+  isWithinRadius: (point: Vector2D, target: Vector2D, radius: number): boolean => {
+    return Vector.distance(point, target) <= radius;
+  },
+
+  // Calculate separation between two players (useful for openness calculations)
+  separation: (receiver: Vector2D, defender: Vector2D): number => {
+    return Vector.distance(receiver, defender);
+  },
+
+  // Convert separation to openness percentage (closer defender = less open)
+  separationToOpenness: (separation: number, tackleRadius: number): number => {
+    // If defender is within tackle radius, receiver is 0% open
+    if (separation <= tackleRadius) return 0;
+
+    // Use exponential falloff for realistic openness calculation
+    // At tackle radius = 0%, at 5+ yards = ~95% open
+    const normalizedSeparation = Math.max(0, separation - tackleRadius);
+    const openness = 100 * (1 - Math.exp(-normalizedSeparation * 0.8));
+    return Math.min(100, Math.max(0, openness));
+  },
+};
+
+// Field geometry utilities
+export const Field = {
+  // Convert yards to field coordinates (assuming field is 120 yards x 53.33 yards)
+  yardsToCoords: (yardLine: number, hash: number): Vector2D => {
+    // yardLine: 0 = own goal line, 50 = midfield, 100 = opponent goal line
+    // hash: 0 = left sideline, 26.665 = middle, 53.33 = right sideline
+    return {
+      x: yardLine + 10, // Add 10 for end zone
+      y: hash,
+    };
+  },
+
+  // Convert field coordinates back to yard line and hash
+  coordsToYards: (position: Vector2D): { yardLine: number; hash: number } => {
+    return {
+      yardLine: position.x - 10, // Subtract 10 for end zone
+      hash: position.y,
+    };
+  },
+
+  // Check if position is in bounds
+  isInBounds: (position: Vector2D): boolean => {
+    return (
+      position.x >= 0 &&
+      position.x <= 120 &&
+      position.y >= 0 &&
+      position.y <= 53.33
+    );
+  },
+
+  // Check if position is in end zone
+  isInEndZone: (position: Vector2D): boolean => {
+    return position.x <= 10 || position.x >= 110;
+  },
+
+  // Get closest sideline distance
+  distanceToSideline: (position: Vector2D): number => {
+    return Math.min(position.y, 53.33 - position.y);
+  },
+
+  // Clamp position to field bounds
+  clampToField: (position: Vector2D): Vector2D => {
+    return {
+      x: Math.max(0, Math.min(120, position.x)),
+      y: Math.max(0, Math.min(53.33, position.y)),
+    };
+  },
+};
+
+// Random utilities for player variations
+export const Random = {
+  // Random float between min and max
+  range: (min: number, max: number): number => {
+    return min + Math.random() * (max - min);
+  },
+
+  // Random element from array
+  element: <T>(array: T[]): T => {
+    return array[Math.floor(Math.random() * array.length)];
+  },
+
+  // Random boolean with probability
+  chance: (probability: number): boolean => {
+    return Math.random() < probability;
+  },
+
+  // Add slight random variation to a value (within percentage)
+  vary: (value: number, variationPercent: number): number => {
+    const variation = value * variationPercent / 100;
+    return Random.range(value - variation, value + variation);
+  },
+};
+
+// Utility functions for route calculations
+export const Route = {
+  // Calculate total route distance
+  getDistance: (waypoints: Vector2D[]): number => {
+    let totalDistance = 0;
+    for (let i = 1; i < waypoints.length; i++) {
+      totalDistance += Vector.distance(waypoints[i - 1], waypoints[i]);
+    }
+    return totalDistance;
+  },
+
+  // Get position along route at given time
+  getPositionAtTime: (waypoints: Vector2D[], timing: number[], currentTime: number): Vector2D => {
+    if (waypoints.length === 0) return Vector.zero();
+    if (currentTime <= 0) return waypoints[0];
+    if (currentTime >= timing[timing.length - 1]) return waypoints[waypoints.length - 1];
+
+    // Find which segment we're in
+    for (let i = 0; i < timing.length - 1; i++) {
+      if (currentTime >= timing[i] && currentTime <= timing[i + 1]) {
+        const segmentProgress = (currentTime - timing[i]) / (timing[i + 1] - timing[i]);
+        return Vector.lerp(waypoints[i], waypoints[i + 1], segmentProgress);
+      }
+    }
+
+    return waypoints[waypoints.length - 1];
+  },
+};

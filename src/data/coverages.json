@@ -1,0 +1,238 @@
+{
+  "cover-1": {
+    "name": "Cover 1",
+    "type": "cover-1",
+    "safetyCount": 1,
+    "description": "Single high safety with man-to-man coverage underneath",
+    "positions": {
+      "CB1": { "x": 67, "y": 8, "type": "man", "leverage": "outside" },
+      "CB2": { "x": 67, "y": 45, "type": "man", "leverage": "outside" },
+      "CB3": { "x": 64, "y": 38, "type": "man", "leverage": "inside" },
+      "S1": { "x": 74, "y": 26.665, "type": "zone" },
+      "LB1": { "x": 62, "y": 30, "type": "man" },
+      "LB2": { "x": 67, "y": 26.665, "type": "zone" },
+      "LB3": { "x": 62, "y": 23, "type": "man" }
+    },
+    "responsibilities": [
+      {
+        "defenderId": "CB1",
+        "type": "man",
+        "assignment": "WR1"
+      },
+      {
+        "defenderId": "CB2",
+        "type": "man",
+        "assignment": "WR2"
+      },
+      {
+        "defenderId": "CB3",
+        "type": "man",
+        "assignment": "WR3"
+      },
+      {
+        "defenderId": "S1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 80, "y": 26.665 },
+          "width": 53.33,
+          "height": 35,
+          "depth": "deep"
+        }
+      },
+      {
+        "defenderId": "LB1",
+        "type": "man",
+        "assignment": "RB1"
+      },
+      {
+        "defenderId": "LB2",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 67, "y": 26.665 },
+          "width": 12,
+          "height": 8,
+          "depth": "intermediate"
+        }
+      },
+      {
+        "defenderId": "LB3",
+        "type": "spy",
+        "assignment": "QB1"
+      }
+    ]
+  },
+  "cover-2": {
+    "name": "Cover 2",
+    "type": "cover-2",
+    "safetyCount": 2,
+    "description": "Two deep safeties with zone coverage underneath",
+    "positions": {
+      "CB1": { "x": 60, "y": 8, "type": "zone" },
+      "CB2": { "x": 60, "y": 45, "type": "zone" },
+      "S1": { "x": 75, "y": 16, "type": "zone" },
+      "S2": { "x": 75, "y": 37, "type": "zone" },
+      "LB1": { "x": 58, "y": 20, "type": "zone" },
+      "LB2": { "x": 58, "y": 26.665, "type": "zone" },
+      "LB3": { "x": 58, "y": 33, "type": "zone" }
+    },
+    "responsibilities": [
+      {
+        "defenderId": "CB1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 65, "y": 8 },
+          "width": 16,
+          "height": 12,
+          "depth": "shallow"
+        }
+      },
+      {
+        "defenderId": "CB2",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 65, "y": 45 },
+          "width": 16,
+          "height": 12,
+          "depth": "shallow"
+        }
+      },
+      {
+        "defenderId": "S1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 80, "y": 16 },
+          "width": 26.665,
+          "height": 40,
+          "depth": "deep"
+        }
+      },
+      {
+        "defenderId": "S2",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 80, "y": 37 },
+          "width": 26.665,
+          "height": 40,
+          "depth": "deep"
+        }
+      },
+      {
+        "defenderId": "LB1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 65, "y": 20 },
+          "width": 13,
+          "height": 10,
+          "depth": "intermediate"
+        }
+      },
+      {
+        "defenderId": "LB2",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 65, "y": 26.665 },
+          "width": 13,
+          "height": 10,
+          "depth": "intermediate"
+        }
+      },
+      {
+        "defenderId": "LB3",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 65, "y": 33 },
+          "width": 13,
+          "height": 10,
+          "depth": "intermediate"
+        }
+      }
+    ]
+  },
+  "cover-3": {
+    "name": "Cover 3",
+    "type": "cover-3",
+    "safetyCount": 1,
+    "description": "Three deep defenders with zone coverage underneath",
+    "positions": {
+      "CB1": { "x": 75, "y": 8, "type": "zone" },
+      "CB2": { "x": 75, "y": 45, "type": "zone" },
+      "S1": { "x": 75, "y": 26.665, "type": "zone" },
+      "LB1": { "x": 58, "y": 16, "type": "zone" },
+      "LB2": { "x": 58, "y": 26.665, "type": "zone" },
+      "LB3": { "x": 58, "y": 37, "type": "zone" },
+      "LB4": { "x": 62, "y": 20, "type": "zone" }
+    },
+    "responsibilities": [
+      {
+        "defenderId": "CB1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 80, "y": 8 },
+          "width": 17.77,
+          "height": 40,
+          "depth": "deep"
+        }
+      },
+      {
+        "defenderId": "CB2",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 80, "y": 45 },
+          "width": 17.77,
+          "height": 40,
+          "depth": "deep"
+        }
+      },
+      {
+        "defenderId": "S1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 80, "y": 26.665 },
+          "width": 17.77,
+          "height": 40,
+          "depth": "deep"
+        }
+      },
+      {
+        "defenderId": "LB1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 62, "y": 16 },
+          "width": 10,
+          "height": 8,
+          "depth": "shallow"
+        }
+      },
+      {
+        "defenderId": "LB2",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 62, "y": 26.665 },
+          "width": 10,
+          "height": 8,
+          "depth": "shallow"
+        }
+      },
+      {
+        "defenderId": "LB3",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 62, "y": 37 },
+          "width": 10,
+          "height": 8,
+          "depth": "shallow"
+        }
+      },
+      {
+        "defenderId": "LB4",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 68, "y": 26.665 },
+          "width": 20,
+          "height": 12,
+          "depth": "intermediate"
+        }
+      }
+    ]
+  }
+}

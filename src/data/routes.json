@@ -1,0 +1,63 @@
+{
+  "slant": {
+    "type": "slant",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 2, "y": 0 },
+      { "x": 4, "y": 3 }
+    ],
+    "timingSeconds": [0, 0.4, 0.8],
+    "depth": 4
+  },
+  "flat": {
+    "type": "flat",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 1, "y": 0 },
+      { "x": 2, "y": -8 },
+      { "x": 4, "y": -8 }
+    ],
+    "timingSeconds": [0, 0.2, 0.8, 1.2],
+    "depth": 2
+  },
+  "go": {
+    "type": "go",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 15, "y": 0 },
+      { "x": 25, "y": 0 }
+    ],
+    "timingSeconds": [0, 1.8, 3.0],
+    "depth": 25
+  },
+  "out": {
+    "type": "out",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 8, "y": 0 },
+      { "x": 10, "y": 5 }
+    ],
+    "timingSeconds": [0, 1.2, 1.6],
+    "depth": 10
+  },
+  "curl": {
+    "type": "curl",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 10, "y": 0 },
+      { "x": 8, "y": 0 }
+    ],
+    "timingSeconds": [0, 1.5, 2.0],
+    "depth": 8
+  },
+  "comeback": {
+    "type": "comeback",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 12, "y": 0 },
+      { "x": 8, "y": 0 }
+    ],
+    "timingSeconds": [0, 1.8, 2.4],
+    "depth": 8
+  }
+}
