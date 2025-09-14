@@ -5,35 +5,35 @@
     "safetyCount": 1,
     "description": "Single high safety with man-to-man coverage underneath",
     "positions": {
-      "CB1": { "x": 67, "y": 8, "type": "man", "leverage": "outside" },
-      "CB2": { "x": 67, "y": 45, "type": "man", "leverage": "outside" },
-      "CB3": { "x": 64, "y": 38, "type": "man", "leverage": "inside" },
-      "S1": { "x": 74, "y": 26.665, "type": "zone" },
-      "LB1": { "x": 62, "y": 30, "type": "man" },
-      "LB2": { "x": 67, "y": 26.665, "type": "zone" },
-      "LB3": { "x": 62, "y": 23, "type": "man" }
+      "CB1": { "x": 8, "y": 53, "type": "man", "leverage": "outside" },
+      "CB2": { "x": 45, "y": 53, "type": "man", "leverage": "outside" },
+      "CB3": { "x": 38, "y": 56, "type": "man", "leverage": "inside" },
+      "S1": { "x": 26.665, "y": 46, "type": "zone" },
+      "LB1": { "x": 30, "y": 58, "type": "man" },
+      "LB2": { "x": 26.665, "y": 53, "type": "zone" },
+      "LB3": { "x": 23, "y": 58, "type": "man" }
     },
     "responsibilities": [
       {
         "defenderId": "CB1",
         "type": "man",
-        "assignment": "WR1"
+        "target": "WR1"
       },
       {
         "defenderId": "CB2",
         "type": "man",
-        "assignment": "WR2"
+        "target": "WR2"
       },
       {
         "defenderId": "CB3",
         "type": "man",
-        "assignment": "WR3"
+        "target": "WR3"
       },
       {
         "defenderId": "S1",
         "type": "zone",
         "zone": {
-          "center": { "x": 80, "y": 26.665 },
+          "center": { "x": 26.665, "y": 40 },
           "width": 53.33,
           "height": 35,
           "depth": "deep"
@@ -42,13 +42,13 @@
       {
         "defenderId": "LB1",
         "type": "man",
-        "assignment": "RB1"
+        "target": "RB1"
       },
       {
         "defenderId": "LB2",
         "type": "zone",
         "zone": {
-          "center": { "x": 67, "y": 26.665 },
+          "center": { "x": 26.665, "y": 53 },
           "width": 12,
           "height": 8,
           "depth": "intermediate"
@@ -57,7 +57,7 @@
       {
         "defenderId": "LB3",
         "type": "spy",
-        "assignment": "QB1"
+        "target": "QB1"
       }
     ]
   },
@@ -234,5 +234,341 @@
         }
       }
     ]
+  },
+  "cover-4": {
+    "name": "Cover 4 (Quarters)",
+    "type": "cover-4",
+    "safetyCount": 2,
+    "description": "Four-deep, three-under zone coverage with pattern-matching responsibilities",
+    "positions": {
+      "CB1": { "x": 8, "y": 53, "type": "zone", "leverage": "inside" },
+      "CB2": { "x": 45, "y": 53, "type": "zone", "leverage": "inside" },
+      "S1": { "x": 18, "y": 48, "type": "zone" },
+      "S2": { "x": 35, "y": 48, "type": "zone" },
+      "LB1": { "x": 20, "y": 56, "type": "zone" },
+      "LB2": { "x": 26.665, "y": 55, "type": "zone" },
+      "LB3": { "x": 33, "y": 56, "type": "zone" }
+    },
+    "responsibilities": [
+      {
+        "defenderId": "CB1",
+        "type": "zone-match",
+        "zone": {
+          "center": { "x": 8, "y": 40 },
+          "width": 13.33,
+          "height": 40,
+          "depth": "deep"
+        },
+        "matchRules": "Match #1 vertical at 8-12 yards"
+      },
+      {
+        "defenderId": "CB2",
+        "type": "zone-match",
+        "zone": {
+          "center": { "x": 45, "y": 40 },
+          "width": 13.33,
+          "height": 40,
+          "depth": "deep"
+        },
+        "matchRules": "Match #1 vertical at 8-12 yards"
+      },
+      {
+        "defenderId": "S1",
+        "type": "zone-match",
+        "zone": {
+          "center": { "x": 18, "y": 40 },
+          "width": 13.33,
+          "height": 40,
+          "depth": "deep"
+        },
+        "matchRules": "Match #2 vertical, rob #1 if #2 goes under"
+      },
+      {
+        "defenderId": "S2",
+        "type": "zone-match",
+        "zone": {
+          "center": { "x": 35, "y": 40 },
+          "width": 13.33,
+          "height": 40,
+          "depth": "deep"
+        },
+        "matchRules": "Match #2 vertical, rob #1 if #2 goes under"
+      },
+      {
+        "defenderId": "LB1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 13, "y": 54 },
+          "width": 10,
+          "height": 8,
+          "depth": "shallow"
+        }
+      },
+      {
+        "defenderId": "LB2",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 26.665, "y": 52 },
+          "width": 15,
+          "height": 10,
+          "depth": "intermediate"
+        }
+      },
+      {
+        "defenderId": "LB3",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 40, "y": 54 },
+          "width": 10,
+          "height": 8,
+          "depth": "shallow"
+        }
+      }
+    ]
+  },
+  "tampa-2": {
+    "name": "Tampa 2",
+    "type": "tampa-2",
+    "safetyCount": 2,
+    "description": "Modified Cover 2 with Mike linebacker dropping to deep middle third",
+    "positions": {
+      "CB1": { "x": 8, "y": 55, "type": "zone", "leverage": "outside" },
+      "CB2": { "x": 45, "y": 55, "type": "zone", "leverage": "outside" },
+      "S1": { "x": 13, "y": 48, "type": "zone" },
+      "S2": { "x": 40, "y": 48, "type": "zone" },
+      "LB1": { "x": 18, "y": 56, "type": "zone" },
+      "LB2": { "x": 26.665, "y": 55, "type": "zone" },
+      "LB3": { "x": 35, "y": 56, "type": "zone" }
+    },
+    "responsibilities": [
+      {
+        "defenderId": "CB1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 8, "y": 40 },
+          "width": 17.77,
+          "height": 40,
+          "depth": "deep"
+        }
+      },
+      {
+        "defenderId": "CB2",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 45, "y": 40 },
+          "width": 17.77,
+          "height": 40,
+          "depth": "deep"
+        }
+      },
+      {
+        "defenderId": "S1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 13, "y": 52 },
+          "width": 12,
+          "height": 10,
+          "depth": "intermediate"
+        }
+      },
+      {
+        "defenderId": "S2",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 40, "y": 52 },
+          "width": 12,
+          "height": 10,
+          "depth": "intermediate"
+        }
+      },
+      {
+        "defenderId": "LB1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 18, "y": 54 },
+          "width": 10,
+          "height": 8,
+          "depth": "shallow"
+        }
+      },
+      {
+        "defenderId": "LB2",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 26.665, "y": 40 },
+          "width": 17.77,
+          "height": 40,
+          "depth": "deep"
+        },
+        "technique": "tempo-drop"
+      },
+      {
+        "defenderId": "LB3",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 35, "y": 54 },
+          "width": 10,
+          "height": 8,
+          "depth": "shallow"
+        }
+      }
+    ]
+  },
+  "cover-6": {
+    "name": "Cover 6 (Quarter-Quarter-Half)",
+    "type": "cover-6",
+    "safetyCount": 2,
+    "description": "Split field coverage - Cover 4 to field side, Cover 2 to boundary side",
+    "positions": {
+      "CB1": { "x": 8, "y": 55, "type": "zone", "leverage": "outside" },
+      "CB2": { "x": 45, "y": 53, "type": "zone", "leverage": "inside" },
+      "S1": { "x": 13, "y": 48, "type": "zone" },
+      "S2": { "x": 35, "y": 48, "type": "zone" },
+      "LB1": { "x": 18, "y": 56, "type": "zone" },
+      "LB2": { "x": 26.665, "y": 55, "type": "zone" },
+      "LB3": { "x": 35, "y": 56, "type": "zone" }
+    },
+    "splitField": {
+      "fieldSide": "cover-4",
+      "boundarySide": "cover-2"
+    },
+    "responsibilities": [
+      {
+        "defenderId": "CB1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 8, "y": 40 },
+          "width": 26.665,
+          "height": 40,
+          "depth": "deep"
+        },
+        "side": "boundary"
+      },
+      {
+        "defenderId": "CB2",
+        "type": "zone-match",
+        "zone": {
+          "center": { "x": 45, "y": 40 },
+          "width": 13.33,
+          "height": 40,
+          "depth": "deep"
+        },
+        "side": "field",
+        "matchRules": "Match #1 vertical at 8-12 yards"
+      },
+      {
+        "defenderId": "S1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 13, "y": 40 },
+          "width": 26.665,
+          "height": 40,
+          "depth": "deep"
+        },
+        "side": "boundary"
+      },
+      {
+        "defenderId": "S2",
+        "type": "zone-match",
+        "zone": {
+          "center": { "x": 35, "y": 40 },
+          "width": 13.33,
+          "height": 40,
+          "depth": "deep"
+        },
+        "side": "field",
+        "matchRules": "Match #2 vertical, rob #1 if #2 goes under"
+      },
+      {
+        "defenderId": "LB1",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 13, "y": 54 },
+          "width": 10,
+          "height": 8,
+          "depth": "shallow"
+        }
+      },
+      {
+        "defenderId": "LB2",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 26.665, "y": 52 },
+          "width": 15,
+          "height": 10,
+          "depth": "intermediate"
+        }
+      },
+      {
+        "defenderId": "LB3",
+        "type": "zone",
+        "zone": {
+          "center": { "x": 40, "y": 54 },
+          "width": 10,
+          "height": 8,
+          "depth": "shallow"
+        }
+      }
+    ]
+  },
+  "cover-0": {
+    "name": "Cover 0 (Zero Blitz)",
+    "type": "cover-0",
+    "safetyCount": 0,
+    "description": "All-out blitz with pure man coverage and no safety help",
+    "positions": {
+      "CB1": { "x": 8, "y": 60, "type": "man", "leverage": "inside" },
+      "CB2": { "x": 45, "y": 60, "type": "man", "leverage": "inside" },
+      "CB3": { "x": 38, "y": 60, "type": "man", "leverage": "inside" },
+      "S1": { "x": 20, "y": 58, "type": "blitz" },
+      "S2": { "x": 33, "y": 58, "type": "blitz" },
+      "LB1": { "x": 26.665, "y": 57, "type": "blitz" },
+      "LB2": { "x": 23, "y": 58, "type": "man" }
+    },
+    "responsibilities": [
+      {
+        "defenderId": "CB1",
+        "type": "man",
+        "target": "WR1"
+      },
+      {
+        "defenderId": "CB2",
+        "type": "man",
+        "target": "WR2"
+      },
+      {
+        "defenderId": "CB3",
+        "type": "man",
+        "target": "WR3"
+      },
+      {
+        "defenderId": "S1",
+        "type": "blitz",
+        "gap": "A",
+        "side": "strong"
+      },
+      {
+        "defenderId": "S2",
+        "type": "blitz",
+        "gap": "B",
+        "side": "weak"
+      },
+      {
+        "defenderId": "LB1",
+        "type": "blitz",
+        "gap": "A",
+        "side": "weak"
+      },
+      {
+        "defenderId": "LB2",
+        "type": "man",
+        "target": "RB1"
+      }
+    ],
+    "blitzPackage": {
+      "rushers": 6,
+      "coverage": 5,
+      "pressureTiming": "immediate"
+    }
   }
 }

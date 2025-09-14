@@ -83,7 +83,7 @@ Paraphrase; do not include long verbatim text.
 
 Return one Markdown package with the following sections. Keep it concise and implementation-ready.
 
-A) Task & Scope
+A: Task & Scope
 
 Mechanic: (e.g., “Cover 3: Alignment, Rotations (Sky/Buzz), Motion Adjustments, vs 2×2 / 3×1”)
 
@@ -91,7 +91,7 @@ Version: YYYY-MM-DD-v1
 
 Assumptions & constraints: (e.g., 7 in coverage, no OL/DL)
 
-B) Field Model Mapping
+B: Field Model Mapping
 
 Field coords: origin at LOS (0,0); +y = defense end zone; x = sideline→sideline.
 
@@ -99,17 +99,19 @@ Hashes & numbers: give yard offsets to use for align/landmark functions.
 
 Strength call logic: (TE side / 3-surface priority)
 
-C) Alignment Rules (Pre-snap)
+C: Alignment Rules (Pre-snap)
 
 Per position (CB/NCB/S/FS/SS/LB) list:
 
 Depth (yd), leverage (inside/outside), shade (press/soft), split (hash/numbers).
 
+Adjustments based on personnel (2TE/1TE/0TE, 2WR/3WR/4WR, 1RB/2RB/0RB, 0FB/1FB)
+
 2×2 vs 3×1 differences.
 
 Field vs boundary preferences, if any.
 
-D) Post-snap Rules & Rotations
+D: Post-snap Rules & Rotations
 
 Zone drops: curl/flat, hook, deep third/half/quarter landmarks (depth × width).
 
@@ -119,7 +121,7 @@ Rotations: which safety rolls down (Sky vs Buzz), how nickel/corner adjusts.
 
 Motion adjustments: who bumps, who spins/rolls; re-declare strength logic.
 
-E) Constraints for Our Simulator
+E: Constraints for Our Simulator
 
 7 in coverage invariant: if blitzing/spy, specify which role converts (and which zone vacates).
 
@@ -127,7 +129,7 @@ No OL/DL: translate pressure into SackTime heuristic only, not pathing.
 
 Clamp to field: ensure all route/zone landmarks end in-bounds.\
 \
-F) Parameter Table (tunable defaults)
+F: Parameter Table (tunable defaults)
 
 Provide a compact table:
 
@@ -138,7 +140,7 @@ Hook drop depth	8–10 yd	7–10	midpoint hash-to-hash
 Deep third start depth	12–14 yd	12–15	midpoint #1/#2
 Safety split (two-high)	top of hash	1–2 yd inside hash	pre-rotation
 …	…	…	…\
-G) Engine-Ready Rules (pseudo-code)
+G: Engine-Ready Rules (pseudo-code)
 
 Provide if/then mappings that Claude can paste into alignment/assignment functions. Example:
 
@@ -157,7 +159,7 @@ onMotionAcrossLOS(() => {
   recomputeStrength();
   rotateSkyOrBuzzByCall();
 });\
-H) Test Cases (acceptance)
+H: Test Cases (acceptance)
 
 List 3–5 scenarios the main agent can run:
 
@@ -167,13 +169,13 @@ List 3–5 scenarios the main agent can run:
 
 Tampa 2 vs 2×2: MLB carry #3 vertical to 15–20; safeties split halves; corners cloud to flat.
 
-I) Gaps & Risks
+I: Gaps & Risks
 
 Note any disagreements across sources and what default you recommend.
 
 Mark items needing future validation in live playtests.
 
-J) Sources
+J: Sources
 
 Provide full citations with URLs and access dates.
 
@@ -199,7 +201,7 @@ Provide full citations with URLs and access dates.
 
 Input from main agent:
 
-“Implement Cover 3 presets (Sky & Buzz) with motion adjustments vs 2×2 and 3×1. Provide alignments, rotations, and drop landmarks.”
+“Implement Cover 3 presets (Sky & Buzz) with motion adjustments vs 2×2 and 3×1. Provide alignments, adjustments based on personnel, rotations, and drop landmarks.”
 
 Your returned package includes:
 

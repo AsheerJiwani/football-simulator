@@ -1,5 +1,6 @@
 import FieldCanvas from '@/sim/FieldCanvas';
 import ControlsPanel from '@/sim/ControlsPanel';
+import ClientOnly from '@/components/ClientOnly';
 
 export default function SimulatorPage() {
   return (
@@ -15,46 +16,65 @@ export default function SimulatorPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Field Canvas - Takes up 2/3 on large screens */}
-          <div className="lg:col-span-2">
-            <div className="bg-gray-800 p-4 rounded-lg">
-              <h2 className="text-xl font-semibold mb-4 text-center">Field View</h2>
-              <div className="flex justify-center">
-                <FieldCanvas
-                  width={800}
-                  height={400}
-                  className="w-full max-w-4xl"
-                />
-              </div>
-
-              {/* Legend */}
-              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-blue-600 rounded-full border border-blue-800"></div>
-                  <span>Offense</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-red-600 rounded-full border border-red-800"></div>
-                  <span>Defense</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-orange-500 rounded-full"></div>
-                  <span>Ball (Thrown)</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-yellow-400">⭐</span>
-                  <span>Star Player</span>
+        <ClientOnly fallback={
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+              <div className="bg-gray-800 p-4 rounded-lg">
+                <h2 className="text-xl font-semibold mb-4 text-center">Field View</h2>
+                <div className="flex justify-center items-center h-[800px]">
+                  <div className="text-gray-400">Loading simulator...</div>
                 </div>
               </div>
             </div>
+            <div className="lg:col-span-1">
+              <div className="bg-gray-800 p-4 rounded-lg">
+                <h2 className="text-xl font-semibold mb-4">Controls</h2>
+                <div className="text-gray-400">Loading controls...</div>
+              </div>
+            </div>
           </div>
+        }>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Field Canvas - Takes up 2/3 on large screens */}
+            <div className="lg:col-span-2">
+              <div className="bg-gray-800 p-4 rounded-lg">
+                <h2 className="text-xl font-semibold mb-4 text-center">Field View</h2>
+                <div className="flex justify-center">
+                  <FieldCanvas
+                    width={400}
+                    height={800}
+                    className="w-full max-w-md"
+                  />
+                </div>
 
-          {/* Controls Panel - Takes up 1/3 on large screens */}
-          <div className="lg:col-span-1">
-            <ControlsPanel />
+                {/* Legend */}
+                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-blue-600 rounded-full border border-blue-800"></div>
+                    <span>Offense</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-red-600 rounded-full border border-red-800"></div>
+                    <span>Defense</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-orange-500 rounded-full"></div>
+                    <span>Ball (Thrown)</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-yellow-400">⭐</span>
+                    <span>Star Player</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Controls Panel - Takes up 1/3 on large screens */}
+            <div className="lg:col-span-1">
+              <ControlsPanel />
+            </div>
           </div>
-        </div>
+        </ClientOnly>
 
         {/* Stats and Info Section */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">

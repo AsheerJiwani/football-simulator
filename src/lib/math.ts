@@ -116,23 +116,23 @@ export const Physics = {
   },
 };
 
-// Field geometry utilities
+// Field geometry utilities (VERTICAL FIELD: 53.33 yards wide x 120 yards tall)
 export const Field = {
-  // Convert yards to field coordinates (assuming field is 120 yards x 53.33 yards)
+  // Convert yards to field coordinates (vertical field: 53.33 wide x 120 tall)
   yardsToCoords: (yardLine: number, hash: number): Vector2D => {
     // yardLine: 0 = own goal line, 50 = midfield, 100 = opponent goal line
     // hash: 0 = left sideline, 26.665 = middle, 53.33 = right sideline
     return {
-      x: yardLine + 10, // Add 10 for end zone
-      y: hash,
+      x: hash, // Hash marks are now along x-axis (width)
+      y: yardLine + 10, // Yard lines are now along y-axis (length), add 10 for end zone
     };
   },
 
   // Convert field coordinates back to yard line and hash
   coordsToYards: (position: Vector2D): { yardLine: number; hash: number } => {
     return {
-      yardLine: position.x - 10, // Subtract 10 for end zone
-      hash: position.y,
+      yardLine: position.y - 10, // Subtract 10 for end zone
+      hash: position.x,
     };
   },
 
@@ -140,27 +140,27 @@ export const Field = {
   isInBounds: (position: Vector2D): boolean => {
     return (
       position.x >= 0 &&
-      position.x <= 120 &&
+      position.x <= 53.33 &&
       position.y >= 0 &&
-      position.y <= 53.33
+      position.y <= 120
     );
   },
 
   // Check if position is in end zone
   isInEndZone: (position: Vector2D): boolean => {
-    return position.x <= 10 || position.x >= 110;
+    return position.y <= 10 || position.y >= 110;
   },
 
   // Get closest sideline distance
   distanceToSideline: (position: Vector2D): number => {
-    return Math.min(position.y, 53.33 - position.y);
+    return Math.min(position.x, 53.33 - position.x);
   },
 
   // Clamp position to field bounds
   clampToField: (position: Vector2D): Vector2D => {
     return {
-      x: Math.max(0, Math.min(120, position.x)),
-      y: Math.max(0, Math.min(53.33, position.y)),
+      x: Math.max(0, Math.min(53.33, position.x)),
+      y: Math.max(0, Math.min(120, position.y)),
     };
   },
 };

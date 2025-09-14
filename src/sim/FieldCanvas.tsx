@@ -10,19 +10,19 @@ interface FieldCanvasProps {
 }
 
 export default function FieldCanvas({
-  width = 800,
-  height = 400,
+  width = 400,
+  height = 800,
   className = ''
 }: FieldCanvasProps) {
   const players = usePlayers();
   const ball = useBall();
   const gamePhase = useGamePhase();
 
-  // Scale factors for field dimensions
-  // NFL field: 120 yards long × 53.33 yards wide
+  // Scale factors for field dimensions (VERTICAL FIELD)
+  // NFL field: 53.33 yards wide × 120 yards long (vertical)
   // SVG canvas: width × height
-  const scaleX = width / 120;
-  const scaleY = height / 53.33;
+  const scaleX = width / 53.33; // Width represents sideline to sideline
+  const scaleY = height / 120;  // Height represents endzone to endzone
 
   // Convert field coordinates to SVG coordinates
   const fieldToSvg = (fieldX: number, fieldY: number) => ({
@@ -30,7 +30,7 @@ export default function FieldCanvas({
     y: fieldY * scaleY,
   });
 
-  // Render field markings
+  // Render field markings (VERTICAL FIELD)
   const renderFieldMarkings = () => {
     const markings = [];
 
@@ -48,26 +48,26 @@ export default function FieldCanvas({
       />
     );
 
-    // Yard lines every 10 yards
+    // Yard lines every 10 yards (now horizontal lines)
     for (let yard = 10; yard <= 110; yard += 10) {
-      const x = fieldToSvg(yard, 0).x;
+      const y = fieldToSvg(0, yard).y;
       const yardNumber = yard <= 50 ? yard : 110 - yard;
 
       markings.push(
         <g key={`yard-${yard}`}>
-          {/* Main yard line */}
+          {/* Main yard line (horizontal) */}
           <line
-            x1={x}
-            y1={0}
-            x2={x}
-            y2={height}
+            x1={0}
+            y1={y}
+            x2={width}
+            y2={y}
             stroke="#ffffff"
             strokeWidth={yard % 50 === 0 ? "3" : "1"}
           />
           {/* Yard numbers */}
           <text
-            x={x}
-            y={height * 0.2}
+            x={width * 0.1}
+            y={y - 5}
             textAnchor="middle"
             fill="#ffffff"
             fontSize="12"
@@ -76,8 +76,8 @@ export default function FieldCanvas({
             {yardNumber}
           </text>
           <text
-            x={x}
-            y={height * 0.8}
+            x={width * 0.9}
+            y={y - 5}
             textAnchor="middle"
             fill="#ffffff"
             fontSize="12"
@@ -89,38 +89,38 @@ export default function FieldCanvas({
       );
     }
 
-    // Goal lines
-    const goalLine1 = fieldToSvg(10, 0).x;
-    const goalLine2 = fieldToSvg(110, 0).x;
+    // Goal lines (horizontal)
+    const goalLine1 = fieldToSvg(0, 10).y;
+    const goalLine2 = fieldToSvg(0, 110).y;
 
     markings.push(
-      <line key="goal-line-1" x1={goalLine1} y1={0} x2={goalLine1} y2={height} stroke="#ffff00" strokeWidth="2" />,
-      <line key="goal-line-2" x1={goalLine2} y1={0} x2={goalLine2} y2={height} stroke="#ffff00" strokeWidth="2" />
+      <line key="goal-line-1" x1={0} y1={goalLine1} x2={width} y2={goalLine1} stroke="#ffff00" strokeWidth="2" />,
+      <line key="goal-line-2" x1={0} y1={goalLine2} x2={width} y2={goalLine2} stroke="#ffff00" strokeWidth="2" />
     );
 
-    // Hash marks
-    const leftHash = fieldToSvg(0, 18.5).y;
-    const rightHash = fieldToSvg(0, 34.83).y;
-    const centerY = fieldToSvg(0, 26.665).y;
+    // Hash marks (now vertical lines)
+    const leftHash = fieldToSvg(18.5, 0).x;
+    const rightHash = fieldToSvg(34.83, 0).x;
+    const centerX = fieldToSvg(26.665, 0).x;
 
-    // Center line
+    // Center line (vertical)
     markings.push(
       <line
         key="center-line"
-        x1={0}
-        y1={centerY}
-        x2={width}
-        y2={centerY}
+        x1={centerX}
+        y1={0}
+        x2={centerX}
+        y2={height}
         stroke="#ffffff"
         strokeWidth="1"
         strokeDasharray="5,5"
       />
     );
 
-    // Hash mark lines
+    // Hash mark lines (vertical)
     markings.push(
-      <line key="left-hash" x1={0} y1={leftHash} x2={width} y2={leftHash} stroke="#ffffff" strokeWidth="0.5" />,
-      <line key="right-hash" x1={0} y1={rightHash} x2={width} y2={rightHash} stroke="#ffffff" strokeWidth="0.5" />
+      <line key="left-hash" x1={leftHash} y1={0} x2={leftHash} y2={height} stroke="#ffffff" strokeWidth="0.5" />,
+      <line key="right-hash" x1={rightHash} y1={0} x2={rightHash} y2={height} stroke="#ffffff" strokeWidth="0.5" />
     );
 
     return markings;
@@ -286,8 +286,9 @@ export default function FieldCanvas({
 
         if (!zone) return null;
 
-        const zoneX = fieldToSvg(zone.center.x - zone.width/2, zone.center.y - zone.height/2).x;
-        const zoneY = fieldToSvg(zone.center.x - zone.width/2, zone.center.y - zone.height/2).y;
+        const zoneTopLeft = fieldToSvg(zone.center.x - zone.width/2, zone.center.y - zone.height/2);
+        const zoneX = zoneTopLeft.x;
+        const zoneY = zoneTopLeft.y;
         const zoneWidth = zone.width * scaleX;
         const zoneHeight = zone.height * scaleY;
 

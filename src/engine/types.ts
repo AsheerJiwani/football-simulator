@@ -17,8 +17,11 @@ export interface Player {
   maxSpeed: number; // yards per second
   currentSpeed: number;
   isStar: boolean; // +10% speed boost
-  hasMotionBoost: boolean; // temporary speed boost from motion
+  hasMotion: boolean; // player will go in motion pre-snap
+  motionPath?: Vector2D[]; // path to follow during motion
+  hasMotionBoost: boolean; // temporary speed boost from motion at snap
   motionBoostTimeLeft: number; // seconds
+  isBlocking: boolean; // player is pass protecting (RB/TE/FB)
 }
 
 export type PlayerType = 'QB' | 'RB' | 'WR' | 'TE' | 'FB' | 'CB' | 'S' | 'LB' | 'NB';
@@ -68,9 +71,9 @@ export interface Coverage {
 export type CoverageType = 'cover-0' | 'cover-1' | 'cover-2' | 'cover-3' | 'cover-4' | 'cover-6' | 'quarters' | 'tampa-2';
 
 export interface CoverageResponsibility {
-  playerId: string;
+  defenderId: string;
   type: 'man' | 'zone' | 'spy' | 'blitz';
-  target?: string; // player ID for man coverage
+  target?: string; // player ID for man coverage (assignment)
   zone?: Zone; // zone area for zone coverage
 }
 
@@ -78,7 +81,7 @@ export interface Zone {
   center: Vector2D;
   width: number;
   height: number;
-  depth: number; // shallow, intermediate, deep
+  depth: string | number; // shallow, intermediate, deep or numeric depth
 }
 
 export interface GameConfig {
@@ -137,6 +140,13 @@ export interface GameState {
   audiblesUsed: number;
   maxAudibles: number;
   gameMode: 'free-play' | 'challenge';
+  motionPlayer?: string; // ID of player in motion
+  isMotionActive: boolean; // whether motion is currently happening
+  passProtection: {
+    rbBlocking: boolean;
+    teBlocking: boolean;
+    fbBlocking: boolean;
+  };
 }
 
 export type GamePhase = 'pre-snap' | 'post-snap' | 'ball-thrown' | 'play-over';

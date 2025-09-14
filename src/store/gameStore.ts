@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { GameState, PlayConcept, Coverage } from '@/engine/types';
 import { FootballEngine } from '@/engine/Engine';
-import { DataLoader } from '@/lib/dataLoader';
+import { DataLoader, GameData } from '@/lib/dataLoader';
 
 interface GameStore {
   // Engine instance
@@ -30,7 +30,21 @@ interface GameStore {
 }
 
 // Create a separate function to initialize the engine to avoid re-creation
+// Only initialize client-side to avoid SSR issues
 const createInitialEngine = () => {
+  if (typeof window === 'undefined') {
+    // Return minimal server-side state
+    return {
+      engine: null as unknown as FootballEngine,
+      defaults: {
+        concept: 'slant-flat',
+        coverage: 'cover-1',
+        sackTime: 5.0,
+        gameMode: 'free-play' as const
+      }
+    };
+  }
+
   const engine = new FootballEngine();
 
   // Load default data
@@ -51,18 +65,25 @@ const createInitialEngine = () => {
 };
 
 export const useGameStore = create<GameStore>()(
-  (set, get) => {
+  subscribeWithSelector((set, get) => {
     const { engine, defaults } = createInitialEngine();
 
     return {
-      // Initial state
-      engine,
-      selectedConcept: defaults.concept,
-      selectedCoverage: defaults.coverage,
-      sackTime: defaults.sackTime,
-      gameMode: defaults.gameMode,
-      isPlaying: false,
-      gameState: engine.getGameState(),
+        // Initial state
+        engine,
+        selectedConcept: defaults.concept,
+        selectedCoverage: defaults.coverage,
+        sackTime: defaults.sackTime,
+        gameMode: defaults.gameMode,
+        isPlaying: false,
+        gameState: engine?.getGameState() || {
+          phase: 'pre-snap' as const,
+          players: [],
+          ball: { position: { x: 0, y: 0 }, state: 'held' as const },
+          playConcept: null,
+          coverage: null,
+          outcome: null
+        },
 
       // Actions
       setConcept: (conceptName: string) => {
@@ -70,6 +91,7 @@ export const useGameStore = create<GameStore>()(
         if (!concept) return;
 
         const { engine } = get();
+        if (!engine) return;
         engine.setPlayConcept(concept);
 
         set((state) => ({
@@ -84,6 +106,7 @@ export const useGameStore = create<GameStore>()(
         if (!coverage) return;
 
         const { engine } = get();
+        if (!engine) return;
         engine.setCoverage(coverage);
 
         set((state) => ({
@@ -95,6 +118,7 @@ export const useGameStore = create<GameStore>()(
 
       setSackTime: (seconds: number) => {
         const { engine } = get();
+        if (!engine) return;
         engine.setSackTime(seconds);
 
         set((state) => ({
@@ -106,6 +130,7 @@ export const useGameStore = create<GameStore>()(
 
       setGameMode: (mode: 'free-play' | 'challenge') => {
         const { engine } = get();
+        if (!engine) return;
         engine.setGameMode(mode);
 
         set((state) => ({
@@ -117,6 +142,7 @@ export const useGameStore = create<GameStore>()(
 
       snap: () => {
         const { engine } = get();
+        if (!engine) return;
         const success = engine.snap();
 
         if (success) {
@@ -126,26 +152,34 @@ export const useGameStore = create<GameStore>()(
             gameState: engine.getGameState()
           }));
 
-          // Start polling for game state updates during play
-          let pollCount = 0;
-          const maxPolls = 1000; // Prevent infinite polling (about 30 seconds at 33ms)
-
+          // Use a more stable polling mechanism with setInterval
           const pollInterval = setInterval(() => {
-            pollCount++;
             const currentState = engine.getGameState();
 
-            set((state) => ({ ...state, gameState: currentState }));
+            set((state) => {
+              // Only update if state has actually changed
+              if (state.gameState.phase !== currentState.phase ||
+                  state.gameState !== currentState) {
+                return {
+                  ...state,
+                  gameState: currentState,
+                  isPlaying: currentState.phase !== 'play-over'
+                };
+              }
+              return state;
+            });
 
-            if (currentState.phase === 'play-over' || pollCount >= maxPolls) {
-              set((state) => ({ ...state, isPlaying: false }));
+            // Stop polling when play is over
+            if (currentState.phase === 'play-over') {
               clearInterval(pollInterval);
             }
-          }, 100); // Slower polling at 10fps to reduce load
+          }, 16); // ~60fps
         }
       },
 
       throwTo: (receiverId: string) => {
         const { engine } = get();
+        if (!engine) return;
         const success = engine.throwTo(receiverId);
 
         if (success) {
@@ -155,6 +189,7 @@ export const useGameStore = create<GameStore>()(
 
       reset: () => {
         const { engine, selectedConcept, selectedCoverage, sackTime, gameMode } = get();
+        if (!engine) return;
 
         engine.reset();
         engine.setGameMode(gameMode);
@@ -176,6 +211,7 @@ export const useGameStore = create<GameStore>()(
 
       updateGameState: () => {
         const { engine } = get();
+        if (!engine) return;
         set((state) => ({ ...state, gameState: engine.getGameState() }));
       },
     };
@@ -189,9 +225,11 @@ export const usePlayers = () => useGameStore(state => state.gameState.players);
 export const useBall = () => useGameStore(state => state.gameState.ball);
 
 // Computed selectors
-export const usePlayOutcome = () => useGameStore(state => {
-  if (!state.gameState.outcome) return null;
-  const outcome = state.gameState.outcome;
+export const usePlayOutcome = () => useGameStore(state => state.gameState.outcome);
+export const usePlayOutcomeText = () => {
+  const outcome = usePlayOutcome();
+  if (!outcome) return null;
+
   switch (outcome.type) {
     case 'catch':
       return `CATCH: ${outcome.yards} yards (${outcome.openness.toFixed(1)}% open)`;
@@ -206,7 +244,7 @@ export const usePlayOutcome = () => useGameStore(state => {
     default:
       return 'PLAY OVER';
   }
-});
+};
 
 export const useCanSnap = () => useGameStore(state =>
   state.gameState.phase === 'pre-snap' &&
@@ -219,31 +257,26 @@ export const useCanThrow = () => useGameStore(state =>
   state.gameState.ball.state === 'held'
 );
 
-export const useEligibleReceivers = () => useGameStore(state =>
-  state.gameState.players
+export const useEligibleReceivers = () => {
+  const players = useGameStore(state => state.gameState.players);
+  return players
     .filter(player => player.team === 'offense' && player.isEligible)
-    .map(player => player.id)
-);
+    .map(player => player.id);
+};
 
-// Action hooks
-export const useGameActions = () => useGameStore(state => ({
-  setConcept: state.setConcept,
-  setCoverage: state.setCoverage,
-  setSackTime: state.setSackTime,
-  setGameMode: state.setGameMode,
-  snap: state.snap,
-  throwTo: state.throwTo,
-  reset: state.reset,
-}));
+// Action hooks - individual selectors to avoid re-creating objects
+export const useSetConcept = () => useGameStore(state => state.setConcept);
+export const useSetCoverage = () => useGameStore(state => state.setCoverage);
+export const useSetSackTime = () => useGameStore(state => state.setSackTime);
+export const useSetGameMode = () => useGameStore(state => state.setGameMode);
+export const useSnap = () => useGameStore(state => state.snap);
+export const useThrowTo = () => useGameStore(state => state.throwTo);
+export const useReset = () => useGameStore(state => state.reset);
 
-// UI state hooks
-export const useUIState = () => useGameStore(state => ({
-  selectedConcept: state.selectedConcept,
-  selectedCoverage: state.selectedCoverage,
-  sackTime: state.sackTime,
-  gameMode: state.gameMode,
-  isPlaying: state.isPlaying,
-}));
+// UI state hooks - individual selectors to avoid re-creating objects
+export const useSelectedConcept = () => useGameStore(state => state.selectedConcept);
+export const useSelectedCoverage = () => useGameStore(state => state.selectedCoverage);
+export const useSackTime = () => useGameStore(state => state.sackTime);
+export const useGameMode = () => useGameStore(state => state.gameMode);
+export const useIsPlaying = () => useGameStore(state => state.isPlaying);
 
-// Import GameData for the store
-import { GameData } from '@/lib/dataLoader';

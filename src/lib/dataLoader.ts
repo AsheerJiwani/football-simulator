@@ -1,30 +1,58 @@
-import type { PlayConcept, Formation, Coverage } from '@/engine/types';
+import type { PlayConcept, Formation, Coverage, CoverageResponsibility, Zone } from '@/engine/types';
 import formationsData from '@/data/formations.json';
 import conceptsData from '@/data/concepts.json';
 import coveragesData from '@/data/coverages.json';
 
 // Type-safe data loaders for football simulator
 
+interface ConceptJSON {
+  name: string;
+  description: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  formation: string;
+  routes: Record<string, {
+    type: string;
+    waypoints: Array<{ x: number; y: number }>;
+    timing: number[];
+    depth: number;
+  }>;
+}
+
+interface CoverageJSON {
+  name: string;
+  type: string;
+  safetyCount: number;
+  description?: string;
+  responsibilities: Array<{
+    defenderId: string;
+    type: string;
+    target?: string;
+    zone?: Zone;
+  }>;
+}
+
 export const DataLoader = {
   // Get all available formations
   getFormations: (): Record<string, Formation> => {
-    return formationsData as any;
+    return formationsData as Record<string, Formation>;
   },
 
   // Get a specific formation by name
   getFormation: (name: string): Formation | null => {
-    const formation = (formationsData as any)[name];
+    const formations = formationsData as Record<string, Formation>;
+    const formation = formations[name];
     return formation || null;
   },
 
   // Get all play concepts
-  getConcepts: (): Record<string, any> => {
-    return conceptsData as any;
+  getConcepts: (): Record<string, ConceptJSON> => {
+    return conceptsData as Record<string, ConceptJSON>;
   },
 
   // Get a specific play concept with formation data included
   getConcept: (name: string): PlayConcept | null => {
-    const conceptData = (conceptsData as any)[name];
+    const concepts = conceptsData as Record<string, ConceptJSON>;
+    const conceptData = concepts[name];
     if (!conceptData) return null;
 
     const formation = DataLoader.getFormation(conceptData.formation);
@@ -37,25 +65,26 @@ export const DataLoader = {
   },
 
   // Get all available coverages
-  getCoverages: (): Record<string, any> => {
-    return coveragesData as any;
+  getCoverages: (): Record<string, CoverageJSON> => {
+    return coveragesData as Record<string, CoverageJSON>;
   },
 
   // Get a specific coverage by name
   getCoverage: (name: string): Coverage | null => {
-    const coverageData = (coveragesData as any)[name];
+    const coverages = coveragesData as Record<string, CoverageJSON>;
+    const coverageData = coverages[name];
     if (!coverageData) return null;
 
     // Transform the JSON data to match our Coverage interface
     return {
       name: coverageData.name,
-      type: coverageData.type as any,
+      type: coverageData.type as Coverage['type'],
       safetyCount: coverageData.safetyCount,
       description: coverageData.description,
-      responsibilities: coverageData.responsibilities.map((resp: any) => ({
-        playerId: resp.defenderId,
-        type: resp.type,
-        target: resp.assignment,
+      responsibilities: coverageData.responsibilities.map((resp): CoverageResponsibility => ({
+        defenderId: resp.defenderId,
+        type: resp.type as CoverageResponsibility['type'],
+        target: resp.target,
         zone: resp.zone,
       })),
     };
@@ -121,14 +150,16 @@ export const GameData = {
 
   // Get concept difficulty level
   getConceptDifficulty: (conceptName: string): 'easy' | 'medium' | 'hard' | null => {
-    const conceptData = (conceptsData as any)[conceptName];
-    return (conceptData?.difficulty as 'easy' | 'medium' | 'hard') || null;
+    const concepts = conceptsData as Record<string, ConceptJSON>;
+    const conceptData = concepts[conceptName];
+    return conceptData?.difficulty || null;
   },
 
   // Filter concepts by difficulty
   getConceptsByDifficulty: (difficulty: 'easy' | 'medium' | 'hard'): string[] => {
-    return Object.entries(conceptsData)
-      .filter(([_, concept]) => concept.difficulty === difficulty)
-      .map(([name, _]) => name);
+    const concepts = conceptsData as Record<string, ConceptJSON>;
+    return Object.entries(concepts)
+      .filter(([, concept]) => concept.difficulty === difficulty)
+      .map(([name]) => name);
   },
 };

@@ -1,32 +1,44 @@
 'use client';
 
-import { useGameActions, useUIState, useCanSnap, useCanThrow, useEligibleReceivers, usePlayOutcome } from '@/store/gameStore';
+import {
+  useSetConcept,
+  useSetCoverage,
+  useSetSackTime,
+  useSetGameMode,
+  useSnap,
+  useThrowTo,
+  useReset,
+  useSelectedConcept,
+  useSelectedCoverage,
+  useSackTime,
+  useGameMode,
+  useIsPlaying,
+  useCanSnap,
+  useCanThrow,
+  useEligibleReceivers,
+  usePlayOutcomeText
+} from '@/store/gameStore';
 import { DataLoader } from '@/lib/dataLoader';
-import { useState } from 'react';
 
 export default function ControlsPanel() {
-  const {
-    setConcept,
-    setCoverage,
-    setSackTime,
-    setGameMode,
-    snap,
-    throwTo,
-    reset
-  } = useGameActions();
+  const setConcept = useSetConcept();
+  const setCoverage = useSetCoverage();
+  const setSackTime = useSetSackTime();
+  const setGameMode = useSetGameMode();
+  const snap = useSnap();
+  const throwTo = useThrowTo();
+  const reset = useReset();
 
-  const {
-    selectedConcept,
-    selectedCoverage,
-    sackTime,
-    gameMode,
-    isPlaying
-  } = useUIState();
+  const selectedConcept = useSelectedConcept();
+  const selectedCoverage = useSelectedCoverage();
+  const sackTime = useSackTime();
+  const gameMode = useGameMode();
+  const isPlaying = useIsPlaying();
 
   const canSnap = useCanSnap();
   const canThrow = useCanThrow();
   const eligibleReceivers = useEligibleReceivers();
-  const playOutcome = usePlayOutcome();
+  const playOutcome = usePlayOutcomeText();
 
   // Get available options
   const concepts = DataLoader.getConceptNames();
@@ -229,7 +241,7 @@ export default function ControlsPanel() {
             <p>1. Select an offensive play concept (e.g., Slant-Flat)</p>
             <p>2. Choose a defensive coverage (e.g., Cover 1)</p>
             <p>3. Adjust sack time if desired (how long QB has to throw)</p>
-            <p>4. Click "SNAP THE BALL!" to start the play</p>
+            <p>4. Click &quot;SNAP THE BALL!&quot; to start the play</p>
             <p>5. Watch players run their routes, then throw to a receiver</p>
             <p>6. See the outcome based on separation and coverage!</p>
             <p className="text-yellow-400">
