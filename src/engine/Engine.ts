@@ -111,6 +111,7 @@ export class FootballEngine {
 
   public setCoverage(coverage: Coverage): void {
     this.gameState.coverage = coverage;
+    this.gameState.currentCoverage = coverage;
     this.setupDefense();
   }
 
@@ -396,10 +397,7 @@ export class FootballEngine {
     if (!qb) return false;
 
     // Calculate ball trajectory timing
-    const throwDistance = Vector.distance(qb.position, receiver.position);
-    const throwTime = Physics.timeToReach(qb.position, receiver.position, this.config.physics.ballSpeed);
-
-    // TODO: Use throwDistance and throwTime for more realistic ball physics
+    // Ball physics calculations happen in updateBallPhysics
 
     this.gameState.ball = {
       ...this.gameState.ball,
@@ -462,14 +460,17 @@ export class FootballEngine {
 
     this.gameState.timeElapsed += deltaTime;
 
+    // Update player positions first
+    this.updatePlayerPositions(deltaTime);
+
+    // Update sack time based on blocked blitzers (dynamic)
+    this.updateSackTimeForBlockedBlitzers();
+
     // Check for sack
     if (this.gameState.phase === 'post-snap' && this.gameState.timeElapsed >= this.gameState.sackTime) {
       this.endPlay({ type: 'sack', yards: 0, openness: 0, catchProbability: 0 });
       return;
     }
-
-    // Update player positions
-    this.updatePlayerPositions(deltaTime);
 
     // Update ball physics
     this.updateBallPhysics(deltaTime);
@@ -516,14 +517,102 @@ export class FootballEngine {
     });
   }
 
-  private updateBlockingPlayerPosition(player: Player, _deltaTime: number): void {
-    // Blocking players stay near their initial position
-    // They could have slight movement for realism but essentially stay put
-    player.velocity = { x: 0, y: 0 };
-    player.currentSpeed = 0;
-
+  private updateBlockingPlayerPosition(player: Player, deltaTime: number): void {
     // Make them ineligible for pass targets while blocking
     player.isEligible = false;
+
+    // Find same-side blitzers to block
+    const blitzers = this.gameState.players.filter(p =>
+      p.team === 'defense' &&
+      p.coverageResponsibility?.type === 'blitz' &&
+      !this.isBlitzerBlocked(p.id)
+    );
+
+    // Determine which side the blocker is on
+    const blockerSide = player.position.x < 26.665 ? 'left' : 'right';
+
+    // Find closest same-side blitzer
+    let targetBlitzer: Player | undefined;
+    let minDistance = Infinity;
+
+    for (const blitzer of blitzers) {
+      const blitzerSide = blitzer.position.x < 26.665 ? 'left' : 'right';
+      if (blitzerSide === blockerSide) {
+        const distance = Vector.distance(player.position, blitzer.position);
+        if (distance < minDistance) {
+          minDistance = distance;
+          targetBlitzer = blitzer;
+        }
+      }
+    }
+
+    if (targetBlitzer) {
+      // Move toward the blitzer to intercept
+      player.blockingTarget = targetBlitzer.id;
+
+      // Check if we're close enough to block
+      const blockingRadius = 2.0; // yards
+      if (minDistance <= blockingRadius) {
+        // We're blocking them - stop both players
+        player.velocity = { x: 0, y: 0 };
+        player.currentSpeed = 0;
+
+        // Mark the blitzer as blocked (neutralized)
+        targetBlitzer.velocity = { x: 0, y: 0 };
+        targetBlitzer.currentSpeed = 0;
+
+        // Mark blitzer as being blocked for sack time calculations
+        targetBlitzer.isBlocked = true;
+      } else {
+        // Move toward the blitzer
+        const direction = Vector.direction(player.position, targetBlitzer.position);
+        const speed = this.getPlayerSpeed(player.playerType);
+        const movement = Vector.multiply(direction, speed * deltaTime);
+
+        player.velocity = movement;
+        player.position = Vector.add(player.position, movement);
+        player.currentSpeed = speed;
+      }
+    } else {
+      // No blitzer to block - move to the LOS and stop
+      if (!player.blockingPosition) {
+        // Set default position at LOS (y = 60)
+        const offsetX = blockerSide === 'left' ? player.position.x - 2 : player.position.x + 2;
+        player.blockingPosition = {
+          x: offsetX,
+          y: 58 // Just in front of LOS
+        };
+      }
+
+      if (player.blockingPosition) {
+        const distance = Vector.distance(player.position, player.blockingPosition);
+        if (distance > 0.5) {
+          const direction = Vector.direction(player.position, player.blockingPosition);
+          const speed = this.getPlayerSpeed(player.playerType) * 0.5; // Move slower when not chasing
+          const movement = Vector.multiply(direction, speed * deltaTime);
+
+          player.velocity = movement;
+          player.position = Vector.add(player.position, movement);
+          player.currentSpeed = speed;
+        } else {
+          player.velocity = { x: 0, y: 0 };
+          player.currentSpeed = 0;
+        }
+      }
+    }
+  }
+
+  private isBlitzerBlocked(blitzerId: string): boolean {
+    // Check if blitzer is marked as blocked or if any blocker is currently blocking this blitzer
+    const blitzer = this.gameState.players.find(p => p.id === blitzerId);
+    if (blitzer?.isBlocked) return true;
+
+    return this.gameState.players.some(p =>
+      p.team === 'offense' &&
+      p.isBlocking &&
+      p.blockingTarget === blitzerId &&
+      Vector.distance(p.position, blitzer?.position || { x: 0, y: 0 }) <= 2.0
+    );
   }
 
   private updateOffensivePlayerPosition(player: Player, deltaTime: number, speed: number): void {
@@ -545,24 +634,252 @@ export class FootballEngine {
   }
 
   private updateDefensivePlayerPosition(player: Player, deltaTime: number, speed: number): void {
-    // Basic defensive AI - will be expanded later
+    if (!player.coverageResponsibility) return;
+
+    // Get current coverage type from gameState
+    const currentCoverage = this.gameState.currentCoverage || this.gameState.coverage;
+
+    // Execute coverage-specific logic
+    switch (currentCoverage?.name) {
+      case 'Cover 4':
+      case 'Quarters':
+        this.executeCover4PatternMatch(player, deltaTime, speed);
+        break;
+      case 'Tampa 2':
+        this.executeTampa2Coverage(player, deltaTime, speed);
+        break;
+      case 'Cover 6':
+        this.executeCover6SplitField(player, deltaTime, speed);
+        break;
+      case 'Cover 0':
+        this.executeCover0Blitz(player, deltaTime, speed);
+        break;
+      default:
+        // Standard man/zone execution for other coverages
+        this.executeStandardCoverage(player, deltaTime, speed);
+        break;
+    }
+  }
+
+  private executeStandardCoverage(player: Player, deltaTime: number, speed: number): void {
     if (!player.coverageResponsibility) return;
 
     let targetPosition = player.position;
 
     if (player.coverageResponsibility.type === 'man' && player.coverageResponsibility.target) {
-      // Man coverage - follow assigned receiver
       const target = this.gameState.players.find(p => p.id === player.coverageResponsibility?.target);
       if (target) {
         targetPosition = target.position;
       }
     } else if (player.coverageResponsibility.type === 'zone' && player.coverageResponsibility.zone) {
-      // Zone coverage - stay in assigned zone (simplified)
-      targetPosition = player.coverageResponsibility.zone.center;
+      targetPosition = this.getZoneTargetPosition(player);
+    } else if (player.coverageResponsibility.type === 'blitz') {
+      // Blitzing - rush the QB
+      const qb = this.gameState.players.find(p => p.playerType === 'QB');
+      if (qb) {
+        targetPosition = qb.position;
+        speed *= 1.1; // Blitzers get slight speed boost
+      }
     }
 
+    this.moveDefenderToTarget(player, targetPosition, deltaTime, speed);
+  }
+
+  private executeCover4PatternMatch(player: Player, deltaTime: number, speed: number): void {
+    if (!player.coverageResponsibility) return;
+
+    // Cover 4 Quarters with pattern matching
+    const verticalThreshold = 8; // yards downfield triggers man coverage
+
+    if (player.playerType === 'CB' || player.playerType === 'S') {
+      // Find assigned receiver (#1 for CB, #2 for Safety)
+      const assignedReceiver = this.findAssignedReceiver(player);
+
+      if (assignedReceiver) {
+        const routeDepth = assignedReceiver.position.y - 60; // Distance from LOS
+
+        // MOD (Man Only Deep) rules
+        if (routeDepth >= verticalThreshold) {
+          // Switch to man coverage on vertical routes
+          player.coverageResponsibility.type = 'man';
+          player.coverageResponsibility.target = assignedReceiver.id;
+          this.moveDefenderToTarget(player, assignedReceiver.position, deltaTime, speed);
+        } else {
+          // Sink to deep quarter if receiver runs shallow
+          const quarterZone = this.getDeepQuarterZone(player);
+          this.moveDefenderToTarget(player, quarterZone, deltaTime, speed * 0.85);
+        }
+      } else {
+        // No receiver in zone - maintain deep quarter position
+        const quarterZone = this.getDeepQuarterZone(player);
+        this.moveDefenderToTarget(player, quarterZone, deltaTime, speed * 0.7);
+      }
+    } else if (player.playerType === 'LB' || player.playerType === 'NB') {
+      // Underneath defenders - wall off crossers and carry verticals
+      this.executeUndernethCoverage(player, deltaTime, speed);
+    }
+  }
+
+  private executeTampa2Coverage(player: Player, deltaTime: number, speed: number): void {
+    if (!player.coverageResponsibility) return;
+
+    // Tampa 2 - 2 deep safeties, Mike LB drops to deep middle
+    if (player.playerType === 'LB' && player.coverageResponsibility.zone?.name === 'deep-middle') {
+      // Mike LB drops to deep hole between safeties
+      const deepHolePosition = { x: 26.665, y: 75 }; // Middle of field, 15 yards deep
+      this.moveDefenderToTarget(player, deepHolePosition, deltaTime, speed * 1.1);
+    } else if (player.playerType === 'S') {
+      // Safeties play deep halves
+      const isFieldSide = player.position.x > 26.665;
+      const halfZone = {
+        x: isFieldSide ? 40 : 13.33,
+        y: 80 // 20 yards deep
+      };
+      this.moveDefenderToTarget(player, halfZone, deltaTime, speed);
+    } else if (player.playerType === 'CB') {
+      // Corners play aggressive underneath zones
+      const flatZone = this.getFlatZone(player);
+      this.moveDefenderToTarget(player, flatZone, deltaTime, speed);
+    } else {
+      // Other LBs play standard underneath zones
+      this.executeUndernethCoverage(player, deltaTime, speed);
+    }
+  }
+
+  private executeCover6SplitField(player: Player, deltaTime: number, speed: number): void {
+    if (!player.coverageResponsibility) return;
+
+    // Cover 6 - Field side plays quarters, boundary side plays Cover 2
+    const isFieldSide = player.position.x > 26.665;
+
+    if (isFieldSide) {
+      // Field side - play quarters coverage
+      this.executeCover4PatternMatch(player, deltaTime, speed);
+    } else {
+      // Boundary side - play Cover 2 principles
+      if (player.playerType === 'CB') {
+        const flatZone = this.getFlatZone(player);
+        this.moveDefenderToTarget(player, flatZone, deltaTime, speed);
+      } else if (player.playerType === 'S' && player.position.x < 26.665) {
+        // Boundary safety plays deep half
+        const deepHalf = { x: 13.33, y: 80 };
+        this.moveDefenderToTarget(player, deepHalf, deltaTime, speed);
+      } else {
+        this.executeStandardCoverage(player, deltaTime, speed);
+      }
+    }
+  }
+
+  private executeCover0Blitz(player: Player, deltaTime: number, speed: number): void {
+    if (!player.coverageResponsibility) return;
+
+    // Cover 0 - All-out blitz with pure man coverage
+    if (player.coverageResponsibility.type === 'man' && player.coverageResponsibility.target) {
+      // Tight man coverage with no help
+      const target = this.gameState.players.find(p => p.id === player.coverageResponsibility!.target);
+      if (target) {
+        // More aggressive positioning
+        const aggressivePosition = {
+          x: target.position.x,
+          y: target.position.y - 1 // Stay closer
+        };
+        this.moveDefenderToTarget(player, aggressivePosition, deltaTime, speed * 1.05);
+      }
+    } else if (player.coverageResponsibility?.type === 'blitz') {
+      // Aggressive blitz path
+      const qb = this.gameState.players.find(p => p.playerType === 'QB');
+      if (qb) {
+        this.moveDefenderToTarget(player, qb.position, deltaTime, speed * 1.15);
+      }
+    }
+  }
+
+  private executeUndernethCoverage(player: Player, deltaTime: number, speed: number): void {
+    // Find closest threat in underneath zone
+    const threats = this.gameState.players.filter(p =>
+      p.team === 'offense' &&
+      p.isEligible &&
+      Math.abs(p.position.y - 60) < 10 && // Within 10 yards of LOS
+      Vector.distance(player.position, p.position) < 15
+    );
+
+    if (threats.length > 0) {
+      // Cover closest threat
+      const closest = threats.reduce((prev, curr) =>
+        Vector.distance(player.position, prev.position) < Vector.distance(player.position, curr.position) ? prev : curr
+      );
+      this.moveDefenderToTarget(player, closest.position, deltaTime, speed);
+    } else if (player.coverageResponsibility?.zone) {
+      // Return to zone
+      this.moveDefenderToTarget(player, player.coverageResponsibility.zone.center, deltaTime, speed * 0.8);
+    }
+  }
+
+  private findAssignedReceiver(defender: Player): Player | null {
+    // Find receiver based on defender's assignment (#1, #2, #3)
+    const offensivePlayers = this.gameState.players.filter(p =>
+      p.team === 'offense' && p.isEligible
+    ).sort((a, b) => {
+      // Sort by outside-in positioning
+      const isLeft = defender.position.x < 26.665;
+      return isLeft ? a.position.x - b.position.x : b.position.x - a.position.x;
+    });
+
+    // CB covers #1, Safety covers #2
+    const index = defender.playerType === 'CB' ? 0 : 1;
+    return offensivePlayers[index] || null;
+  }
+
+  private getDeepQuarterZone(defender: Player): Vector2D {
+    // Calculate deep quarter zone position
+    const isLeft = defender.position.x < 26.665;
+    return {
+      x: isLeft ? 10 : 43.33, // Near sideline
+      y: 75 // 15 yards deep
+    };
+  }
+
+  private getFlatZone(defender: Player): Vector2D {
+    // Calculate flat zone position
+    const isLeft = defender.position.x < 26.665;
+    return {
+      x: isLeft ? 10 : 43.33,
+      y: 65 // 5 yards deep
+    };
+  }
+
+  private getZoneTargetPosition(player: Player): Vector2D {
+    if (!player.coverageResponsibility?.zone) return player.position;
+
+    // Find closest offensive threat in zone
+    const threatsInZone = this.gameState.players.filter(p => {
+      if (p.team !== 'offense' || !p.isEligible) return false;
+
+      const zone = player.coverageResponsibility!.zone!;
+      const inZone = Math.abs(p.position.x - zone.center.x) <= zone.width / 2 &&
+                     Math.abs(p.position.y - zone.center.y) <= zone.depth / 2;
+      return inZone;
+    });
+
+    if (threatsInZone.length > 0) {
+      // Move toward closest threat in zone
+      const closest = threatsInZone.reduce((prev, curr) =>
+        Vector.distance(player.position, prev.position) < Vector.distance(player.position, curr.position) ? prev : curr
+      );
+      return closest.position;
+    }
+
+    // No threats - return to zone center
+    return player.coverageResponsibility.zone.center;
+  }
+
+  private moveDefenderToTarget(player: Player, targetPosition: Vector2D, deltaTime: number, speed: number): void {
     const direction = Vector.direction(player.position, targetPosition);
-    const maxMovement = speed * deltaTime * 0.9; // Slightly slower reaction
+    const distance = Vector.distance(player.position, targetPosition);
+
+    // Smooth deceleration when close to target
+    const speedMultiplier = distance > 5 ? 1 : distance / 5;
+    const maxMovement = speed * deltaTime * speedMultiplier * 0.9;
 
     player.velocity = Vector.multiply(direction, maxMovement);
     player.position = Vector.add(player.position, player.velocity);
@@ -840,32 +1157,35 @@ export class FootballEngine {
   }
 
   private calculateAdjustedSackTime(): void {
-    // Count blitzing defenders
-    const blitzers = this.gameState.players.filter(player =>
+    // Store original sack time for dynamic adjustments
+    const baseSackTime = this.gameState.sackTime;
+
+    // Count only unblocked blitzing defenders
+    const unblockedBlitzers = this.gameState.players.filter(player =>
       player.team === 'defense' &&
-      player.coverageResponsibility?.type === 'blitz'
+      player.coverageResponsibility?.type === 'blitz' &&
+      !this.isBlitzerBlocked(player.id)
     );
 
-    const blitzerCount = blitzers.length;
+    const unblockedCount = unblockedBlitzers.length;
 
-    if (blitzerCount === 0) {
-      // No adjustment needed
+    if (unblockedCount === 0) {
+      // No unblocked blitzers - no adjustment needed
       return;
     }
 
     // Get base sack time for scaling
-    const baseSackTime = this.gameState.sackTime;
     const maxSackTime = this.config.gameplay.maxSackTime;
 
     // Calculate proportional reduction based on Claude.md specs
     let minReduction = 0;
     let maxReduction = 0;
 
-    if (blitzerCount === 1) {
+    if (unblockedCount === 1) {
       // 1 blitzer: 0.3-2.0s reduction (scaled to sack time)
       minReduction = 0.3;
       maxReduction = 2.0;
-    } else if (blitzerCount >= 2) {
+    } else if (unblockedCount >= 2) {
       // 2+ blitzers: 0.7-4.0s reduction (scaled to sack time)
       minReduction = 0.7;
       maxReduction = 4.0;
@@ -882,6 +1202,22 @@ export class FootballEngine {
 
     // Apply reduction, ensuring sack time doesn't go below 0.5s
     this.gameState.sackTime = Math.max(0.5, baseSackTime - reduction);
+  }
+
+  // Update sack time dynamically during play for newly blocked blitzers
+  private updateSackTimeForBlockedBlitzers(): void {
+    if (this.gameState.phase !== 'post-snap') return;
+
+    // Recalculate based on current blocking status
+    const originalSackTime = this.config.gameplay.defaultSackTime;
+    if (this.gameState.gameMode === 'challenge') {
+      this.gameState.sackTime = this.config.gameplay.challengeModeSackTime;
+    } else {
+      this.gameState.sackTime = originalSackTime;
+    }
+
+    // Reapply adjustments for unblocked blitzers
+    this.calculateAdjustedSackTime();
   }
 
   private getPlayerTypeFromId(playerId: string): PlayerType {

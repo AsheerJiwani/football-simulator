@@ -13,7 +13,7 @@ Movements should be fluid, defender tracking based on man/match/zone concepts hi
 
 Field should be 120 yards long (100 yards + 10 yards for each endzone) & vertical instead of horizontal
 
-Directive: Whenever implementing, modifying, or expanding any NFL mechanic (coverages, alignments, motions, player speeds, ball physics, openness/tackle logic, or new concepts), Claude must first call the Research Subagent to gather factual, cited evidence before coding. For each coverage, the agent should return JSON Structured data describing each positions' role in the coverage system as well as the adjustments made when offensive personnel and formations changes occur.
+Directive: Whenever implementing, modifying, or expanding any NFL mechanic (coverages, alignments, motions, player speeds, ball physics, openness/tackle logic, zone bubbles, or new concepts), Claude must first call the Research Subagent to gather factual, cited evidence before coding. For each coverage, the agent should return JSON Structured data describing each positions' role in the coverage system as well as the adjustments made when offensive personnel and formations changes occur.
 
 Only differences from real NFL:
 
@@ -43,7 +43,7 @@ Sack Time: Slider (2–10s) determines how long QB has before being “sacked.�
 
 Drag-and-Drop Positioning: Place players on default legal anchors along LOS.
 
-Pass Protection: RB/FB/TE may block if aligned properly. In blocking, they should pick up same-side blitzers by running towards them and stopping in front of them, holding them off permanently. if they pick up a blitzer, the blitzer should have no effect on Sack Time. Otherwise, they should simply run towards their blocking position and stop.
+Pass Protection: RB/FB/TE may block if aligned properly. In blocking, they should pick up same-side blitzers by running towards them and stopping in front of them, holding them off permanently. if they pick up a blitzer, the blitzer should have no effect on Sack Time. Otherwise, they should simply run towards the LOS and stop.
 
 Shotgun vs Dropback: QB starts in shotgun (~6 yds deep) or dropback (1 yd → auto drop ~5 yds).
 
@@ -199,7 +199,7 @@ This will prove the full loop works before expanding.
 
 ✅ Coding Guardrails for Claude
 
-Run build and commit to Github when appropriate to ensure no compilation errors
+Commit and push to Github when appropriate to ensure no compilation errors or eslint warnings that prevent compilation or cause "Failed to compile".
 
 Engine stays pure TypeScript: no React imports. Keep deterministic & testable.
 

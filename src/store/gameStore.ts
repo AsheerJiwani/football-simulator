@@ -23,6 +23,9 @@ interface GameStore {
   setCoverage: (coverageName: string) => void;
   setSackTime: (seconds: number) => void;
   setGameMode: (mode: 'free-play' | 'challenge') => void;
+  sendInMotion: (playerId: string) => void;
+  setPassProtection: (rbBlocking: boolean, teBlocking: boolean, fbBlocking: boolean) => void;
+  setAudible: (playerId: string, routeType: string) => void;
   snap: () => void;
   throwTo: (receiverId: string) => void;
   reset: () => void;
@@ -138,6 +141,43 @@ export const useGameStore = create<GameStore>()(
           gameMode: mode,
           gameState: engine.getGameState()
         }));
+      },
+
+      sendInMotion: (playerId: string) => {
+        const { engine } = get();
+        if (!engine) return;
+        const success = engine.sendInMotion(playerId);
+
+        if (success) {
+          set((state) => ({
+            ...state,
+            gameState: engine.getGameState()
+          }));
+        }
+      },
+
+      setPassProtection: (rbBlocking: boolean, teBlocking: boolean, fbBlocking: boolean) => {
+        const { engine } = get();
+        if (!engine) return;
+        engine.setPassProtection(rbBlocking, teBlocking, fbBlocking);
+
+        set((state) => ({
+          ...state,
+          gameState: engine.getGameState()
+        }));
+      },
+
+      setAudible: (playerId: string, routeType: string) => {
+        const { engine } = get();
+        if (!engine) return;
+        const success = engine.audibleRoute(playerId, routeType as any);
+
+        if (success) {
+          set((state) => ({
+            ...state,
+            gameState: engine.getGameState()
+          }));
+        }
       },
 
       snap: () => {
@@ -269,6 +309,9 @@ export const useSetConcept = () => useGameStore(state => state.setConcept);
 export const useSetCoverage = () => useGameStore(state => state.setCoverage);
 export const useSetSackTime = () => useGameStore(state => state.setSackTime);
 export const useSetGameMode = () => useGameStore(state => state.setGameMode);
+export const useSendInMotion = () => useGameStore(state => state.sendInMotion);
+export const useSetPassProtection = () => useGameStore(state => state.setPassProtection);
+export const useSetAudible = () => useGameStore(state => state.setAudible);
 export const useSnap = () => useGameStore(state => state.snap);
 export const useThrowTo = () => useGameStore(state => state.throwTo);
 export const useReset = () => useGameStore(state => state.reset);
@@ -279,4 +322,11 @@ export const useSelectedCoverage = () => useGameStore(state => state.selectedCov
 export const useSackTime = () => useGameStore(state => state.sackTime);
 export const useGameMode = () => useGameStore(state => state.gameMode);
 export const useIsPlaying = () => useGameStore(state => state.isPlaying);
+
+// Game state selectors
+export const useMotionPlayer = () => useGameStore(state => state.gameState.motionPlayer);
+export const useIsMotionActive = () => useGameStore(state => state.gameState.isMotionActive);
+export const usePassProtection = () => useGameStore(state => state.gameState.passProtection);
+export const useAudiblesUsed = () => useGameStore(state => state.gameState.audiblesUsed);
+export const useMaxAudibles = () => useGameStore(state => state.gameState.maxAudibles);
 

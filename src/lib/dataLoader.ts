@@ -1,4 +1,4 @@
-import type { PlayConcept, Formation, Coverage, CoverageResponsibility, Zone } from '@/engine/types';
+import type { PlayConcept, Formation, Coverage, CoverageResponsibility, Zone, Vector2D } from '@/engine/types';
 import formationsData from '@/data/formations.json';
 import conceptsData from '@/data/concepts.json';
 import coveragesData from '@/data/coverages.json';
@@ -27,7 +27,13 @@ interface CoverageJSON {
     defenderId: string;
     type: string;
     target?: string;
-    zone?: Zone;
+    zone?: {
+      name?: string;
+      center: Vector2D;
+      width: number;
+      height: number;
+      depth: string | number; // Can be string like "deep" or number
+    };
   }>;
 }
 
@@ -75,6 +81,17 @@ export const DataLoader = {
     const coverageData = coverages[name];
     if (!coverageData) return null;
 
+    // Helper function to convert depth strings to numbers
+    const convertDepth = (depth: string | number): number => {
+      if (typeof depth === 'number') return depth;
+      switch (depth) {
+        case 'shallow': return 5;
+        case 'intermediate': return 10;
+        case 'deep': return 15;
+        default: return 10;
+      }
+    };
+
     // Transform the JSON data to match our Coverage interface
     return {
       name: coverageData.name,
@@ -85,7 +102,10 @@ export const DataLoader = {
         defenderId: resp.defenderId,
         type: resp.type as CoverageResponsibility['type'],
         target: resp.target,
-        zone: resp.zone,
+        zone: resp.zone ? {
+          ...resp.zone,
+          depth: convertDepth(resp.zone.depth)
+        } : undefined,
       })),
     };
   },

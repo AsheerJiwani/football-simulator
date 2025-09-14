@@ -86,7 +86,7 @@ This document tracks the implementation progress of Phase 4: Expand Content for 
 
 - [ ] **UI Controls**
   - [ ] Add pass protection toggles
-  - [ ] Show blocking assignments visually
+  - [ ] Show blocking assignments visually with "Show Routes" button
   - [ ] Update formation display
 
 ### 6. Blitzer Sack Time Reduction ✅

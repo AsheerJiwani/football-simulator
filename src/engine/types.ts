@@ -22,6 +22,9 @@ export interface Player {
   hasMotionBoost: boolean; // temporary speed boost from motion at snap
   motionBoostTimeLeft: number; // seconds
   isBlocking: boolean; // player is pass protecting (RB/TE/FB)
+  blockingTarget?: string; // ID of defender being blocked
+  blockingPosition?: Vector2D; // default blocking position when no blitzer
+  isBlocked?: boolean; // defender is being blocked (for blitzers)
 }
 
 export type PlayerType = 'QB' | 'RB' | 'WR' | 'TE' | 'FB' | 'CB' | 'S' | 'LB' | 'NB';
@@ -78,10 +81,11 @@ export interface CoverageResponsibility {
 }
 
 export interface Zone {
+  name?: string; // Zone name (e.g., 'deep-middle', 'flat', 'hook')
   center: Vector2D;
   width: number;
   height: number;
-  depth: string | number; // shallow, intermediate, deep or numeric depth
+  depth: number; // numeric depth in yards
 }
 
 export interface GameConfig {
@@ -135,6 +139,7 @@ export interface GameState {
   ball: Ball;
   playConcept?: PlayConcept;
   coverage?: Coverage;
+  currentCoverage?: Coverage; // Current active coverage
   outcome?: PlayOutcome;
   isShowingDefense: boolean;
   audiblesUsed: number;
