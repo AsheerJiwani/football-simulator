@@ -439,6 +439,8 @@ export class FootballEngine {
     player.position = { ...position };
 
     // Realign defense based on new offensive formation
+    // For man coverage, adjust defender positions
+    // For zone coverage, recalculate zone centers
     this.realignDefense();
 
     return true;
@@ -450,6 +452,9 @@ export class FootballEngine {
     const coverage = this.gameState.coverage;
     const offensePlayers = this.gameState.players.filter(p => p.team === 'offense');
     const defensePlayers = this.gameState.players.filter(p => p.team === 'defense');
+
+    // If no defenders exist yet, return (defense not set up)
+    if (defensePlayers.length === 0) return;
 
     // Determine new formation strength (based on receiver positioning)
     const losY = this.gameState.lineOfScrimmage;
@@ -473,8 +478,10 @@ export class FootballEngine {
           const assignedReceiver = offensePlayers.find(p => p.id === defender.coverageAssignment);
           if (assignedReceiver) {
             // Position defender based on receiver's new position
-            const isPress = defender.technique === 'press';
-            const cushion = isPress ? 1 : defender.cushion || 7;
+            // Determine cushion based on defender type and coverage
+            const cushion = defender.playerType === 'CB' ? 7 :
+                           defender.playerType === 'S' ? 12 :
+                           defender.playerType === 'LB' ? 5 : 3;
 
             // Maintain inside/outside leverage
             const leverageOffset = assignedReceiver.position.x < centerX ? -0.5 : 0.5;
@@ -483,23 +490,35 @@ export class FootballEngine {
               x: assignedReceiver.position.x + leverageOffset,
               y: losY + cushion
             };
+
+            // Reset velocity to prevent sliding
+            defender.velocity = { x: 0, y: 0 };
+            defender.currentSpeed = 0;
+
+            // Update coverage responsibility to maintain man assignment
+            if (defender.coverageResponsibility) {
+              defender.coverageResponsibility.target = assignedReceiver.id;
+              defender.coverageResponsibility.type = 'man';
+            }
           }
         }
       });
     } else {
       // Zone coverage - adjust zone responsibilities based on formation
       defensePlayers.forEach(defender => {
-        if (defender.zoneResponsibility) {
-          // Adjust zone positioning based on strong side
-          const zone = defender.zoneResponsibility;
+        if (defender.coverageResponsibility?.zone) {
+          const zone = defender.coverageResponsibility.zone;
+          const originalCenter = { ...zone.center };
 
           // Shift zones toward formation strength
-          if (zone.includes('strong')) {
+          if (zone.name?.includes('strong')) {
             const shiftAmount = strongSide === 'right' ? 3 : -3;
-            defender.position.x += shiftAmount;
-          } else if (zone.includes('weak')) {
+            zone.center.x = originalCenter.x + shiftAmount;
+            defender.position.x = zone.center.x;
+          } else if (zone.name?.includes('weak')) {
             const shiftAmount = strongSide === 'right' ? -3 : 3;
-            defender.position.x += shiftAmount;
+            zone.center.x = originalCenter.x + shiftAmount;
+            defender.position.x = zone.center.x;
           }
 
           // Adjust for bunch formations (receivers close together)
@@ -507,14 +526,21 @@ export class FootballEngine {
           if (bunchedReceivers.length > 0) {
             // Tighten zone coverage near bunch
             const bunchCenter = this.calculateBunchCenter(bunchedReceivers);
-            const distanceToBunch = Math.abs(defender.position.x - bunchCenter.x);
+            const distanceToBunch = Math.abs(zone.center.x - bunchCenter.x);
 
             if (distanceToBunch < 10) {
-              // Move defender closer to bunch
-              const adjustment = (bunchCenter.x - defender.position.x) * 0.3;
-              defender.position.x += adjustment;
+              // Adjust zone center toward bunch
+              const adjustment = (bunchCenter.x - zone.center.x) * 0.3;
+              zone.center.x += adjustment;
+
+              // Also update defender position to reflect new zone center
+              defender.position.x = zone.center.x;
             }
           }
+
+          // Reset velocity to prevent sliding
+          defender.velocity = { x: 0, y: 0 };
+          defender.currentSpeed = 0;
         }
       });
     }
