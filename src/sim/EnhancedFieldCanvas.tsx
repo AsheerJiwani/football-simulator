@@ -97,7 +97,11 @@ export default function EnhancedFieldCanvas({
     const anchor = anchors.find(a => a.id === anchorId);
 
     if (anchor && !occupiedAnchors.has(anchorId)) {
+      // Update the custom position which will trigger engine update
       setCustomPosition(playerId, anchor.position);
+
+      // Trigger defensive realignment after offensive position change
+      // This will be handled by the engine when updatePlayerPosition is called
 
       // Validate formation
       const offensePlayers = players

@@ -92,11 +92,59 @@ export function generateFormationAnchors(
     });
   });
 
+  // Add stacking positions for each LOS receiver position (1 yard behind)
+  // These allow for bunched formations, trips, and stacks
+  losPositions.forEach((pos, i) => {
+    // Skip center position for stacking
+    if (i === 3) return;
+
+    // Direct stack (1 yard behind)
+    anchors.push({
+      id: `stack-${i}-behind`,
+      position: { x: pos.x, y: losY - 1 },
+      type: 'slot',
+      isValid: true,
+      isOccupied: false
+    });
+
+    // Stack behind and left (for bunch formations)
+    if (pos.x > 5) { // Ensure we don't go out of bounds
+      anchors.push({
+        id: `stack-${i}-behind-left`,
+        position: { x: pos.x - 1, y: losY - 1 },
+        type: 'slot',
+        isValid: true,
+        isOccupied: false
+      });
+    }
+
+    // Stack behind and right (for bunch formations)
+    if (pos.x < 48) { // Ensure we don't go out of bounds
+      anchors.push({
+        id: `stack-${i}-behind-right`,
+        position: { x: pos.x + 1, y: losY - 1 },
+        type: 'slot',
+        isValid: true,
+        isOccupied: false
+      });
+    }
+
+    // Additional depth stacking (2 yards behind for deeper routes)
+    anchors.push({
+      id: `stack-${i}-deep`,
+      position: { x: pos.x, y: losY - 2 },
+      type: 'slot',
+      isValid: true,
+      isOccupied: false
+    });
+  });
+
   // Backfield positions (RB, FB)
   const backfieldPositions = [
     { x: 26.665 + hashOffset, y: losY - 5 },  // Behind QB
     { x: 20 + hashOffset, y: losY - 7 },       // Offset back left
     { x: 33 + hashOffset, y: losY - 7 },       // Offset back right
+    { x: 26.665 + hashOffset, y: losY - 3 },  // Pistol RB position
   ];
 
   backfieldPositions.forEach((pos, i) => {
@@ -109,15 +157,17 @@ export function generateFormationAnchors(
     });
   });
 
-  // Slot positions (just off LOS)
+  // Slot positions (just off LOS) - Additional flexibility
   const slotPositions = [
-    { x: 12 + hashOffset, y: losY - 1 },
-    { x: 41 + hashOffset, y: losY - 1 },
+    { x: 12 + hashOffset, y: losY - 1.5 },
+    { x: 41 + hashOffset, y: losY - 1.5 },
+    { x: 8 + hashOffset, y: losY - 1 },  // Wide slot left
+    { x: 45 + hashOffset, y: losY - 1 }, // Wide slot right
   ];
 
   slotPositions.forEach((pos, i) => {
     anchors.push({
-      id: `slot-${i}`,
+      id: `slot-flex-${i}`,
       position: { x: pos.x, y: pos.y },
       type: 'slot',
       isValid: true,

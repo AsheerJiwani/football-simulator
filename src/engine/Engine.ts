@@ -435,8 +435,121 @@ export class FootballEngine {
     const player = this.gameState.players.find(p => p.id === playerId);
     if (!player || player.team !== 'offense') return false;
 
+    // Update the player's position
     player.position = { ...position };
+
+    // Realign defense based on new offensive formation
+    this.realignDefense();
+
     return true;
+  }
+
+  private realignDefense(): void {
+    if (!this.gameState.coverage) return;
+
+    const coverage = this.gameState.coverage;
+    const offensePlayers = this.gameState.players.filter(p => p.team === 'offense');
+    const defensePlayers = this.gameState.players.filter(p => p.team === 'defense');
+
+    // Determine new formation strength (based on receiver positioning)
+    const losY = this.gameState.lineOfScrimmage;
+    const centerX = 26.665;
+
+    const leftReceivers = offensePlayers.filter(p =>
+      p.isEligible && p.position.x < centerX - 5
+    ).length;
+
+    const rightReceivers = offensePlayers.filter(p =>
+      p.isEligible && p.position.x > centerX + 5
+    ).length;
+
+    const strongSide: 'left' | 'right' = rightReceivers > leftReceivers ? 'right' : 'left';
+
+    // Realign based on coverage type
+    if (coverage.type === 'cover-1' || coverage.type === 'cover-0') {
+      // Man coverage - realign defenders to follow their assigned receivers
+      defensePlayers.forEach(defender => {
+        if (defender.coverageAssignment) {
+          const assignedReceiver = offensePlayers.find(p => p.id === defender.coverageAssignment);
+          if (assignedReceiver) {
+            // Position defender based on receiver's new position
+            const isPress = defender.technique === 'press';
+            const cushion = isPress ? 1 : defender.cushion || 7;
+
+            // Maintain inside/outside leverage
+            const leverageOffset = assignedReceiver.position.x < centerX ? -0.5 : 0.5;
+
+            defender.position = {
+              x: assignedReceiver.position.x + leverageOffset,
+              y: losY + cushion
+            };
+          }
+        }
+      });
+    } else {
+      // Zone coverage - adjust zone responsibilities based on formation
+      defensePlayers.forEach(defender => {
+        if (defender.zoneResponsibility) {
+          // Adjust zone positioning based on strong side
+          const zone = defender.zoneResponsibility;
+
+          // Shift zones toward formation strength
+          if (zone.includes('strong')) {
+            const shiftAmount = strongSide === 'right' ? 3 : -3;
+            defender.position.x += shiftAmount;
+          } else if (zone.includes('weak')) {
+            const shiftAmount = strongSide === 'right' ? -3 : 3;
+            defender.position.x += shiftAmount;
+          }
+
+          // Adjust for bunch formations (receivers close together)
+          const bunchedReceivers = this.detectBunchFormation(offensePlayers);
+          if (bunchedReceivers.length > 0) {
+            // Tighten zone coverage near bunch
+            const bunchCenter = this.calculateBunchCenter(bunchedReceivers);
+            const distanceToBunch = Math.abs(defender.position.x - bunchCenter.x);
+
+            if (distanceToBunch < 10) {
+              // Move defender closer to bunch
+              const adjustment = (bunchCenter.x - defender.position.x) * 0.3;
+              defender.position.x += adjustment;
+            }
+          }
+        }
+      });
+    }
+  }
+
+  private detectBunchFormation(offensePlayers: Player[]): Player[] {
+    const receivers = offensePlayers.filter(p => p.isEligible);
+    const bunched: Player[] = [];
+
+    // Check for receivers within 3 yards of each other
+    for (let i = 0; i < receivers.length; i++) {
+      for (let j = i + 1; j < receivers.length; j++) {
+        const distance = Math.sqrt(
+          Math.pow(receivers[i].position.x - receivers[j].position.x, 2) +
+          Math.pow(receivers[i].position.y - receivers[j].position.y, 2)
+        );
+
+        if (distance < 3) {
+          if (!bunched.includes(receivers[i])) bunched.push(receivers[i]);
+          if (!bunched.includes(receivers[j])) bunched.push(receivers[j]);
+        }
+      }
+    }
+
+    return bunched;
+  }
+
+  private calculateBunchCenter(players: Player[]): Vector2D {
+    const sumX = players.reduce((sum, p) => sum + p.position.x, 0);
+    const sumY = players.reduce((sum, p) => sum + p.position.y, 0);
+
+    return {
+      x: sumX / players.length,
+      y: sumY / players.length
+    };
   }
 
   public audibleRoute(playerId: string, newRouteType: RouteType): boolean {
