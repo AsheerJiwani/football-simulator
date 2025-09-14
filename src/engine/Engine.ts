@@ -468,8 +468,8 @@ export class FootballEngine {
       case 'slant':
         baseRoute.waypoints = [
           startPos,
-          { x: startPos.x, y: startPos.y - 2 },
-          { x: startPos.x - 5, y: startPos.y - 5 }
+          { x: startPos.x, y: startPos.y + 2 },
+          { x: startPos.x - 5, y: startPos.y + 5 }
         ];
         baseRoute.timing = [0, 0.5, 1.0];
         baseRoute.depth = 5;
@@ -478,8 +478,8 @@ export class FootballEngine {
       case 'go':
         baseRoute.waypoints = [
           startPos,
-          { x: startPos.x, y: startPos.y - 15 },
-          { x: startPos.x, y: startPos.y - 30 }
+          { x: startPos.x, y: startPos.y + 15 },
+          { x: startPos.x, y: startPos.y + 30 }
         ];
         baseRoute.timing = [0, 1.8, 3.5];
         baseRoute.depth = 30;
@@ -488,8 +488,8 @@ export class FootballEngine {
       case 'out':
         baseRoute.waypoints = [
           startPos,
-          { x: startPos.x, y: startPos.y - 8 },
-          { x: startPos.x + 5, y: startPos.y - 10 }
+          { x: startPos.x, y: startPos.y + 8 },
+          { x: startPos.x + 5, y: startPos.y + 10 }
         ];
         baseRoute.timing = [0, 1.2, 1.6];
         baseRoute.depth = 10;
@@ -498,8 +498,8 @@ export class FootballEngine {
       case 'in':
         baseRoute.waypoints = [
           startPos,
-          { x: startPos.x, y: startPos.y - 8 },
-          { x: startPos.x - 5, y: startPos.y - 10 }
+          { x: startPos.x, y: startPos.y + 8 },
+          { x: startPos.x - 5, y: startPos.y + 10 }
         ];
         baseRoute.timing = [0, 1.2, 1.6];
         baseRoute.depth = 10;
@@ -508,8 +508,8 @@ export class FootballEngine {
       case 'curl':
         baseRoute.waypoints = [
           startPos,
-          { x: startPos.x, y: startPos.y - 12 },
-          { x: startPos.x, y: startPos.y - 10 }
+          { x: startPos.x, y: startPos.y + 12 },
+          { x: startPos.x, y: startPos.y + 10 }
         ];
         baseRoute.timing = [0, 1.5, 2.0];
         baseRoute.depth = 10;
@@ -518,9 +518,9 @@ export class FootballEngine {
       case 'flat':
         baseRoute.waypoints = [
           startPos,
-          { x: startPos.x, y: startPos.y - 1 },
-          { x: startPos.x + 8, y: startPos.y - 2 },
-          { x: startPos.x + 8, y: startPos.y - 4 }
+          { x: startPos.x, y: startPos.y + 1 },
+          { x: startPos.x + 8, y: startPos.y + 2 },
+          { x: startPos.x + 8, y: startPos.y + 4 }
         ];
         baseRoute.timing = [0, 0.2, 0.9, 1.3];
         baseRoute.depth = 3;
@@ -529,8 +529,8 @@ export class FootballEngine {
       case 'post':
         baseRoute.waypoints = [
           startPos,
-          { x: startPos.x, y: startPos.y - 8 },
-          { x: startPos.x - 3, y: startPos.y - 18 }
+          { x: startPos.x, y: startPos.y + 8 },
+          { x: startPos.x - 3, y: startPos.y + 18 }
         ];
         baseRoute.timing = [0, 1.3, 2.5];
         baseRoute.depth = 18;
@@ -539,8 +539,8 @@ export class FootballEngine {
       case 'comeback':
         baseRoute.waypoints = [
           startPos,
-          { x: startPos.x, y: startPos.y - 12 },
-          { x: startPos.x, y: startPos.y - 8 }
+          { x: startPos.x, y: startPos.y + 12 },
+          { x: startPos.x, y: startPos.y + 8 }
         ];
         baseRoute.timing = [0, 1.8, 2.4];
         baseRoute.depth = 8;
@@ -549,8 +549,8 @@ export class FootballEngine {
       case 'fade':
         baseRoute.waypoints = [
           startPos,
-          { x: startPos.x + 2, y: startPos.y - 10 },
-          { x: startPos.x + 3, y: startPos.y - 20 }
+          { x: startPos.x + 2, y: startPos.y + 10 },
+          { x: startPos.x + 3, y: startPos.y + 20 }
         ];
         baseRoute.timing = [0, 1.5, 3.0];
         baseRoute.depth = 20;
@@ -812,7 +812,7 @@ export class FootballEngine {
         const offsetX = blockerSide === 'left' ? player.position.x - 2 : player.position.x + 2;
         player.blockingPosition = {
           x: offsetX,
-          y: this.gameState.lineOfScrimmage - 2 // Just in front of LOS
+          y: this.gameState.lineOfScrimmage + 2 // Just upfield from LOS
         };
       }
 
@@ -958,14 +958,14 @@ export class FootballEngine {
     // Tampa 2 - 2 deep safeties, Mike LB drops to deep middle
     if (player.playerType === 'LB' && player.coverageResponsibility.zone?.name === 'deep-middle') {
       // Mike LB drops to deep hole between safeties
-      const deepHolePosition = { x: 26.665, y: 75 }; // Middle of field, 15 yards deep
+      const deepHolePosition = { x: 26.665, y: this.gameState.lineOfScrimmage + 15 }; // Middle of field, 15 yards deep from LOS
       this.moveDefenderToTarget(player, deepHolePosition, deltaTime, speed * 1.1);
     } else if (player.playerType === 'S') {
       // Safeties play deep halves
       const isFieldSide = player.position.x > 26.665;
       const halfZone = {
         x: isFieldSide ? 40 : 13.33,
-        y: 80 // 20 yards deep
+        y: this.gameState.lineOfScrimmage + 20 // 20 yards deep from LOS
       };
       this.moveDefenderToTarget(player, halfZone, deltaTime, speed);
     } else if (player.playerType === 'CB') {
@@ -994,7 +994,7 @@ export class FootballEngine {
         this.moveDefenderToTarget(player, flatZone, deltaTime, speed);
       } else if (player.playerType === 'S' && player.position.x < 26.665) {
         // Boundary safety plays deep half
-        const deepHalf = { x: 13.33, y: 80 };
+        const deepHalf = { x: 13.33, y: this.gameState.lineOfScrimmage + 20 };
         this.moveDefenderToTarget(player, deepHalf, deltaTime, speed);
       } else {
         this.executeStandardCoverage(player, deltaTime, speed);
@@ -1013,7 +1013,7 @@ export class FootballEngine {
         // More aggressive positioning
         const aggressivePosition = {
           x: target.position.x,
-          y: target.position.y - 1 // Stay closer
+          y: target.position.y + 1 // Stay closer on defensive side
         };
         this.moveDefenderToTarget(player, aggressivePosition, deltaTime, speed * 1.05);
       }
@@ -1067,7 +1067,7 @@ export class FootballEngine {
     const isLeft = defender.position.x < 26.665;
     return {
       x: isLeft ? 10 : 43.33, // Near sideline
-      y: 75 // 15 yards deep
+      y: this.gameState.lineOfScrimmage + 15 // 15 yards deep from LOS
     };
   }
 
@@ -1076,7 +1076,7 @@ export class FootballEngine {
     const isLeft = defender.position.x < 26.665;
     return {
       x: isLeft ? 10 : 43.33,
-      y: 65 // 5 yards deep
+      y: this.gameState.lineOfScrimmage + 5 // 5 yards deep from LOS
     };
   }
 

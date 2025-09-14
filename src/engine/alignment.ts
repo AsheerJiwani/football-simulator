@@ -184,7 +184,7 @@ export function getCover1Cornerback(receiver: Player, leverage: Leverage, los: n
 
   return {
     x: receiver.position.x + xOffset,
-    y: receiver.position.y - depth, // Behind receiver
+    y: receiver.position.y + depth, // In front of receiver (defensive side)
   };
 }
 
@@ -197,7 +197,7 @@ export function getCover1StrongSafety(targetReceiver: Player, _los: number): Vec
   // 2 yards outside the target receiver
   return {
     x: targetReceiver.position.x + 2,
-    y: targetReceiver.position.y - depth,
+    y: targetReceiver.position.y + depth,
   };
 }
 
@@ -218,7 +218,7 @@ export function getCover1Linebacker(targetReceiver: Player, los: number, role: '
   // Coverage linebacker aligns over target
   return {
     x: targetReceiver.position.x,
-    y: targetReceiver.position.y - depth,
+    y: targetReceiver.position.y + depth,
   };
 }
 
@@ -736,7 +736,7 @@ export function generateCover0Alignment(
           const receiver = sortedReceivers[cbIdx++];
           positions[defender.id] = {
             x: receiver.position.x,
-            y: receiver.position.y - 1 // Press coverage
+            y: receiver.position.y + 1 // Press coverage (on defensive side)
           };
         }
         break;
@@ -760,7 +760,7 @@ export function generateCover0Alignment(
           if (rb) {
             positions[defender.id] = {
               x: rb.position.x,
-              y: rb.position.y - 2
+              y: rb.position.y + 2
             };
           } else {
             positions[defender.id] = { x: 23, y: los + 2 };
