@@ -273,6 +273,181 @@ export default function EnhancedFieldCanvas({
     return markings;
   };
 
+  // Render the ball with proper states and trajectory
+  const renderBall = (ball: Ball) => {
+    const position = fieldToSvg(ball.position.x, ball.position.y);
+
+    let ballColor = '#8B4513'; // Brown for held ball
+    let ballSize = 4;
+
+    if (ball.state === 'thrown') {
+      ballColor = '#FF4500'; // Orange for thrown ball
+      ballSize = 6;
+    } else if (ball.state === 'caught') {
+      ballColor = '#32CD32'; // Green for caught ball
+    } else if (ball.state === 'incomplete' || ball.state === 'intercepted') {
+      ballColor = '#DC143C'; // Red for incomplete/intercepted
+    }
+
+    return (
+      <g key="ball">
+        <circle
+          cx={position.x}
+          cy={position.y}
+          r={ballSize}
+          fill={ballColor}
+          stroke="#000000"
+          strokeWidth="1"
+        />
+        {/* Ball trajectory line for thrown balls */}
+        {ball.state === 'thrown' && ball.targetPlayer && (
+          <g>
+            {/* Find target player and draw trajectory line */}
+            {players
+              .filter(p => p.id === ball.targetPlayer)
+              .map(target => {
+                const targetPos = fieldToSvg(target.position.x, target.position.y);
+                return (
+                  <line
+                    key="trajectory"
+                    x1={position.x}
+                    y1={position.y}
+                    x2={targetPos.x}
+                    y2={targetPos.y}
+                    stroke="#FF4500"
+                    strokeWidth="2"
+                    strokeDasharray="4,4"
+                    opacity="0.7"
+                  />
+                );
+              })}
+          </g>
+        )}
+      </g>
+    );
+  };
+
+  // Render route paths for offensive players
+  const renderRoutes = () => {
+    if (!isShowingRoutes) return null;
+
+    return players
+      .filter(player => player.team === 'offense' && player.isEligible)
+      .map(player => {
+        // Get the route from the player object (includes audibles and adjustments)
+        const route = player.route;
+        if (!route || !route.waypoints || route.waypoints.length === 0) return null;
+
+        // Start from player's current position (accounts for motion)
+        const startPos = fieldToSvg(player.position.x, player.position.y);
+
+        // Transform route waypoints to display coordinates
+        const pathPoints = route.waypoints.map(waypoint =>
+          fieldToSvg(waypoint.x, waypoint.y)
+        );
+
+        // Add continuation path after final waypoint
+        if (route.waypoints.length >= 2) {
+          const lastWaypoint = route.waypoints[route.waypoints.length - 1];
+          const secondLastWaypoint = route.waypoints[route.waypoints.length - 2];
+
+          // Calculate direction from second-to-last to last waypoint
+          const dx = lastWaypoint.x - secondLastWaypoint.x;
+          const dy = lastWaypoint.y - secondLastWaypoint.y;
+          const magnitude = Math.sqrt(dx * dx + dy * dy);
+
+          if (magnitude > 0) {
+            const dirX = dx / magnitude;
+            const dirY = dy / magnitude;
+
+            // Extend the route 30 yards in the same direction or to boundary
+            let endX = lastWaypoint.x + dirX * 30;
+            let endY = lastWaypoint.y + dirY * 30;
+
+            // Clamp to field boundaries
+            endX = Math.max(0, Math.min(53.33, endX));
+            endY = Math.max(lastWaypoint.y, Math.min(120, endY));
+
+            // Add the continuation point
+            const continuationPoint = fieldToSvg(endX, endY);
+            pathPoints.push(continuationPoint);
+          }
+        }
+
+        // Create SVG path string
+        let pathString = `M ${startPos.x} ${startPos.y}`;
+        pathPoints.forEach(point => {
+          pathString += ` L ${point.x} ${point.y}`;
+        });
+
+        return (
+          <g key={`route-${player.id}`}>
+            <path
+              d={pathString}
+              stroke="#00FF00"
+              strokeWidth="2"
+              strokeDasharray="4,2"
+              fill="none"
+              opacity="0.7"
+            />
+            {/* Add route depth indicator at the final break point */}
+            {pathPoints.length >= 1 && (
+              <circle
+                cx={pathPoints[pathPoints.length - 2]?.x || pathPoints[0].x}
+                cy={pathPoints[pathPoints.length - 2]?.y || pathPoints[0].y}
+                r="4"
+                fill="#00FF00"
+                opacity="0.8"
+              />
+            )}
+            {/* Add starting position indicator */}
+            <circle
+              cx={startPos.x}
+              cy={startPos.y}
+              r="3"
+              fill="#00FF00"
+              opacity="0.6"
+            />
+          </g>
+        );
+      });
+  };
+
+  // Render coverage zones for defense
+  const renderCoverageZones = () => {
+    if (!isShowingDefense) return null;
+
+    return players
+      .filter(player =>
+        player.team === 'defense' &&
+        player.coverageResponsibility?.type === 'zone'
+      )
+      .map(player => {
+        const zone = player.coverageResponsibility?.zone;
+        if (!zone) return null;
+
+        const zoneTopLeft = fieldToSvg(zone.center.x - zone.width/2, zone.center.y - zone.height/2);
+        const zoneX = zoneTopLeft.x;
+        const zoneY = zoneTopLeft.y;
+        const zoneWidth = zone.width * scaleX;
+        const zoneHeight = zone.height * scaleY;
+
+        return (
+          <rect
+            key={`zone-${player.id}`}
+            x={zoneX}
+            y={zoneY}
+            width={zoneWidth}
+            height={zoneHeight}
+            fill="rgba(255, 0, 0, 0.1)"
+            stroke="#cc0000"
+            strokeWidth="1"
+            strokeDasharray="3,3"
+          />
+        );
+      });
+  };
+
   // Enhanced player rendering
   const renderEnhancedPlayer = (player: Player) => {
     const position = fieldToSvg(player.position.x, player.position.y);
@@ -392,29 +567,11 @@ export default function EnhancedFieldCanvas({
             />
           )}
 
+          {/* Coverage zones (behind players) */}
+          {renderCoverageZones()}
+
           {/* Routes */}
-          {isShowingRoutes && gameState.playConcept && players
-            .filter(p => p.team === 'offense' && p.isEligible)
-            .map(player => {
-              const route = gameState.playConcept?.routes[player.id];
-              if (!route?.waypoints) return null;
-
-              const startPos = fieldToSvg(player.position.x, player.position.y);
-              const pathPoints = route.waypoints.map(w => fieldToSvg(w.x, w.y));
-              const pathString = `M ${startPos.x} ${startPos.y} ${pathPoints.map(p => `L ${p.x} ${p.y}`).join(' ')}`;
-
-              return (
-                <path
-                  key={`route-${player.id}`}
-                  d={pathString}
-                  stroke="#00ff00"
-                  strokeWidth="3"
-                  strokeDasharray="6,3"
-                  fill="none"
-                  opacity="0.7"
-                />
-              );
-            })}
+          {renderRoutes()}
 
           {/* Players */}
           {players.map((player) => (
@@ -424,15 +581,18 @@ export default function EnhancedFieldCanvas({
           ))}
 
           {/* Ball */}
-          <circle
-            cx={fieldToSvg(ball.position.x, ball.position.y).x}
-            cy={fieldToSvg(ball.position.x, ball.position.y).y}
-            r={ball.state === 'thrown' ? 8 : 5}
-            fill={ball.state === 'thrown' ? '#ff6600' : '#8b4513'}
-            stroke="#000000"
-            strokeWidth="2"
-          />
+          {renderBall(ball)}
         </svg>
+
+        {/* Game phase indicator */}
+        <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm">
+          Phase: {gamePhase}
+        </div>
+
+        {/* Ball state indicator */}
+        <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white px-2 py-1 rounded text-sm">
+          Ball: {ball.state}
+        </div>
 
         {/* Formation validation errors */}
         {formationErrors.length > 0 && (
