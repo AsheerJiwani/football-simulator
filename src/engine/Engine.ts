@@ -215,10 +215,9 @@ export class FootballEngine {
   public setPersonnel(personnel: PersonnelPackage): void {
     this.gameState.personnel = personnel;
 
-    // Re-setup offensive players with new personnel
-    if (this.gameState.playConcept) {
-      this.setupPlayers();
-    }
+    // Don't re-setup offensive players, just update personnel
+    // The actual offensive players on field are determined by formation
+    // Personnel is used for defensive adjustments only
 
     // Realign defense to new offensive personnel
     if (this.gameState.coverage) {
@@ -381,11 +380,10 @@ export class FootballEngine {
         break;
     }
 
-    // Update player position to end position
-    player.position = { ...endPos };
+    // Store motion path but don't update position yet (will be animated)
     player.motionPath = path;
 
-    // Store motion for visualization and route adjustment
+    // Store motion for visualization
     this.gameState.motion = {
       type: motionType,
       playerId,
@@ -396,24 +394,7 @@ export class FootballEngine {
       currentTime: 0
     };
 
-    // Update route starting point if player has a route
-    if (player.route && player.route.waypoints.length > 0) {
-      // Adjust route to start from motion end position
-      const routeAdjustment = {
-        x: endPos.x - player.route.waypoints[0].x,
-        y: endPos.y - player.route.waypoints[0].y
-      };
-
-      player.route.waypoints = player.route.waypoints.map((wp, idx) => {
-        if (idx === 0) return { ...endPos };
-        return {
-          x: wp.x + routeAdjustment.x,
-          y: wp.y + routeAdjustment.y
-        };
-      });
-    }
-
-    // Start motion animation
+    // Start motion animation (route will be updated after motion completes)
     this.animateMotion(player);
 
     return true;
@@ -1861,13 +1842,68 @@ export class FootballEngine {
     return baseRoute;
   }
 
+  private updateRouteAfterMotion(player: Player, endPos: Vector2D): void {
+    if (player.route && player.route.waypoints.length > 0) {
+      const routeAdjustment = {
+        x: endPos.x - player.route.waypoints[0].x,
+        y: endPos.y - player.route.waypoints[0].y
+      };
+
+      player.route.waypoints = player.route.waypoints.map((wp, idx) => {
+        if (idx === 0) return { ...endPos };
+        return {
+          x: wp.x + routeAdjustment.x,
+          y: wp.y + routeAdjustment.y
+        };
+      });
+    }
+  }
+
   private animateMotion(player: Player): void {
     if (!player.motionPath || player.motionPath.length < 2) return;
 
     const startPos = player.motionPath[0];
-    const endPos = player.motionPath[1];
-    const motionDuration = 1.5; // 1.5 seconds for motion
+    const endPos = player.motionPath[player.motionPath.length - 1]; // Use last position for multi-point paths
+
+    // Calculate total distance for multi-point paths
+    let totalDistance = 0;
+    for (let i = 0; i < player.motionPath.length - 1; i++) {
+      const p1 = player.motionPath[i];
+      const p2 = player.motionPath[i + 1];
+      totalDistance += Math.sqrt(
+        Math.pow(p2.x - p1.x, 2) +
+        Math.pow(p2.y - p1.y, 2)
+      );
+    }
+
+    // Get player's actual speed (use average of min/max)
+    const speedRange = this.config.playerSpeeds[player.playerType] || { min: 8, max: 9 }; // Default if type not found
+    const playerSpeed = (speedRange.min + speedRange.max) / 2;
+
+    // Calculate realistic motion duration based on speed
+    const motionDuration = totalDistance / playerSpeed; // time = distance / speed
+
+    // In test environment, complete motion instantly to avoid animation loops
+    if (typeof requestAnimationFrame === 'undefined') {
+      player.position = { ...endPos };
+      player.velocity = { x: 0, y: 0 };
+      player.currentSpeed = 0;
+      player.hasMotionBoost = true;
+      this.gameState.isMotionActive = false;
+
+      // Update route waypoints after motion
+      this.updateRouteAfterMotion(player, endPos);
+
+      // Trigger defensive adjustments
+      this.handleMotionAdjustments(
+        this.gameState.players.filter(p => p.team === 'offense'),
+        this.gameState.players.filter(p => p.team === 'defense')
+      );
+      return;
+    }
+
     const startTime = performance.now();
+    let iterationCount = 0; // Safety counter for test environments
 
     const updateMotion = () => {
       if (this.gameState.phase !== 'pre-snap') {
@@ -1875,34 +1911,82 @@ export class FootballEngine {
         return;
       }
 
+      // Safety check for test environments to prevent infinite loops
+      iterationCount++;
+      if (iterationCount > 100) {
+        // Force complete motion if stuck in loop
+        player.position = { ...endPos };
+        player.velocity = { x: 0, y: 0 };
+        player.currentSpeed = 0;
+        this.gameState.isMotionActive = false;
+        player.hasMotionBoost = true;
+        this.updateRouteAfterMotion(player, endPos);
+        this.handleMotionAdjustments(
+          this.gameState.players.filter(p => p.team === 'offense'),
+          this.gameState.players.filter(p => p.team === 'defense')
+        );
+        return;
+      }
+
       const elapsed = (performance.now() - startTime) / 1000;
       const progress = Math.min(elapsed / motionDuration, 1);
 
       // Interpolate position
-      player.position = {
+      const newPosition = {
         x: startPos.x + (endPos.x - startPos.x) * progress,
         y: startPos.y + (endPos.y - startPos.y) * progress
       };
 
+      // Update velocity for smooth UI rendering
+      const deltaTime = elapsed > 0 ? elapsed : 0.016; // Avoid division by zero
+      player.velocity = {
+        x: (newPosition.x - player.position.x) / deltaTime,
+        y: (newPosition.y - player.position.y) / deltaTime
+      };
+
+      player.position = newPosition;
+      player.currentSpeed = playerSpeed; // Set to motion speed
+
       if (progress < 1) {
         // Use requestAnimationFrame if available (browser), otherwise use setTimeout (Node/test)
-    if (typeof requestAnimationFrame !== 'undefined') {
-      requestAnimationFrame(updateMotion);
-    } else {
-      setTimeout(updateMotion, 16); // ~60fps
-    }
+        if (typeof requestAnimationFrame !== 'undefined') {
+          requestAnimationFrame(updateMotion);
+        } else {
+          setTimeout(updateMotion, 16); // ~60fps
+        }
       } else {
         // Motion complete
         this.gameState.isMotionActive = false;
         player.hasMotionBoost = true; // Ready for boost at snap
+        player.velocity = { x: 0, y: 0 }; // Stop moving
+        player.currentSpeed = 0;
+
+        // Update route waypoints after motion
+        this.updateRouteAfterMotion(player, endPos);
+
+        // Trigger defensive adjustments after motion completes
+        this.handleMotionAdjustments(
+          this.gameState.players.filter(p => p.team === 'offense'),
+          this.gameState.players.filter(p => p.team === 'defense')
+        );
       }
     };
 
-    // Use requestAnimationFrame if available (browser), otherwise use setTimeout (Node/test)
+    // Start the motion animation only in production
     if (typeof requestAnimationFrame !== 'undefined') {
       requestAnimationFrame(updateMotion);
     } else {
-      setTimeout(updateMotion, 16); // ~60fps
+      // In test environment, complete motion instantly instead of using setTimeout
+      player.position = { ...endPos };
+      player.velocity = { x: 0, y: 0 };
+      player.currentSpeed = 0;
+      this.gameState.isMotionActive = false;
+      player.hasMotionBoost = true;
+      this.updateRouteAfterMotion(player, endPos);
+      this.handleMotionAdjustments(
+        this.gameState.players.filter(p => p.team === 'offense'),
+        this.gameState.players.filter(p => p.team === 'defense')
+      );
     }
   }
 
@@ -1979,12 +2063,7 @@ export class FootballEngine {
       if (this.gameState.phase !== 'play-over') {
         // Use requestAnimationFrame if available, otherwise setTimeout
         if (typeof requestAnimationFrame !== 'undefined') {
-          // Use requestAnimationFrame if available, otherwise setTimeout
-    if (typeof requestAnimationFrame !== 'undefined') {
-      this.animationFrameId = requestAnimationFrame(gameLoop);
-    } else {
-      this.animationFrameId = setTimeout(gameLoop, 16) as any;
-    }
+          this.animationFrameId = requestAnimationFrame(gameLoop);
         } else {
           this.animationFrameId = setTimeout(gameLoop, 16) as any;
         }
@@ -1993,7 +2072,7 @@ export class FootballEngine {
       }
     };
 
-    // Use requestAnimationFrame if available, otherwise setTimeout
+    // Start the game loop
     if (typeof requestAnimationFrame !== 'undefined') {
       this.animationFrameId = requestAnimationFrame(gameLoop);
     } else {
@@ -2247,13 +2326,15 @@ export class FootballEngine {
       if (target) {
         const newPosition = this.defensiveMovement.updateManCoverage(player, target, deltaTime);
 
-        // Update velocity for animation
-        player.velocity = {
-          x: (newPosition.x - player.position.x) / deltaTime,
-          y: (newPosition.y - player.position.y) / deltaTime
-        };
-        player.position = newPosition;
-        player.currentSpeed = Vector.magnitude(player.velocity);
+        // Update velocity for animation only if newPosition is valid
+        if (newPosition) {
+          player.velocity = {
+            x: (newPosition.x - player.position.x) / deltaTime,
+            y: (newPosition.y - player.position.y) / deltaTime
+          };
+          player.position = newPosition;
+          player.currentSpeed = Vector.magnitude(player.velocity);
+        }
       }
     } else if (player.coverageResponsibility.type === 'zone' && player.coverageResponsibility.zone) {
       // Use improved zone coverage movement
@@ -2261,13 +2342,15 @@ export class FootballEngine {
       const ballCarrier = this.gameState.players.find(p => p.hasBall);
       const newPosition = this.defensiveMovement.updateZoneCoverage(player, zoneLandmark, deltaTime, ballCarrier);
 
-      // Update velocity for animation
-      player.velocity = {
-        x: (newPosition.x - player.position.x) / deltaTime,
-        y: (newPosition.y - player.position.y) / deltaTime
-      };
-      player.position = newPosition;
-      player.currentSpeed = Vector.magnitude(player.velocity);
+      // Update velocity for animation only if newPosition is valid
+      if (newPosition) {
+        player.velocity = {
+          x: (newPosition.x - player.position.x) / deltaTime,
+          y: (newPosition.y - player.position.y) / deltaTime
+        };
+        player.position = newPosition;
+        player.currentSpeed = Vector.magnitude(player.velocity);
+      }
     } else if (player.coverageResponsibility.type === 'blitz') {
       // Blitzing - rush the QB
       const qb = this.gameState.players.find(p => p.playerType === 'QB');
@@ -2606,6 +2689,26 @@ export class FootballEngine {
     // Only clear offensive players, preserve defense
     this.gameState.players = this.gameState.players.filter(p => p.team === 'defense');
 
+    // Set personnel based on formation's personnel data
+    if (concept.formation.personnel) {
+      // Convert formation personnel to PersonnelPackage format
+      const { RB, TE, WR } = concept.formation.personnel;
+      let personnelCode = `${RB || 0}${TE || 0}`;
+
+      // Special case: Empty backfield (0 RB, 0 TE) is treated as 10 personnel (spread)
+      if (personnelCode === '00' && WR >= 4) {
+        personnelCode = '10';
+      }
+
+      // Validate personnel package
+      if (['10', '11', '12', '21'].includes(personnelCode)) {
+        this.gameState.personnel = personnelCode as PersonnelPackage;
+      } else {
+        // Default to 11 personnel if invalid
+        this.gameState.personnel = '11';
+      }
+    }
+
     // Calculate hash offset for offensive alignment
     let hashOffset = 0;
     if (this.gameState.hashPosition === 'left') {
@@ -2743,6 +2846,7 @@ export class FootballEngine {
         optimalPersonnel
       );
 
+
       const defensivePlayers: Player[] = [];
       adjustedResponsibilities.forEach((responsibility) => {
         const playerType = this.getPlayerTypeFromId(responsibility.defenderId);
@@ -2778,6 +2882,7 @@ export class FootballEngine {
 
         defensivePlayers.push(defender);
       });
+
 
       // Apply dynamic alignment based on coverage type
       let alignmentPositions: Record<string, Vector2D> = {};
