@@ -147,14 +147,15 @@ Top Panel includes Play, Coverage, Sack Time, Star Player button to choose who b
 All controls implemented into Sidebar and Top Panel with beautiful, spacious layout, and do not interfere with field on webpage.
 - Implement zone bubbles & man assignment lines (line attached to defender with a bubble shape displaying their zone assignment in zone coverage, or a line attached to their man in man coverage, utilize research agent for each coverage)
 THE ABOVE TASKS ARE HANDLED IN PHASE_4_TASKS.md
-- Add more plays and coverages with zone bubbles
+- Add more plays and coverages with zone bubbles, perfect zone bubbles shape and placement like in nfl playbooks
 - Perfect defensive coverage concepts (man: cushion/press, zone: find ways to perfect realistic nfl-mechanics, match: find ways to perfect realistic nfl-mechanics, rotations)
+- Add more audible routes specific for each position
 - Build Challenge Mode
 - Integrate authentication
 - Training mode: User selects play, defense is auto-picked to counter
 - Easy mode vs hard mode (easy: no rotations in coverage; hard: rotations in coverage occur with nfl-realism)
 - Add subscription tiers to unlock easy mode past one month and to unlock hard mode separately
-- Final UI Redesign
+- Final UI Redesign + Landing Page (utilize Landing Page Research subagent NOT THE ONE PROMPTED FOR NFL MECHANICS to research quality landing page elements and apply them to our Football Game Simulator Landing Page with beautful layout, even spacing, and CTAs)
 - Implement analytics per-user
 
 ## Development Timeline Estimate

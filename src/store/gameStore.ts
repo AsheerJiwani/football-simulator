@@ -19,6 +19,9 @@ interface GameStore {
   // Game State (derived from engine)
   gameState: GameState;
 
+  // Custom positions for drag-and-drop
+  customPositions: Map<string, { x: number; y: number }>;
+
   // Actions
   setConcept: (conceptName: string) => void;
   setCoverage: (coverageName: string) => void;
@@ -31,6 +34,8 @@ interface GameStore {
   sendInMotion: (playerId: string, motionType?: string) => void;
   setPassProtection: (rbBlocking: boolean, teBlocking: boolean, fbBlocking: boolean) => void;
   setAudible: (playerId: string, routeType: string) => void;
+  setCustomPosition: (playerId: string, position: { x: number; y: number }) => void;
+  clearCustomPositions: () => void;
   snap: () => void;
   throwTo: (receiverId: string) => void;
   reset: () => void;
@@ -95,6 +100,7 @@ export const useGameStore = create<GameStore>()(
           coverage: null,
           outcome: null
         },
+        customPositions: new Map(),
 
       // Actions
       setConcept: (conceptName: string) => {
@@ -231,6 +237,37 @@ export const useGameStore = create<GameStore>()(
             gameState: engine.getGameState()
           }));
         }
+      },
+
+      setCustomPosition: (playerId: string, position: { x: number; y: number }) => {
+        set((state) => {
+          const newPositions = new Map(state.customPositions);
+          newPositions.set(playerId, position);
+
+          // Update engine with custom position
+          const { engine } = get();
+          if (engine) {
+            const players = engine.getGameState().players;
+            const player = players.find(p => p.id === playerId);
+            if (player) {
+              player.position = position;
+              engine.updatePlayerPosition(playerId, position);
+            }
+          }
+
+          return {
+            ...state,
+            customPositions: newPositions,
+            gameState: engine?.getGameState() || state.gameState
+          };
+        });
+      },
+
+      clearCustomPositions: () => {
+        set((state) => ({
+          ...state,
+          customPositions: new Map()
+        }));
       },
 
       snap: () => {

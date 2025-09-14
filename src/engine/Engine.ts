@@ -429,6 +429,16 @@ export class FootballEngine {
     });
   }
 
+  public updatePlayerPosition(playerId: string, position: Vector2D): boolean {
+    if (this.gameState.phase !== 'pre-snap') return false;
+
+    const player = this.gameState.players.find(p => p.id === playerId);
+    if (!player || player.team !== 'offense') return false;
+
+    player.position = { ...position };
+    return true;
+  }
+
   public audibleRoute(playerId: string, newRouteType: RouteType): boolean {
     // Can only audible pre-snap
     if (this.gameState.phase !== 'pre-snap') return false;
