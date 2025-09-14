@@ -27,12 +27,6 @@ interface GameStore {
   throwTo: (receiverId: string) => void;
   reset: () => void;
   updateGameState: () => void;
-
-  // Selectors (computed values)
-  canSnap: () => boolean;
-  canThrow: () => boolean;
-  eligibleReceivers: () => string[];
-  playOutcome: () => string | null;
 }
 
 export const useGameStore = create<GameStore>()(
@@ -121,19 +115,19 @@ export const useGameStore = create<GameStore>()(
           });
 
           // Start polling for game state updates during play
-          const pollGameState = () => {
+          const pollInterval = setInterval(() => {
             const currentState = engine.getGameState();
+            const { isPlaying } = get();
+
             set({ gameState: currentState });
 
             if (currentState.phase === 'play-over') {
               set({ isPlaying: false });
-            } else if (get().isPlaying) {
-              // Continue polling at ~30fps during play
-              setTimeout(pollGameState, 33);
+              clearInterval(pollInterval);
+            } else if (!isPlaying) {
+              clearInterval(pollInterval);
             }
-          };
-
-          setTimeout(pollGameState, 33);
+          }, 33);
         }
       },
 
@@ -170,48 +164,6 @@ export const useGameStore = create<GameStore>()(
         const { engine } = get();
         set({ gameState: engine.getGameState() });
       },
-
-      // Selectors
-      canSnap: () => {
-        const { gameState } = get();
-        return gameState.phase === 'pre-snap' &&
-               gameState.playConcept !== undefined &&
-               gameState.coverage !== undefined;
-      },
-
-      canThrow: () => {
-        const { gameState } = get();
-        return gameState.phase === 'post-snap' &&
-               gameState.ball.state === 'held';
-      },
-
-      eligibleReceivers: () => {
-        const { gameState } = get();
-        return gameState.players
-          .filter(player => player.team === 'offense' && player.isEligible)
-          .map(player => player.id);
-      },
-
-      playOutcome: () => {
-        const { gameState } = get();
-        if (!gameState.outcome) return null;
-
-        const outcome = gameState.outcome;
-        switch (outcome.type) {
-          case 'catch':
-            return `CATCH: ${outcome.yards} yards (${outcome.openness.toFixed(1)}% open)`;
-          case 'incomplete':
-            return `INCOMPLETE (${outcome.openness.toFixed(1)}% open)`;
-          case 'interception':
-            return `INTERCEPTION by ${outcome.defender}`;
-          case 'sack':
-            return 'SACKED';
-          case 'timeout':
-            return 'OUT OF TIME';
-          default:
-            return 'PLAY OVER';
-        }
-      },
     };
   })
 );
@@ -221,10 +173,43 @@ export const useGameState = () => useGameStore(state => state.gameState);
 export const useGamePhase = () => useGameStore(state => state.gameState.phase);
 export const usePlayers = () => useGameStore(state => state.gameState.players);
 export const useBall = () => useGameStore(state => state.gameState.ball);
-export const usePlayOutcome = () => useGameStore(state => state.playOutcome());
-export const useCanSnap = () => useGameStore(state => state.canSnap());
-export const useCanThrow = () => useGameStore(state => state.canThrow());
-export const useEligibleReceivers = () => useGameStore(state => state.eligibleReceivers());
+
+// Computed selectors
+export const usePlayOutcome = () => useGameStore(state => {
+  if (!state.gameState.outcome) return null;
+  const outcome = state.gameState.outcome;
+  switch (outcome.type) {
+    case 'catch':
+      return `CATCH: ${outcome.yards} yards (${outcome.openness.toFixed(1)}% open)`;
+    case 'incomplete':
+      return `INCOMPLETE (${outcome.openness.toFixed(1)}% open)`;
+    case 'interception':
+      return `INTERCEPTION by ${outcome.defender}`;
+    case 'sack':
+      return 'SACKED';
+    case 'timeout':
+      return 'OUT OF TIME';
+    default:
+      return 'PLAY OVER';
+  }
+});
+
+export const useCanSnap = () => useGameStore(state =>
+  state.gameState.phase === 'pre-snap' &&
+  !!state.gameState.playConcept &&
+  !!state.gameState.coverage
+);
+
+export const useCanThrow = () => useGameStore(state =>
+  state.gameState.phase === 'post-snap' &&
+  state.gameState.ball.state === 'held'
+);
+
+export const useEligibleReceivers = () => useGameStore(state =>
+  state.gameState.players
+    .filter(player => player.team === 'offense' && player.isEligible)
+    .map(player => player.id)
+);
 
 // Action hooks
 export const useGameActions = () => useGameStore(state => ({
