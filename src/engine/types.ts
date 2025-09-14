@@ -148,6 +148,8 @@ export interface GameState {
   gameMode: 'free-play' | 'challenge';
   motionPlayer?: string; // ID of player in motion
   isMotionActive: boolean; // whether motion is currently happening
+  motion?: Motion; // Current motion details
+  personnel: PersonnelPackage;
   passProtection: {
     rbBlocking: boolean;
     teBlocking: boolean;
@@ -156,6 +158,20 @@ export interface GameState {
 }
 
 export type GamePhase = 'pre-snap' | 'post-snap' | 'ball-thrown' | 'play-over';
+
+export type MotionType = 'fly' | 'orbit' | 'jet' | 'return' | 'shift';
+
+export interface Motion {
+  type: MotionType;
+  playerId: string;
+  startPosition: Vector2D;
+  endPosition: Vector2D;
+  path: Vector2D[];
+  duration: number;
+  currentTime: number;
+}
+
+export type PersonnelPackage = '11' | '12' | '21' | '10' | '20' | '22' | '00';
 
 export interface PlayOutcome {
   type: 'catch' | 'incomplete' | 'interception' | 'sack' | 'timeout';

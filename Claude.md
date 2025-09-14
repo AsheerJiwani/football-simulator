@@ -15,6 +15,8 @@ Field should be 120 yards long (100 yards + 10 yards for each endzone) & vertica
 
 Directive: Whenever implementing, modifying, or expanding any NFL mechanic (coverages, alignments, motions, player speeds, ball physics, openness/tackle logic, zone bubbles, or new concepts), Claude must first call the Research Subagent to gather factual, cited evidence before coding. For each coverage, the agent should return JSON Structured data describing each positions' role in the coverage system as well as the adjustments made when offensive personnel and formations changes occur.
 
+If Claude utilizes the research subagent, ensure that it is utilized after "plan mode" is finished and when actually working in the code.
+
 Only differences from real NFL:
 
 After the "break" point in a route where the receiver makes their last move, they should continue running the same direction until reaching the sideline.
@@ -201,7 +203,7 @@ This will prove the full loop works before expanding.
 
 ✅ Coding Guardrails for Claude
 
-Commit and push to Github when appropriate to ensure no compilation errors or eslint warnings that prevent compilation or cause "Failed to compile".
+Commit and push to Github when appropriate & after every plan is complete to ensure no compilation errors or eslint warnings that prevent compilation or cause "Failed to compile". Handle errors appropriately
 
 Engine stays pure TypeScript: no React imports. Keep deterministic & testable.
 

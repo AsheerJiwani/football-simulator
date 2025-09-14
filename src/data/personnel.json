@@ -1,0 +1,93 @@
+{
+  "11": {
+    "name": "11 Personnel",
+    "description": "3 WR, 1 TE, 1 RB - Standard passing formation",
+    "positions": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 3,
+      "TE": 1,
+      "FB": 0
+    },
+    "formations": ["trips-right", "doubles", "strong-right", "bunch-right"],
+    "defaultFormation": "trips-right"
+  },
+  "12": {
+    "name": "12 Personnel",
+    "description": "2 WR, 2 TE, 1 RB - Balanced run/pass",
+    "positions": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 2,
+      "TE": 2,
+      "FB": 0
+    },
+    "formations": ["strong-right", "strong-left", "i-formation"],
+    "defaultFormation": "strong-right"
+  },
+  "21": {
+    "name": "21 Personnel",
+    "description": "2 WR, 1 TE, 2 RB - Heavy run formation",
+    "positions": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 2,
+      "TE": 1,
+      "FB": 1
+    },
+    "formations": ["i-formation", "strong-right", "power-right"],
+    "defaultFormation": "i-formation"
+  },
+  "10": {
+    "name": "10 Personnel",
+    "description": "4 WR, 0 TE, 1 RB - Spread passing attack",
+    "positions": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 4,
+      "TE": 0,
+      "FB": 0
+    },
+    "formations": ["spread", "empty", "trips-right"],
+    "defaultFormation": "spread"
+  },
+  "20": {
+    "name": "20 Personnel",
+    "description": "3 WR, 0 TE, 2 RB - Spread with dual backs",
+    "positions": {
+      "QB": 1,
+      "RB": 2,
+      "WR": 3,
+      "TE": 0,
+      "FB": 0
+    },
+    "formations": ["pistol", "spread", "split-backs"],
+    "defaultFormation": "pistol"
+  },
+  "22": {
+    "name": "22 Personnel",
+    "description": "1 WR, 2 TE, 2 RB - Goal line/power formation",
+    "positions": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 1,
+      "TE": 2,
+      "FB": 1
+    },
+    "formations": ["power-right", "jumbo", "goal-line"],
+    "defaultFormation": "power-right"
+  },
+  "00": {
+    "name": "00 Personnel (Empty)",
+    "description": "5 WR, 0 TE, 0 RB - Maximum passing threats",
+    "positions": {
+      "QB": 1,
+      "RB": 0,
+      "WR": 5,
+      "TE": 0,
+      "FB": 0
+    },
+    "formations": ["empty", "spread-5wide"],
+    "defaultFormation": "empty"
+  }
+}

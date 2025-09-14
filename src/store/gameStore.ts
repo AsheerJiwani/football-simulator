@@ -11,6 +11,7 @@ interface GameStore {
   // UI State
   selectedConcept: string;
   selectedCoverage: string;
+  selectedPersonnel: string;
   sackTime: number;
   gameMode: 'free-play' | 'challenge';
   isPlaying: boolean;
@@ -23,9 +24,10 @@ interface GameStore {
   setCoverage: (coverageName: string) => void;
   setSackTime: (seconds: number) => void;
   setGameMode: (mode: 'free-play' | 'challenge') => void;
+  setPersonnel: (personnel: string) => void;
   setShowDefense: (show: boolean) => void;
   setShowRoutes: (show: boolean) => void;
-  sendInMotion: (playerId: string) => void;
+  sendInMotion: (playerId: string, motionType?: string) => void;
   setPassProtection: (rbBlocking: boolean, teBlocking: boolean, fbBlocking: boolean) => void;
   setAudible: (playerId: string, routeType: string) => void;
   snap: () => void;
@@ -44,6 +46,7 @@ const createInitialEngine = () => {
       defaults: {
         concept: 'slant-flat',
         coverage: 'cover-1',
+        personnel: '11',
         sackTime: 5.0,
         gameMode: 'free-play' as const
       }
@@ -78,6 +81,7 @@ export const useGameStore = create<GameStore>()(
         engine,
         selectedConcept: defaults.concept,
         selectedCoverage: defaults.coverage,
+        selectedPersonnel: (defaults as any).personnel || '11',
         sackTime: defaults.sackTime,
         gameMode: defaults.gameMode,
         isPlaying: false,
@@ -145,6 +149,18 @@ export const useGameStore = create<GameStore>()(
         }));
       },
 
+      setPersonnel: (personnel: string) => {
+        const { engine } = get();
+        if (!engine) return;
+        engine.setPersonnel(personnel as any);
+
+        set((state) => ({
+          ...state,
+          selectedPersonnel: personnel,
+          gameState: engine.getGameState()
+        }));
+      },
+
       setShowDefense: (show: boolean) => {
         const { engine } = get();
         if (!engine) return;
@@ -167,10 +183,10 @@ export const useGameStore = create<GameStore>()(
         }));
       },
 
-      sendInMotion: (playerId: string) => {
+      sendInMotion: (playerId: string, motionType?: string) => {
         const { engine } = get();
         if (!engine) return;
-        const success = engine.sendInMotion(playerId);
+        const success = engine.sendInMotion(playerId, motionType as any);
 
         if (success) {
           set((state) => ({
@@ -335,6 +351,7 @@ export const useSetConcept = () => useGameStore(state => state.setConcept);
 export const useSetCoverage = () => useGameStore(state => state.setCoverage);
 export const useSetSackTime = () => useGameStore(state => state.setSackTime);
 export const useSetGameMode = () => useGameStore(state => state.setGameMode);
+export const useSetPersonnel = () => useGameStore(state => state.setPersonnel);
 export const useSetShowDefense = () => useGameStore(state => state.setShowDefense);
 export const useSetShowRoutes = () => useGameStore(state => state.setShowRoutes);
 export const useSendInMotion = () => useGameStore(state => state.sendInMotion);
@@ -347,6 +364,7 @@ export const useReset = () => useGameStore(state => state.reset);
 // UI state hooks - individual selectors to avoid re-creating objects
 export const useSelectedConcept = () => useGameStore(state => state.selectedConcept);
 export const useSelectedCoverage = () => useGameStore(state => state.selectedCoverage);
+export const useSelectedPersonnel = () => useGameStore(state => state.selectedPersonnel);
 export const useSackTime = () => useGameStore(state => state.sackTime);
 export const useGameMode = () => useGameStore(state => state.gameMode);
 export const useIsPlaying = () => useGameStore(state => state.isPlaying);

@@ -26,6 +26,7 @@ import { DataLoader } from '@/lib/dataLoader';
 import MotionControls from './MotionControls';
 import AudibleControls from './AudibleControls';
 import PassProtectionControls from './PassProtectionControls';
+import PersonnelSelector from './PersonnelSelector';
 
 export default function ControlsPanel() {
   const setConcept = useSetConcept();
@@ -205,7 +206,8 @@ export default function ControlsPanel() {
       {!isPlaying && (
         <div className="border-t border-gray-600 pt-4">
           <h3 className="text-lg font-semibold mb-3">Pre-Snap Adjustments</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <PersonnelSelector />
             <MotionControls />
             <AudibleControls />
             <PassProtectionControls />

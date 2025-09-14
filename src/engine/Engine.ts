@@ -10,6 +10,9 @@ import type {
   Vector2D,
   RouteType,
   Route,
+  PersonnelPackage,
+  Motion,
+  MotionType,
 } from './types';
 
 import { Vector, Physics, Field, Random, Route as RouteUtil } from '@/lib/math';
@@ -81,6 +84,7 @@ export class FootballEngine {
       maxAudibles: this.config.gameplay.maxAudibles,
       gameMode: 'free-play',
       isMotionActive: false,
+      personnel: '11' as PersonnelPackage,
       passProtection: {
         rbBlocking: false,
         teBlocking: false,
@@ -108,6 +112,10 @@ export class FootballEngine {
   public setPlayConcept(concept: PlayConcept): void {
     this.gameState.playConcept = concept;
     this.setupPlayers();
+    // Re-setup defense to adjust to new offensive formation/personnel
+    if (this.gameState.coverage) {
+      this.setupDefense();
+    }
   }
 
   public setCoverage(coverage: Coverage): void {
@@ -145,7 +153,19 @@ export class FootballEngine {
     this.gameState.isShowingRoutes = show;
   }
 
-  public sendInMotion(playerId: string): boolean {
+  public setPersonnel(personnel: PersonnelPackage): void {
+    this.gameState.personnel = personnel;
+    // TODO: Update formations and plays based on personnel
+    // Re-setup players with new personnel
+    if (this.gameState.playConcept) {
+      this.setupPlayers();
+      if (this.gameState.coverage) {
+        this.setupDefense();
+      }
+    }
+  }
+
+  public sendInMotion(playerId: string, motionType: MotionType = 'fly'): boolean {
     // Can only send player in motion pre-snap
     if (this.gameState.phase !== 'pre-snap') return false;
 
@@ -161,18 +181,91 @@ export class FootballEngine {
 
     if (!player) return false;
 
-    // Set up motion path (across formation)
-    const startX = player.position.x;
-    const targetX = startX < 26.665 ? 45 : 8; // Move to opposite side
-
+    // Set up motion based on type
     player.hasMotion = true;
-    player.motionPath = [
-      player.position,
-      { x: targetX, y: player.position.y }
-    ];
-
     this.gameState.motionPlayer = playerId;
     this.gameState.isMotionActive = true;
+
+    const startPos = { ...player.position };
+    let endPos: Vector2D;
+    let path: Vector2D[] = [];
+
+    switch (motionType) {
+      case 'fly':
+        // Straight across formation
+        endPos = {
+          x: player.position.x > 26.665 ? 10 : 43,
+          y: player.position.y
+        };
+        path = [startPos, endPos];
+        break;
+      case 'orbit':
+        // Behind QB then out
+        const behindQB = { x: 26.665, y: 62 };
+        endPos = {
+          x: player.position.x > 26.665 ? 10 : 43,
+          y: 60
+        };
+        path = [startPos, behindQB, endPos];
+        break;
+      case 'jet':
+        // Fast sweep motion
+        endPos = {
+          x: player.position.x > 26.665 ? 5 : 48,
+          y: 60
+        };
+        path = [startPos, endPos];
+        break;
+      case 'return':
+        // Out and back
+        const midPoint = {
+          x: player.position.x > 26.665 ? player.position.x - 5 : player.position.x + 5,
+          y: player.position.y
+        };
+        endPos = { ...startPos };
+        path = [startPos, midPoint, endPos];
+        break;
+      case 'shift':
+        // Short adjustment
+        endPos = {
+          x: player.position.x + (player.position.x > 26.665 ? -3 : 3),
+          y: player.position.y
+        };
+        path = [startPos, endPos];
+        break;
+    }
+
+    // Update player position to end position
+    player.position = { ...endPos };
+    player.motionPath = path;
+
+    // Store motion for visualization and route adjustment
+    this.gameState.motion = {
+      type: motionType,
+      playerId,
+      startPosition: startPos,
+      endPosition: endPos,
+      path,
+      duration: motionType === 'jet' ? 0.8 : 1.2,
+      currentTime: 0
+    };
+
+    // Update route starting point if player has a route
+    if (player.route && player.route.waypoints.length > 0) {
+      // Adjust route to start from motion end position
+      const routeAdjustment = {
+        x: endPos.x - startPos.x,
+        y: endPos.y - startPos.y
+      };
+
+      player.route.waypoints = player.route.waypoints.map((wp, idx) => {
+        if (idx === 0) return { ...endPos };
+        return {
+          x: wp.x + routeAdjustment.x,
+          y: wp.y + routeAdjustment.y
+        };
+      });
+    }
 
     // Start motion animation
     this.animateMotion(player);

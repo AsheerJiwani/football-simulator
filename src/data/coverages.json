@@ -9,9 +9,9 @@
       "CB2": { "x": 45, "y": 53, "type": "man", "leverage": "outside" },
       "CB3": { "x": 38, "y": 56, "type": "man", "leverage": "inside" },
       "S1": { "x": 26.665, "y": 46, "type": "zone" },
-      "LB1": { "x": 30, "y": 58, "type": "man" },
-      "LB2": { "x": 26.665, "y": 53, "type": "zone" },
-      "LB3": { "x": 23, "y": 58, "type": "man" }
+      "LB1": { "x": 30, "y": 64, "type": "man" },
+      "LB2": { "x": 26.665, "y": 64.5, "type": "zone" },
+      "LB3": { "x": 23, "y": 64, "type": "man" }
     },
     "responsibilities": [
       {
@@ -67,13 +67,13 @@
     "safetyCount": 2,
     "description": "Two deep safeties with zone coverage underneath",
     "positions": {
-      "CB1": { "x": 60, "y": 8, "type": "zone" },
-      "CB2": { "x": 60, "y": 45, "type": "zone" },
-      "S1": { "x": 75, "y": 16, "type": "zone" },
-      "S2": { "x": 75, "y": 37, "type": "zone" },
-      "LB1": { "x": 58, "y": 20, "type": "zone" },
-      "LB2": { "x": 58, "y": 26.665, "type": "zone" },
-      "LB3": { "x": 58, "y": 33, "type": "zone" }
+      "CB1": { "x": 8, "y": 55, "type": "zone" },
+      "CB2": { "x": 45, "y": 55, "type": "zone" },
+      "S1": { "x": 16, "y": 48, "type": "zone" },
+      "S2": { "x": 37, "y": 48, "type": "zone" },
+      "LB1": { "x": 20, "y": 64, "type": "zone" },
+      "LB2": { "x": 26.665, "y": 64, "type": "zone" },
+      "LB3": { "x": 33, "y": 64, "type": "zone" }
     },
     "responsibilities": [
       {
@@ -154,13 +154,13 @@
     "safetyCount": 1,
     "description": "Three deep defenders with zone coverage underneath",
     "positions": {
-      "CB1": { "x": 75, "y": 8, "type": "zone" },
-      "CB2": { "x": 75, "y": 45, "type": "zone" },
-      "S1": { "x": 75, "y": 26.665, "type": "zone" },
-      "LB1": { "x": 58, "y": 16, "type": "zone" },
-      "LB2": { "x": 58, "y": 26.665, "type": "zone" },
-      "LB3": { "x": 58, "y": 37, "type": "zone" },
-      "LB4": { "x": 62, "y": 20, "type": "zone" }
+      "CB1": { "x": 8, "y": 48, "type": "zone" },
+      "CB2": { "x": 45, "y": 48, "type": "zone" },
+      "S1": { "x": 26.665, "y": 48, "type": "zone" },
+      "LB1": { "x": 16, "y": 64, "type": "zone" },
+      "LB2": { "x": 26.665, "y": 64, "type": "zone" },
+      "LB3": { "x": 37, "y": 64, "type": "zone" },
+      "LB4": { "x": 20, "y": 64.5, "type": "zone" }
     },
     "responsibilities": [
       {
@@ -245,9 +245,9 @@
       "CB2": { "x": 45, "y": 53, "type": "zone", "leverage": "inside" },
       "S1": { "x": 18, "y": 48, "type": "zone" },
       "S2": { "x": 35, "y": 48, "type": "zone" },
-      "LB1": { "x": 20, "y": 56, "type": "zone" },
-      "LB2": { "x": 26.665, "y": 55, "type": "zone" },
-      "LB3": { "x": 33, "y": 56, "type": "zone" }
+      "LB1": { "x": 20, "y": 64, "type": "zone" },
+      "LB2": { "x": 26.665, "y": 64, "type": "zone" },
+      "LB3": { "x": 33, "y": 64, "type": "zone" }
     },
     "responsibilities": [
       {
@@ -336,9 +336,9 @@
       "CB2": { "x": 45, "y": 55, "type": "zone", "leverage": "outside" },
       "S1": { "x": 13, "y": 48, "type": "zone" },
       "S2": { "x": 40, "y": 48, "type": "zone" },
-      "LB1": { "x": 18, "y": 56, "type": "zone" },
-      "LB2": { "x": 26.665, "y": 55, "type": "zone" },
-      "LB3": { "x": 35, "y": 56, "type": "zone" }
+      "LB1": { "x": 18, "y": 64, "type": "zone" },
+      "LB2": { "x": 26.665, "y": 65, "type": "zone" },
+      "LB3": { "x": 35, "y": 64, "type": "zone" }
     },
     "responsibilities": [
       {
@@ -424,9 +424,9 @@
       "CB2": { "x": 45, "y": 53, "type": "zone", "leverage": "inside" },
       "S1": { "x": 13, "y": 48, "type": "zone" },
       "S2": { "x": 35, "y": 48, "type": "zone" },
-      "LB1": { "x": 18, "y": 56, "type": "zone" },
-      "LB2": { "x": 26.665, "y": 55, "type": "zone" },
-      "LB3": { "x": 35, "y": 56, "type": "zone" }
+      "LB1": { "x": 18, "y": 64, "type": "zone" },
+      "LB2": { "x": 26.665, "y": 64, "type": "zone" },
+      "LB3": { "x": 35, "y": 64, "type": "zone" }
     },
     "splitField": {
       "fieldSide": "cover-4",
@@ -522,8 +522,8 @@
       "CB3": { "x": 38, "y": 60, "type": "man", "leverage": "inside" },
       "S1": { "x": 20, "y": 58, "type": "blitz" },
       "S2": { "x": 33, "y": 58, "type": "blitz" },
-      "LB1": { "x": 26.665, "y": 57, "type": "blitz" },
-      "LB2": { "x": 23, "y": 58, "type": "man" }
+      "LB1": { "x": 26.665, "y": 64, "type": "blitz" },
+      "LB2": { "x": 23, "y": 64, "type": "man" }
     },
     "responsibilities": [
       {
