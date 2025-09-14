@@ -1,6 +1,6 @@
 'use client';
 
-import { usePlayers, useBall, useGamePhase } from '@/store/gameStore';
+import { usePlayers, useBall, useGamePhase, useIsShowingDefense, useIsShowingRoutes, useGameState } from '@/store/gameStore';
 import type { Player, Ball } from '@/engine/types';
 
 interface FieldCanvasProps {
@@ -17,6 +17,9 @@ export default function FieldCanvas({
   const players = usePlayers();
   const ball = useBall();
   const gamePhase = useGamePhase();
+  const isShowingDefense = useIsShowingDefense();
+  const isShowingRoutes = useIsShowingRoutes();
+  const gameState = useGameState();
 
   // Scale factors for field dimensions (VERTICAL FIELD)
   // NFL field: 53.33 yards wide × 120 yards long (vertical)
@@ -241,40 +244,55 @@ export default function FieldCanvas({
 
   // Render route paths for offensive players
   const renderRoutes = () => {
-    if (gamePhase === 'pre-snap') return null;
+    if (!isShowingRoutes) return null;
+    if (!gameState.playConcept) return null;
 
     return players
-      .filter(player => player.team === 'offense' && player.route)
+      .filter(player => player.team === 'offense' && player.isEligible)
       .map(player => {
-        const route = player.route!;
+        // Get the route from the play concept
+        const route = gameState.playConcept?.routes[player.id];
+        if (!route || !route.waypoints) return null;
+
+        const startPos = fieldToSvg(player.position.x, player.position.y);
         const pathPoints = route.waypoints.map(waypoint =>
           fieldToSvg(waypoint.x, waypoint.y)
         );
 
-        // Create SVG path string
+        // Create SVG path string starting from player position
         const pathString = pathPoints.reduce((path, point, index) => {
-          if (index === 0) return `M ${point.x} ${point.y}`;
+          if (index === 0) return `M ${startPos.x} ${startPos.y} L ${point.x} ${point.y}`;
           return `${path} L ${point.x} ${point.y}`;
         }, '');
 
         return (
-          <path
-            key={`route-${player.id}`}
-            d={pathString}
-            stroke="#87CEEB"
-            strokeWidth="2"
-            strokeDasharray="2,2"
-            fill="none"
-            opacity="0.6"
-          />
+          <g key={`route-${player.id}`}>
+            <path
+              d={pathString}
+              stroke="#00FF00"
+              strokeWidth="2"
+              strokeDasharray="4,2"
+              fill="none"
+              opacity="0.7"
+            />
+            {/* Add route depth indicator at the end */}
+            <circle
+              cx={pathPoints[pathPoints.length - 1]?.x}
+              cy={pathPoints[pathPoints.length - 1]?.y}
+              r="4"
+              fill="#00FF00"
+              opacity="0.8"
+            />
+          </g>
         );
       });
   };
 
   // Render coverage zones for defense (if showing defense)
   const renderCoverageZones = () => {
-    // This would be implemented when we have zone coverage visualization
-    // For now, just render basic zone indicators for zone defenders
+    if (!isShowingDefense) return null;
+
+    // Render basic zone indicators for zone defenders
     return players
       .filter(player =>
         player.team === 'defense' &&

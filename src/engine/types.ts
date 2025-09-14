@@ -142,6 +142,7 @@ export interface GameState {
   currentCoverage?: Coverage; // Current active coverage
   outcome?: PlayOutcome;
   isShowingDefense: boolean;
+  isShowingRoutes: boolean;
   audiblesUsed: number;
   maxAudibles: number;
   gameMode: 'free-play' | 'challenge';

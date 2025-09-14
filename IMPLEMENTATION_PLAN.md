@@ -136,8 +136,9 @@
 - Mobile responsive design
 - Zero runtime errors in production
 
-## Next Steps (Phase 4+)
+## Next Steps (Phase 4+) **ONGOING**
 - Add motion and audibles
+- Implement Hash-based Snap logic and adjustements to positioning (offense and zone coverage) (utilize research agent to draft a .md file with nfl rules regarding "next-play setup on left or right or in between hash")
 - Implement drag-and-drop positioning
 - Improve fluidity of movement mechanics (incredibly detailed movement mechanics including how far a defender should lag behind after a receiver cuts in man coverge, how fast defenders run in zones, how leverage affects defender's advantage based on receiver route in certain coverages, how close defenders trail receivers naturally, zone handoffs, safety tracking, etc.)
 - Design production-grade UI with an interactive control panel and the field should take up majority of the webpage as the main focus. Field size should render as at least 50% of the screen, while maintaining integrity of all simulation code.
@@ -167,14 +168,13 @@
   - Ball velocity set to realistic 25 yd/s (~55mph NFL average)
   - Cover 1 positioning validated with proper leverage
   - JSON data structure for extensible plays/formations/coverages
-- ✅ **Phase 3 Complete!** Full UI implementation with real-time gameplay
+- ✅ **Phase 3 Complete!** Basic UI implementation with non-fluid gameplay
   - Zustand store with optimized selectors for 60Hz engine integration
   - SVG field canvas with NFL-accurate dimensions and visual indicators
   - Controls panel with dropdown selectors and dynamic interactions
   - Landing page with feature showcase and marketing content
   - TypeScript compilation passing with proper type safety
   - Development server running successfully on localhost:3004
-- 🎯 **MVP READY!** Fully playable football simulator with research-validated mechanics
 
 ---
 

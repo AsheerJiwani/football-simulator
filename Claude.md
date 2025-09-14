@@ -132,7 +132,9 @@ Control Center: personnel, formation, coverage, sack slider, star toggle, etc.
 
 Field Canvas: drag-and-drop anchors, Snap & Throw buttons.
 
-Phase 4 — Expand Content
+Phase 4 — Expand Content, Improve UI
+
+Implement Hash-based Snap logic and adjustements to positioning (offense and zone coverage) (utilize research agent to draft a .md file with nfl rules regarding "next-play setup on left or right hash")
 
 Add more concepts (Smash, Mesh, Flood, Four Verts).
 

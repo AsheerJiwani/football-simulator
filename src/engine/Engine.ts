@@ -76,6 +76,7 @@ export class FootballEngine {
       players: [],
       ball: this.createBall(),
       isShowingDefense: true,
+      isShowingRoutes: false,
       audiblesUsed: 0,
       maxAudibles: this.config.gameplay.maxAudibles,
       gameMode: 'free-play',
@@ -130,6 +131,18 @@ export class FootballEngine {
       this.gameState.maxAudibles = 2;
       this.gameState.isShowingDefense = false;
     }
+  }
+
+  public setShowDefense(show: boolean): void {
+    if (this.gameState.gameMode === 'challenge') {
+      this.gameState.isShowingDefense = false;
+    } else {
+      this.gameState.isShowingDefense = show;
+    }
+  }
+
+  public setShowRoutes(show: boolean): void {
+    this.gameState.isShowingRoutes = show;
   }
 
   public sendInMotion(playerId: string): boolean {
@@ -1039,7 +1052,9 @@ export class FootballEngine {
     if (!this.gameState.coverage) return;
 
     const coverage = this.gameState.coverage;
-    const offensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
+    // Remove existing defensive players but keep offensive players
+    this.gameState.players = this.gameState.players.filter(p => p.team === 'offense');
+    const offensivePlayers = this.gameState.players;
 
     // Apply dynamic personnel substitution and alignment for Cover 1
     if (coverage.type === 'cover-1') {

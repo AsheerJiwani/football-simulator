@@ -5,6 +5,8 @@ import {
   useSetCoverage,
   useSetSackTime,
   useSetGameMode,
+  useSetShowDefense,
+  useSetShowRoutes,
   useSnap,
   useThrowTo,
   useReset,
@@ -16,7 +18,9 @@ import {
   useCanSnap,
   useCanThrow,
   useEligibleReceivers,
-  usePlayOutcomeText
+  usePlayOutcomeText,
+  useIsShowingDefense,
+  useIsShowingRoutes
 } from '@/store/gameStore';
 import { DataLoader } from '@/lib/dataLoader';
 import MotionControls from './MotionControls';
@@ -28,6 +32,8 @@ export default function ControlsPanel() {
   const setCoverage = useSetCoverage();
   const setSackTime = useSetSackTime();
   const setGameMode = useSetGameMode();
+  const setShowDefense = useSetShowDefense();
+  const setShowRoutes = useSetShowRoutes();
   const snap = useSnap();
   const throwTo = useThrowTo();
   const reset = useReset();
@@ -37,6 +43,8 @@ export default function ControlsPanel() {
   const sackTime = useSackTime();
   const gameMode = useGameMode();
   const isPlaying = useIsPlaying();
+  const isShowingDefense = useIsShowingDefense();
+  const isShowingRoutes = useIsShowingRoutes();
 
   const canSnap = useCanSnap();
   const canThrow = useCanThrow();
@@ -165,6 +173,31 @@ export default function ControlsPanel() {
               Reset Play
             </button>
           </div>
+        </div>
+
+        {/* Visual Toggles */}
+        <div className="flex space-x-4 mt-4">
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={isShowingDefense}
+              onChange={(e) => setShowDefense(e.target.checked)}
+              disabled={gameMode === 'challenge'}
+              className="rounded text-blue-600 focus:ring-blue-500"
+            />
+            <span className={gameMode === 'challenge' ? 'text-gray-500' : 'text-gray-300'}>
+              Show Defense
+            </span>
+          </label>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={isShowingRoutes}
+              onChange={(e) => setShowRoutes(e.target.checked)}
+              className="rounded text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-gray-300">Show Routes</span>
+          </label>
         </div>
       </div>
 

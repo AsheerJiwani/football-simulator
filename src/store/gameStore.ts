@@ -23,6 +23,8 @@ interface GameStore {
   setCoverage: (coverageName: string) => void;
   setSackTime: (seconds: number) => void;
   setGameMode: (mode: 'free-play' | 'challenge') => void;
+  setShowDefense: (show: boolean) => void;
+  setShowRoutes: (show: boolean) => void;
   sendInMotion: (playerId: string) => void;
   setPassProtection: (rbBlocking: boolean, teBlocking: boolean, fbBlocking: boolean) => void;
   setAudible: (playerId: string, routeType: string) => void;
@@ -139,6 +141,28 @@ export const useGameStore = create<GameStore>()(
         set((state) => ({
           ...state,
           gameMode: mode,
+          gameState: engine.getGameState()
+        }));
+      },
+
+      setShowDefense: (show: boolean) => {
+        const { engine } = get();
+        if (!engine) return;
+        engine.setShowDefense(show);
+
+        set((state) => ({
+          ...state,
+          gameState: engine.getGameState()
+        }));
+      },
+
+      setShowRoutes: (show: boolean) => {
+        const { engine } = get();
+        if (!engine) return;
+        engine.setShowRoutes(show);
+
+        set((state) => ({
+          ...state,
           gameState: engine.getGameState()
         }));
       },
@@ -263,6 +287,8 @@ export const useGameState = () => useGameStore(state => state.gameState);
 export const useGamePhase = () => useGameStore(state => state.gameState.phase);
 export const usePlayers = () => useGameStore(state => state.gameState.players);
 export const useBall = () => useGameStore(state => state.gameState.ball);
+export const useIsShowingDefense = () => useGameStore(state => state.gameState.isShowingDefense);
+export const useIsShowingRoutes = () => useGameStore(state => state.gameState.isShowingRoutes);
 
 // Computed selectors
 export const usePlayOutcome = () => useGameStore(state => state.gameState.outcome);
@@ -309,6 +335,8 @@ export const useSetConcept = () => useGameStore(state => state.setConcept);
 export const useSetCoverage = () => useGameStore(state => state.setCoverage);
 export const useSetSackTime = () => useGameStore(state => state.setSackTime);
 export const useSetGameMode = () => useGameStore(state => state.setGameMode);
+export const useSetShowDefense = () => useGameStore(state => state.setShowDefense);
+export const useSetShowRoutes = () => useGameStore(state => state.setShowRoutes);
 export const useSendInMotion = () => useGameStore(state => state.sendInMotion);
 export const useSetPassProtection = () => useGameStore(state => state.setPassProtection);
 export const useSetAudible = () => useGameStore(state => state.setAudible);
