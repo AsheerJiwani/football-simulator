@@ -105,10 +105,10 @@ export class FootballEngine {
         fbBlocking: false,
       },
       // Drive and field position
-      lineOfScrimmage: 70, // Start at defensive 30-yard line
+      lineOfScrimmage: 30, // Start at offensive 30-yard line
       currentDown: 1,
       yardsToGo: 10,
-      driveStartPosition: 70,
+      driveStartPosition: 30,
       ballOn: 30,
       isFirstDown: true,
       hashPosition: 'middle',
@@ -116,7 +116,7 @@ export class FootballEngine {
   }
 
   private createBall(): Ball {
-    const los = this.gameState?.lineOfScrimmage || 70;
+    const los = this.gameState?.lineOfScrimmage || 30;
     const hashPos = this.gameState?.hashPosition || 'middle';
 
     // Calculate x position based on hash
@@ -271,17 +271,17 @@ export class FootballEngine {
 
     // Check for turnover on downs
     if (this.gameState.currentDown > 4) {
-      // Reset to defensive 30-yard line on turnover
-      this.setLineOfScrimmage(70);
+      // Reset to offensive 30-yard line on turnover
+      this.setLineOfScrimmage(30);
       this.gameState.currentDown = 1;
       this.gameState.yardsToGo = 10;
-      this.gameState.driveStartPosition = 70;
+      this.gameState.driveStartPosition = 30;
     } else if (newLOS >= 100) {
-      // Touchdown! Reset to defensive 30-yard line
-      this.setLineOfScrimmage(70);
+      // Touchdown! Reset to offensive 30-yard line
+      this.setLineOfScrimmage(30);
       this.gameState.currentDown = 1;
       this.gameState.yardsToGo = 10;
-      this.gameState.driveStartPosition = 70;
+      this.gameState.driveStartPosition = 30;
     } else {
       // Continue drive
       this.setLineOfScrimmage(newLOS);

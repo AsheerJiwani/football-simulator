@@ -127,6 +127,40 @@ export default function FieldCanvas({
       <line key="right-hash" x1={rightHash} y1={0} x2={rightHash} y2={height} stroke="#ffffff" strokeWidth="0.5" />
     );
 
+    // Line of Scrimmage (blue line)
+    const losY = fieldToSvg(0, gameState.lineOfScrimmage).y;
+    markings.push(
+      <line
+        key="line-of-scrimmage"
+        x1={0}
+        y1={losY}
+        x2={width}
+        y2={losY}
+        stroke="#0066ff"
+        strokeWidth="3"
+        opacity="0.8"
+      />
+    );
+
+    // First Down Marker (yellow line) - only show if not in red zone
+    const firstDownYard = gameState.lineOfScrimmage + gameState.yardsToGo;
+    if (firstDownYard < 110) { // Don't show if we're inside the 10-yard line (red zone)
+      const firstDownY = fieldToSvg(0, firstDownYard).y;
+      markings.push(
+        <line
+          key="first-down-marker"
+          x1={0}
+          y1={firstDownY}
+          x2={width}
+          y2={firstDownY}
+          stroke="#ffff00"
+          strokeWidth="3"
+          opacity="0.8"
+          strokeDasharray="10,5"
+        />
+      );
+    }
+
     return markings;
   };
 
