@@ -13,7 +13,7 @@ Movements should be fluid, defender tracking based on man/match/zone concepts hi
 
 Field should be 120 yards long (100 yards + 10 yards for each endzone) & vertical instead of horizontal
 
-The default LOS is on the offensive side (closer to bottom of field in UI) at 30 yard line, changes based on last play, indicated by a blue line
+The default LOS is on the offensive side (closer to bottom of field, away from defensive endzone in UI) at 30 yard line, changes based on last play, indicated by a blue line
 
 First down marker 10 yards ahead of the LOS indicated by yellow line
 

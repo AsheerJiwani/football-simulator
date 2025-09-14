@@ -29,9 +29,10 @@ export default function FieldCanvas({
   const scaleY = height / 120;  // Height represents endzone to endzone
 
   // Convert field coordinates to SVG coordinates
+  // Invert Y-axis so offensive endzone (Y=0) is at bottom of screen
   const fieldToSvg = (fieldX: number, fieldY: number) => ({
     x: fieldX * scaleX,
-    y: fieldY * scaleY,
+    y: (120 - fieldY) * scaleY,  // Invert Y to put offense at bottom
   });
 
   // Render field markings (VERTICAL FIELD)
