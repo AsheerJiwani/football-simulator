@@ -17,6 +17,7 @@ import type {
 } from './types';
 
 import { Vector, Physics, Field, Random, Route as RouteUtil } from '@/lib/math';
+import { DataLoader } from '@/lib/dataLoader';
 import {
   generateCover1Alignment,
   generateCover2Alignment,
@@ -215,9 +216,41 @@ export class FootballEngine {
   public setPersonnel(personnel: PersonnelPackage): void {
     this.gameState.personnel = personnel;
 
-    // Don't re-setup offensive players, just update personnel
-    // The actual offensive players on field are determined by formation
-    // Personnel is used for defensive adjustments only
+    // If no offensive players exist, create a basic formation matching the personnel
+    const hasOffense = this.gameState.players.some(p => p.team === 'offense');
+    if (!hasOffense) {
+      // Create a basic formation that matches the personnel package
+      let formation;
+      switch (personnel) {
+        case '10':
+          formation = DataLoader.getFormation('empty'); // 4 WRs
+          break;
+        case '11':
+          formation = DataLoader.getFormation('trips-right'); // 3 WRs, 1 RB
+          break;
+        case '12':
+          formation = DataLoader.getFormation('singleback'); // 2 WRs, 2 TEs, 1 RB
+          break;
+        case '21':
+          formation = DataLoader.getFormation('singleback'); // Fallback
+          break;
+        default:
+          formation = DataLoader.getFormation('trips-right');
+      }
+
+      if (formation) {
+        const mockConcept: PlayConcept = {
+          name: 'Personnel Test',
+          description: 'Test formation for personnel',
+          difficulty: 'medium',
+          formation: formation,
+          routes: {}
+        };
+        this.setPlayConcept(mockConcept);
+        // setPlayConcept already sets personnel, so restore it
+        this.gameState.personnel = personnel;
+      }
+    }
 
     // Realign defense to new offensive personnel
     if (this.gameState.coverage) {
@@ -3114,7 +3147,15 @@ export class FootballEngine {
 
       case 'cover-3':
         // Three-deep zones - adjust for run/pass tendencies
-        if (formation.isTrips) {
+        if (offensivePersonnel === '10') {
+          // 4 WRs - use Nickel package (5 DBs, 2 LBs)
+          return {
+            CB: 2,
+            S: 2,
+            NB: 1,
+            LB: 2
+          };
+        } else if (formation.isTrips) {
           // Trips formations - need extra coverage
           return {
             CB: 2,
@@ -3135,7 +3176,7 @@ export class FootballEngine {
       case 'cover-4':
       case 'quarters':
         // Four-deep coverage - pattern matching
-        if (formation.receiverCount >= 4) {
+        if (offensivePersonnel === '10' || formation.receiverCount >= 4) {
           // Many receivers - Dime package
           return {
             CB: 2,
@@ -3143,11 +3184,28 @@ export class FootballEngine {
             NB: 2,
             LB: 1
           };
+        } else if (offensivePersonnel === '11') {
+          // Standard Nickel
+          return {
+            CB: 2,
+            S: 2,
+            NB: 1,
+            LB: 2
+          };
         }
         break;
 
       case 'tampa-2':
         // Similar to Cover 2 but MLB drops deep
+        if (offensivePersonnel === '10') {
+          // 4 WRs - need DBs but keep MLB
+          return {
+            CB: 2,
+            S: 2,
+            NB: 1,
+            LB: 2 // Keep MLB plus one other
+          };
+        }
         return {
           CB: 2,
           S: 2,
@@ -3156,7 +3214,15 @@ export class FootballEngine {
 
       case 'cover-6':
         // Field/boundary split coverage
-        if (formation.isTrips) {
+        if (offensivePersonnel === '10') {
+          // 4 WRs - Nickel package
+          return {
+            CB: 2,
+            S: 2,
+            NB: 1,
+            LB: 2
+          };
+        } else if (formation.isTrips) {
           return {
             CB: 2,
             S: 2,
@@ -3183,6 +3249,30 @@ export class FootballEngine {
   ): any[] {
     let adjustedResponsibilities = [...originalResponsibilities];
 
+    // First, ensure we have the right number of safeties
+    const existingSafetyCount = adjustedResponsibilities.filter(r => r.defenderId.startsWith('S')).length;
+    const safetiesNeeded = (optimalPersonnel.S || 2) - existingSafetyCount;
+
+    if (safetiesNeeded > 0) {
+      // Add missing safeties
+      for (let i = existingSafetyCount; i < optimalPersonnel.S; i++) {
+        const safetyId = `S${i + 1}`;
+        // Check if this safety already exists
+        if (!adjustedResponsibilities.find(r => r.defenderId === safetyId)) {
+          adjustedResponsibilities.push({
+            defenderId: safetyId,
+            type: 'zone' as const,
+            zone: {
+              center: { x: i === 0 ? 16 : 37, y: 13 },
+              width: 26.665,
+              height: 40,
+              depth: 'deep'
+            }
+          });
+        }
+      }
+    }
+
     // Ensure we maintain exactly 7 defenders
     // If we need to add nickel backs, we need to remove other defenders
     if (optimalPersonnel.NB && optimalPersonnel.NB > 0) {
@@ -3194,7 +3284,7 @@ export class FootballEngine {
         // Remove linebackers to make room for nickel backs
         const lbsToRemove = adjustedResponsibilities
           .filter(r => r.defenderId.startsWith('LB'))
-          .slice(0, nbNeeded);
+          .slice(-nbNeeded); // Remove from the end
 
         lbsToRemove.forEach(lb => {
           const index = adjustedResponsibilities.findIndex(r => r.defenderId === lb.defenderId);
@@ -3216,8 +3306,30 @@ export class FootballEngine {
       }
     }
 
-    // Ensure we have exactly 7 defenders
-    adjustedResponsibilities = adjustedResponsibilities.slice(0, 7);
+    // Ensure we have exactly 7 defenders - prioritize key positions
+    // Keep CBs, Safeties, and NBs first, then LBs
+    if (adjustedResponsibilities.length > 7) {
+      const prioritizedResponsibilities: any[] = [];
+
+      // Priority 1: Cornerbacks (keep all)
+      const cbs = adjustedResponsibilities.filter(r => r.defenderId.startsWith('CB'));
+      prioritizedResponsibilities.push(...cbs);
+
+      // Priority 2: Safeties (keep all for proper coverage)
+      const safeties = adjustedResponsibilities.filter(r => r.defenderId.startsWith('S'));
+      prioritizedResponsibilities.push(...safeties);
+
+      // Priority 3: Nickel backs (if needed)
+      const nbs = adjustedResponsibilities.filter(r => r.defenderId.startsWith('NB'));
+      prioritizedResponsibilities.push(...nbs);
+
+      // Priority 4: Linebackers (fill remaining spots)
+      const lbs = adjustedResponsibilities.filter(r => r.defenderId.startsWith('LB'));
+      const spotsRemaining = 7 - prioritizedResponsibilities.length;
+      prioritizedResponsibilities.push(...lbs.slice(0, spotsRemaining));
+
+      adjustedResponsibilities = prioritizedResponsibilities.slice(0, 7);
+    }
 
     // Adjust linebacker responsibilities based on formation
     if (formation.personnel === '12' || formation.personnel === '21') {
@@ -3252,6 +3364,57 @@ export class FootballEngine {
           if (distanceToBunch < 10) {
             resp.zone.width *= 0.8; // Tighten zone
           }
+        }
+      });
+    }
+
+    // Special handling for Cover 0 - ensure all eligible defenders are in man/blitz
+    const coverageType = this.gameState.coverage?.type;
+    if (coverageType === 'cover-0') {
+      // In Cover 0, all defenders should be either man or blitz (no zones)
+      // Convert any zone defenders to man coverage
+      const eligibleReceivers = formation.receiverCount || 4;
+
+      // First convert all zone defenders to man
+      adjustedResponsibilities.forEach(resp => {
+        if (resp.type === 'zone') {
+          resp.type = 'man';
+          // Will be properly assigned targets later
+          delete resp.zone;
+        }
+      });
+
+      // Ensure we have enough man defenders (at least 5 for spread)
+      const manDefenders = adjustedResponsibilities.filter(r => r.type === 'man');
+      const blitzers = adjustedResponsibilities.filter(r => r.type === 'blitz');
+
+      // Need at least 5 man defenders vs spread
+      const manDefendersNeeded = Math.max(5, Math.min(eligibleReceivers, 6));
+
+      if (manDefenders.length < manDefendersNeeded) {
+        // Convert some blitzers to man coverage
+        const toConvert = Math.min(blitzers.length, manDefendersNeeded - manDefenders.length);
+        for (let i = 0; i < toConvert; i++) {
+          blitzers[i].type = 'man';
+          delete blitzers[i].gap;
+          delete blitzers[i].side;
+        }
+      }
+
+      // Assign targets to man defenders without targets
+      const availableTargets = ['WR1', 'WR2', 'WR3', 'WR4', 'TE1', 'RB1'];
+      const assignedTargets = adjustedResponsibilities
+        .filter(r => r.type === 'man' && r.target)
+        .map(r => r.target);
+
+      const unassignedTargets = availableTargets.filter(t => !assignedTargets.includes(t));
+      const defendersNeedingTargets = adjustedResponsibilities.filter(r =>
+        r.type === 'man' && !r.target
+      );
+
+      defendersNeedingTargets.forEach((defender, index) => {
+        if (index < unassignedTargets.length) {
+          defender.target = unassignedTargets[index];
         }
       });
     }

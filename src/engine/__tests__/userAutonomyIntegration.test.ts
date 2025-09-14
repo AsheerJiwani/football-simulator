@@ -29,7 +29,7 @@ describe('User Autonomy Integration Tests', () => {
 
   describe('1. setPlayConcept() Integration Chain', () => {
     test('should trigger defensive realignment when play concept changes', () => {
-      // Get Four Verts concept (trips formation)
+      // Get Four Verts concept (spread 2x2 formation)
       const fourVerts = DataLoader.getConcept('four-verts');
       expect(fourVerts).toBeDefined();
 
@@ -697,7 +697,7 @@ describe('User Autonomy Integration Tests', () => {
         coverageName: string,
         formationTest: (state: GameState) => void
       ) => {
-        test(`${coverageName} should adjust to trips formation`, () => {
+        test(`${coverageName} should adjust to spread formation`, () => {
           const coverage = DataLoader.getCoverage(coverageName);
           const fourVerts = DataLoader.getConcept('four-verts');
 
@@ -723,6 +723,12 @@ describe('User Autonomy Integration Tests', () => {
         const manDefenders = defenders.filter(d =>
           d.coverageResponsibility?.type === 'man'
         );
+        // Debug: log defender responsibilities
+        console.log('Cover 0 defenders:', defenders.map(d => ({
+          id: d.id,
+          type: d.coverageResponsibility?.type,
+          target: d.coverageResponsibility?.target
+        })));
         expect(manDefenders.length).toBeGreaterThanOrEqual(5);
       });
 
@@ -927,6 +933,7 @@ describe('User Autonomy Integration Tests', () => {
             p.playerType === 'NB'
           );
           const lbs = defenders.filter(p => p.playerType === 'LB');
+
 
           switch (personnel) {
             case '10': // 4 WRs
