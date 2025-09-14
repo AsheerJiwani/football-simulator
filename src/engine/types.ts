@@ -69,6 +69,7 @@ export interface Coverage {
   safetyCount: number;
   description?: string;
   responsibilities: CoverageResponsibility[];
+  positions?: Record<string, Vector2D>; // Defender positions relative to LOS
 }
 
 export type CoverageType = 'cover-0' | 'cover-1' | 'cover-2' | 'cover-3' | 'cover-4' | 'cover-6' | 'quarters' | 'tampa-2';
@@ -155,6 +156,14 @@ export interface GameState {
     teBlocking: boolean;
     fbBlocking: boolean;
   };
+  // Drive and field position
+  lineOfScrimmage: number; // Y-coordinate of LOS (default 30)
+  currentDown: number; // 1-4
+  yardsToGo: number; // Yards needed for first down
+  driveStartPosition: number; // Where the drive started
+  ballOn: number; // Current field position (yard line)
+  isFirstDown: boolean;
+  hashPosition: 'left' | 'middle' | 'right'; // Hash mark position
 }
 
 export type GamePhase = 'pre-snap' | 'post-snap' | 'ball-thrown' | 'play-over';

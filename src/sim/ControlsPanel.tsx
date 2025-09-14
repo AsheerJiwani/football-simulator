@@ -27,6 +27,7 @@ import MotionControls from './MotionControls';
 import AudibleControls from './AudibleControls';
 import PassProtectionControls from './PassProtectionControls';
 import PersonnelSelector from './PersonnelSelector';
+import { DownAndDistance } from './DownAndDistance';
 
 export default function ControlsPanel() {
   const setConcept = useSetConcept();
@@ -73,6 +74,9 @@ export default function ControlsPanel() {
           </select>
         </div>
       </div>
+
+      {/* Down and Distance */}
+      <DownAndDistance />
 
       {/* Play Selection */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

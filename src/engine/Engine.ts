@@ -16,7 +16,18 @@ import type {
 } from './types';
 
 import { Vector, Physics, Field, Random, Route as RouteUtil } from '@/lib/math';
-import { generateCover1Alignment, getOptimalDefensivePersonnel, generateDefensiveAssignments, analyzeFormation } from './alignment';
+import {
+  generateCover1Alignment,
+  generateCover2Alignment,
+  generateCover3Alignment,
+  generateCover4Alignment,
+  generateTampa2Alignment,
+  generateCover6Alignment,
+  generateCover0Alignment,
+  getOptimalDefensivePersonnel,
+  generateDefensiveAssignments,
+  analyzeFormation
+} from './alignment';
 
 export class FootballEngine {
   private gameState: GameState;
@@ -90,12 +101,21 @@ export class FootballEngine {
         teBlocking: false,
         fbBlocking: false,
       },
+      // Drive and field position
+      lineOfScrimmage: 70, // Start at defensive 30-yard line
+      currentDown: 1,
+      yardsToGo: 10,
+      driveStartPosition: 70,
+      ballOn: 30,
+      isFirstDown: true,
+      hashPosition: 'middle',
     };
   }
 
   private createBall(): Ball {
+    const los = this.gameState?.lineOfScrimmage || 70;
     return {
-      position: { x: 26.665, y: 60 }, // Start at midfield, middle hash (vertical field)
+      position: { x: 26.665, y: los }, // Ball at LOS, middle hash (vertical field)
       velocity: { x: 0, y: 0 },
       state: 'held',
       timeInAir: 0,
@@ -165,6 +185,69 @@ export class FootballEngine {
     }
   }
 
+  public setLineOfScrimmage(yardLine: number): void {
+    // Clamp between goal lines (0-100)
+    this.gameState.lineOfScrimmage = Math.max(1, Math.min(99, yardLine));
+    this.gameState.ballOn = this.gameState.lineOfScrimmage;
+    // Update ball position
+    this.gameState.ball.position.y = this.gameState.lineOfScrimmage;
+    // Re-setup players at new LOS
+    if (this.gameState.playConcept) {
+      this.setupPlayers();
+      if (this.gameState.coverage) {
+        this.setupDefense();
+      }
+    }
+  }
+
+  public advanceToNextPlay(): void {
+    if (!this.gameState.outcome) return;
+
+    const { type, yards } = this.gameState.outcome;
+    let newLOS = this.gameState.lineOfScrimmage;
+
+    // Calculate new field position based on outcome
+    if (type === 'catch') {
+      newLOS += yards;
+    } else if (type === 'sack') {
+      newLOS += yards; // Negative yards for sack
+    }
+    // Incomplete pass stays at same spot
+
+    // Check for first down
+    const yardsGained = newLOS - this.gameState.lineOfScrimmage;
+    if (yardsGained >= this.gameState.yardsToGo) {
+      this.gameState.currentDown = 1;
+      this.gameState.yardsToGo = 10;
+      this.gameState.isFirstDown = true;
+    } else {
+      this.gameState.currentDown++;
+      this.gameState.yardsToGo -= yardsGained;
+      this.gameState.isFirstDown = false;
+    }
+
+    // Check for turnover on downs
+    if (this.gameState.currentDown > 4) {
+      // Reset to defensive 30-yard line on turnover
+      this.setLineOfScrimmage(70);
+      this.gameState.currentDown = 1;
+      this.gameState.yardsToGo = 10;
+      this.gameState.driveStartPosition = 70;
+    } else if (newLOS >= 100) {
+      // Touchdown! Reset to defensive 30-yard line
+      this.setLineOfScrimmage(70);
+      this.gameState.currentDown = 1;
+      this.gameState.yardsToGo = 10;
+      this.gameState.driveStartPosition = 70;
+    } else {
+      // Continue drive
+      this.setLineOfScrimmage(newLOS);
+    }
+
+    // Reset play state
+    this.reset();
+  }
+
   public sendInMotion(playerId: string, motionType: MotionType = 'fly'): boolean {
     // Can only send player in motion pre-snap
     if (this.gameState.phase !== 'pre-snap') return false;
@@ -204,7 +287,7 @@ export class FootballEngine {
         const behindQB = { x: 26.665, y: 62 };
         endPos = {
           x: player.position.x > 26.665 ? 10 : 43,
-          y: 60
+          y: this.gameState.lineOfScrimmage
         };
         path = [startPos, behindQB, endPos];
         break;
@@ -212,7 +295,7 @@ export class FootballEngine {
         // Fast sweep motion
         endPos = {
           x: player.position.x > 26.665 ? 5 : 48,
-          y: 60
+          y: this.gameState.lineOfScrimmage
         };
         path = [startPos, endPos];
         break;
@@ -686,7 +769,7 @@ export class FootballEngine {
         const offsetX = blockerSide === 'left' ? player.position.x - 2 : player.position.x + 2;
         player.blockingPosition = {
           x: offsetX,
-          y: 58 // Just in front of LOS
+          y: this.gameState.lineOfScrimmage - 2 // Just in front of LOS
         };
       }
 
@@ -802,7 +885,7 @@ export class FootballEngine {
       const assignedReceiver = this.findAssignedReceiver(player);
 
       if (assignedReceiver) {
-        const routeDepth = assignedReceiver.position.y - 60; // Distance from LOS
+        const routeDepth = assignedReceiver.position.y - this.gameState.lineOfScrimmage; // Distance from LOS
 
         // MOD (Man Only Deep) rules
         if (routeDepth >= verticalThreshold) {
@@ -905,7 +988,7 @@ export class FootballEngine {
     const threats = this.gameState.players.filter(p =>
       p.team === 'offense' &&
       p.isEligible &&
-      Math.abs(p.position.y - 60) < 10 && // Within 10 yards of LOS
+      Math.abs(p.position.y - this.gameState.lineOfScrimmage) < 10 && // Within 10 yards of LOS
       Vector.distance(player.position, p.position) < 15
     );
 
@@ -1120,9 +1203,14 @@ export class FootballEngine {
     // Create offensive players based on formation
     Object.entries(concept.formation.positions).forEach(([playerId, position]) => {
       const playerType = this.getPlayerTypeFromId(playerId);
+      // Adjust position relative to current LOS (formations assume LOS at y=60)
+      const adjustedPosition = {
+        x: position.x,
+        y: position.y - 60 + this.gameState.lineOfScrimmage
+      };
       const player: Player = {
         id: playerId,
-        position: { ...position },
+        position: adjustedPosition,
         velocity: { x: 0, y: 0 },
         team: 'offense',
         playerType,
@@ -1189,7 +1277,7 @@ export class FootballEngine {
       });
 
       // Apply dynamic alignment
-      const alignmentPositions = generateCover1Alignment(offensivePlayers, defensivePlayers);
+      const alignmentPositions = generateCover1Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
 
       // Update defender positions with calculated alignments
       defensivePlayers.forEach(defender => {
@@ -1206,14 +1294,14 @@ export class FootballEngine {
       this.gameState.players.push(...defensivePlayers);
 
     } else {
-      // For non-Cover 1 coverages, use static JSON-based assignments
+      // For other coverages, create defenders and apply dynamic alignment
       const defensivePlayers: Player[] = [];
       coverage.responsibilities.forEach((responsibility) => {
         const playerType = this.getPlayerTypeFromId(responsibility.defenderId);
 
         const defender: Player = {
           id: responsibility.defenderId,
-          position: this.getDefensivePosition(responsibility.defenderId, coverage),
+          position: { x: 0, y: 0 }, // Will be set by alignment system
           velocity: { x: 0, y: 0 },
           team: 'defense',
           playerType,
@@ -1231,27 +1319,81 @@ export class FootballEngine {
         defensivePlayers.push(defender);
       });
 
+      // Apply dynamic alignment based on coverage type
+      let alignmentPositions: Record<string, Vector2D> = {};
+
+      switch (coverage.type) {
+        case 'cover-0':
+          alignmentPositions = generateCover0Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+          break;
+        case 'cover-2':
+          alignmentPositions = generateCover2Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+          break;
+        case 'cover-3':
+          alignmentPositions = generateCover3Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+          break;
+        case 'tampa-2':
+          alignmentPositions = generateTampa2Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+          break;
+        case 'cover-4':
+        case 'quarters':
+          alignmentPositions = generateCover4Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+          break;
+        case 'cover-6':
+          alignmentPositions = generateCover6Alignment(offensivePlayers, defensivePlayers, this.gameState.lineOfScrimmage);
+          break;
+        default:
+          // For coverages without specific alignment functions, use fallback positioning
+          defensivePlayers.forEach(defender => {
+            defender.position = this.getDefensivePosition(defender.id, coverage);
+          });
+          break;
+      }
+
+      // Update defender positions with calculated alignments
+      if (Object.keys(alignmentPositions).length > 0) {
+        defensivePlayers.forEach(defender => {
+          const calculatedPosition = alignmentPositions[defender.id];
+          if (calculatedPosition) {
+            defender.position = calculatedPosition;
+          } else {
+            // Fallback to static positioning if dynamic calculation fails
+            defender.position = this.getDefensivePosition(defender.id, coverage);
+          }
+        });
+      }
+
       // Add defensive players to game state
       this.gameState.players.push(...defensivePlayers);
     }
   }
 
-  private getDefensivePosition(defenderId: string, _coverage: Coverage): Vector2D {
-    // Get position from coverage data - this would come from our JSON
-    // For now, return basic positions based on player type (vertical field)
-    const playerType = this.getPlayerTypeFromId(defenderId);
+  private getDefensivePosition(defenderId: string, coverage: Coverage): Vector2D {
+    // Get position from coverage data and adjust relative to LOS
+    const los = this.gameState.lineOfScrimmage;
+    const coveragePosition = coverage.positions?.[defenderId];
 
+    if (coveragePosition) {
+      // Coverage positions assume LOS at y=60, so adjust relative to actual LOS
+      return {
+        x: coveragePosition.x,
+        y: coveragePosition.y - 60 + los
+      };
+    }
+
+    // Fallback positions based on player type
+    const playerType = this.getPlayerTypeFromId(defenderId);
     switch (playerType) {
       case 'CB':
-        return defenderId === 'CB1' ? { x: 8, y: 60 } :
-               defenderId === 'CB2' ? { x: 45, y: 60 } : { x: 38, y: 60 };
+        return defenderId === 'CB1' ? { x: 8, y: los - 5 } :
+               defenderId === 'CB2' ? { x: 45, y: los - 5 } : { x: 38, y: los - 3 };
       case 'S':
-        return { x: 26.665, y: 45 };
+        return { x: 26.665, y: los - 12 }; // 12 yards behind LOS
       case 'LB':
-        return defenderId === 'LB1' ? { x: 30, y: 62 } :
-               defenderId === 'LB2' ? { x: 23, y: 62 } : { x: 16, y: 62 };
+        return defenderId === 'LB1' ? { x: 20, y: los - 4 } :
+               defenderId === 'LB2' ? { x: 26.665, y: los - 5 } : { x: 33, y: los - 4 };
       default:
-        return { x: 26.665, y: 65 };
+        return { x: 26.665, y: los - 5 };
     }
   }
 

@@ -1,6 +1,6 @@
 📌 Project Overview
 
-We are building a gamified football simulator hosted as a Next.js 15 app on Vercel.
+We are building a gamified football game simulator hosted as a Next.js 15 app on Vercel.
 Target audience: Quarterbacks and young football players who want to practice attacking different defensive coverages.
 
 Key design rules:
@@ -12,6 +12,8 @@ Mechanics must feel NFL-realistic (routes, coverages, player speeds, motions, au
 Movements should be fluid, defender tracking based on man/match/zone concepts highly realistic
 
 Field should be 120 yards long (100 yards + 10 yards for each endzone) & vertical instead of horizontal
+
+Gameplay with drives (4 downs, first down line 10 yards ahead of default start position [30 yard line], if 4 downs are reached and user does not complete a first down, they should have to reset at the 30 yard line.) with ongoing plays starting from where the last one ended based on the hashmarks and last play result
 
 Directive: Whenever implementing, modifying, or expanding any NFL mechanic (coverages, alignments, motions, player speeds, ball physics, openness/tackle logic, zone bubbles, or new concepts), Claude must first call the Research Subagent to gather factual, cited evidence before coding. For each coverage, the agent should return JSON Structured data describing each positions' role in the coverage system as well as the adjustments made when offensive personnel and formations changes occur.
 
@@ -36,6 +38,10 @@ Personnel & Formations: Adjust RB/TE/WR counts; each concept has a default forma
 Defensive Coverage: User selects coverage (Cover 0–6, Quarters, Tampa 2, etc.); defense auto-aligns based on formation/personnel.
 
 Throw: After the snap, QB may throw to any non-pass-pro eligible.
+
+Next Play: User can advance to the next play, beginning from the same y position on the field if the last play was an incomplete pass, or from where the QB was in y value when he was sacked, or where the receiver was when they were tackled if they caught the ball, or from the default starting position (30 yard line) if they scored a touchdown.
+
+Reset: User can reset the play after the ball is snapped and without clicking "Next Play" to reset from the same down
 
 Audibles: Change a single receiver’s route pre-snap.
 

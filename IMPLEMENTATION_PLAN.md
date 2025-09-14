@@ -139,15 +139,17 @@
 ## Next Steps (Phase 4+) **ONGOING**
 - Add motion and audibles
 - Implement Hash-based Snap logic and adjustements to positioning (offense and zone coverage) (utilize research agent to draft a .md file with nfl rules regarding "next-play setup on left or right or in between hash")
+- Implement "Next Play" mechanics
 - Implement drag-and-drop positioning
 - Improve fluidity of movement mechanics (incredibly detailed movement mechanics including how far a defender should lag behind after a receiver cuts in man coverge, how fast defenders run in zones, how leverage affects defender's advantage based on receiver route in certain coverages, how close defenders trail receivers naturally, zone handoffs, safety tracking, etc.)
 - Design production-grade UI with an interactive control panel and the field should take up majority of the webpage as the main focus. Field size should render as at least 50% of the screen, while maintaining integrity of all simulation code.
 - Add more plays and coverages
-- Perfect defensive coverage concepts (man: cushion/press, zone: find ways to perfect realistic nfl-mechanics, match: find ways to perfect realistic nfl-mechanics)
+- Perfect defensive coverage concepts (man: cushion/press, zone: find ways to perfect realistic nfl-mechanics, match: find ways to perfect realistic nfl-mechanics, rotations)
 - Build Challenge Mode
 - Integrate authentication
-- Add subscription tiers
-- Implement analytics
+- Easy mode vs hard mode (easy: no rotations in coverage; hard: rotations in coverage occur with nfl-realism)
+- Add subscription tiers to unlock easy mode past one month and to unlock hard mode separately
+- Implement analytics per-user
 
 ## Development Timeline Estimate
 - Phase 1: 2-3 hours

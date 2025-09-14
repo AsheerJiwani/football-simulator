@@ -33,6 +33,7 @@ interface GameStore {
   snap: () => void;
   throwTo: (receiverId: string) => void;
   reset: () => void;
+  advanceToNextPlay: () => void;
   updateGameState: () => void;
 }
 
@@ -289,6 +290,26 @@ export const useGameStore = create<GameStore>()(
         }));
       },
 
+      advanceToNextPlay: () => {
+        const { engine, selectedConcept, selectedCoverage } = get();
+        if (!engine) return;
+
+        engine.advanceToNextPlay();
+
+        // Reload concept and coverage with new field position
+        const concept = DataLoader.getConcept(selectedConcept);
+        const coverage = DataLoader.getCoverage(selectedCoverage);
+
+        if (concept) engine.setPlayConcept(concept);
+        if (coverage) engine.setCoverage(coverage);
+
+        set((state) => ({
+          ...state,
+          isPlaying: false,
+          gameState: engine.getGameState()
+        }));
+      },
+
       updateGameState: () => {
         const { engine } = get();
         if (!engine) return;
@@ -375,4 +396,12 @@ export const useIsMotionActive = () => useGameStore(state => state.gameState.isM
 export const usePassProtection = () => useGameStore(state => state.gameState.passProtection);
 export const useAudiblesUsed = () => useGameStore(state => state.gameState.audiblesUsed);
 export const useMaxAudibles = () => useGameStore(state => state.gameState.maxAudibles);
+
+// Drive state selectors
+export const useLineOfScrimmage = () => useGameStore(state => state.gameState.lineOfScrimmage);
+export const useCurrentDown = () => useGameStore(state => state.gameState.currentDown);
+export const useYardsToGo = () => useGameStore(state => state.gameState.yardsToGo);
+export const useBallOn = () => useGameStore(state => state.gameState.ballOn);
+export const useIsFirstDown = () => useGameStore(state => state.gameState.isFirstDown);
+export const useAdvanceToNextPlay = () => useGameStore(state => state.advanceToNextPlay);
 

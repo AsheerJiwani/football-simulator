@@ -151,7 +151,7 @@ export function calculateLeverage(receiver: Player, fieldBoundary: 'left' | 'rig
 /**
  * Calculate Cover 1 Free Safety position
  */
-export function getCover1FreeSafety(formation: FormationAnalysis): Vector2D {
+export function getCover1FreeSafety(formation: FormationAnalysis, los: number): Vector2D {
   const centerX = 26.665; // Center of field
   const depth = COVER_1_CONSTANTS.FS_DEPTH;
 
@@ -165,14 +165,14 @@ export function getCover1FreeSafety(formation: FormationAnalysis): Vector2D {
 
   return {
     x: centerX + xAdjustment,
-    y: 60 - depth, // 60 is LOS, subtract depth to go back
+    y: los - depth, // Position relative to actual LOS
   };
 }
 
 /**
  * Calculate Cover 1 Cornerback position
  */
-export function getCover1Cornerback(receiver: Player, leverage: Leverage, coverage: 'soft' | 'press' = 'soft'): Vector2D {
+export function getCover1Cornerback(receiver: Player, leverage: Leverage, los: number, coverage: 'soft' | 'press' = 'soft'): Vector2D {
   const depth = coverage === 'press' ? COVER_1_CONSTANTS.CB_DEPTH_PRESS : COVER_1_CONSTANTS.CB_DEPTH_SOFT;
 
   let xOffset = 0;
@@ -191,7 +191,7 @@ export function getCover1Cornerback(receiver: Player, leverage: Leverage, covera
 /**
  * Calculate Cover 1 Strong Safety position
  */
-export function getCover1StrongSafety(targetReceiver: Player): Vector2D {
+export function getCover1StrongSafety(targetReceiver: Player, _los: number): Vector2D {
   const depth = COVER_1_CONSTANTS.SS_DEPTH_VS_TE;
 
   // 2 yards outside the target receiver
@@ -204,14 +204,14 @@ export function getCover1StrongSafety(targetReceiver: Player): Vector2D {
 /**
  * Calculate Cover 1 Linebacker position
  */
-export function getCover1Linebacker(targetReceiver: Player, role: 'coverage' | 'spy' = 'coverage'): Vector2D {
+export function getCover1Linebacker(targetReceiver: Player, los: number, role: 'coverage' | 'spy' = 'coverage'): Vector2D {
   const depth = COVER_1_CONSTANTS.LB_DEPTH;
 
   if (role === 'spy') {
     // Spy stays in middle of field to watch QB
     return {
       x: 26.665,
-      y: 60 - depth,
+      y: los - depth,
     };
   }
 
@@ -399,7 +399,8 @@ export function generateDefensiveAssignments(
  */
 export function generateCover1Alignment(
   offensivePlayers: Player[],
-  defensivePlayers: Player[]
+  defensivePlayers: Player[],
+  los: number
 ): Record<string, Vector2D> {
   const formation = analyzeFormation(offensivePlayers);
   const positions: Record<string, Vector2D> = {};
@@ -415,12 +416,12 @@ export function generateCover1Alignment(
     switch (defender.playerType) {
       case 'S':
         if (defender.id === 'S1' || defender.id === 'FS') {
-          positions[defender.id] = getCover1FreeSafety(formation);
+          positions[defender.id] = getCover1FreeSafety(formation, los);
         } else {
           // Strong Safety - cover #2 receiver on strength side
           const strongSideReceivers = formation.strength === 'left' ? leftReceivers : rightReceivers;
           if (strongSideReceivers.number2) {
-            positions[defender.id] = getCover1StrongSafety(strongSideReceivers.number2);
+            positions[defender.id] = getCover1StrongSafety(strongSideReceivers.number2, los);
           }
         }
         break;
@@ -430,17 +431,17 @@ export function generateCover1Alignment(
         if (assignedReceiver) {
           const boundaryDirection = assignedReceiver.position.x < 26.665 ? 'left' : 'right';
           const leverage = calculateLeverage(assignedReceiver, boundaryDirection);
-          positions[defender.id] = getCover1Cornerback(assignedReceiver, leverage);
+          positions[defender.id] = getCover1Cornerback(assignedReceiver, leverage, los);
         }
         break;
 
       case 'LB':
         if (responsibility.type === 'spy') {
-          positions[defender.id] = getCover1Linebacker(offensivePlayers[0], 'spy'); // QB
+          positions[defender.id] = getCover1Linebacker(offensivePlayers[0], los, 'spy'); // QB
         } else if (responsibility.target) {
           const assignedReceiver = offensivePlayers.find(p => p.id === responsibility.target);
           if (assignedReceiver) {
-            positions[defender.id] = getCover1Linebacker(assignedReceiver, 'coverage');
+            positions[defender.id] = getCover1Linebacker(assignedReceiver, los, 'coverage');
           }
         }
         break;
@@ -449,7 +450,7 @@ export function generateCover1Alignment(
         const assignedNickelReceiver = offensivePlayers.find(p => p.id === responsibility.target);
         if (assignedNickelReceiver) {
           const leverage = calculateLeverage(assignedNickelReceiver, 'left'); // Default
-          positions[defender.id] = getCover1Cornerback(assignedNickelReceiver, leverage);
+          positions[defender.id] = getCover1Cornerback(assignedNickelReceiver, leverage, los);
         }
         break;
     }
@@ -463,7 +464,8 @@ export function generateCover1Alignment(
  */
 export function generateCover4Alignment(
   offensivePlayers: Player[],
-  defensivePlayers: Player[]
+  defensivePlayers: Player[],
+  los: number
 ): Record<string, Vector2D> {
   const formation = analyzeFormation(offensivePlayers);
   const positions: Record<string, Vector2D> = {};
@@ -476,29 +478,125 @@ export function generateCover4Alignment(
       case 'CB':
         // CBs take outside quarters
         if (defender.id === 'CB1') {
-          positions[defender.id] = { x: 8, y: 53 }; // Left outside quarter
+          positions[defender.id] = { x: 8, y: los - 7 }; // Left outside quarter, 7 yards behind LOS
         } else if (defender.id === 'CB2') {
-          positions[defender.id] = { x: 45, y: 53 }; // Right outside quarter
+          positions[defender.id] = { x: 45, y: los - 7 }; // Right outside quarter
         }
         break;
 
       case 'S':
         // Safeties take inside quarters
         if (defender.id === 'S1') {
-          positions[defender.id] = { x: 18, y: 48 }; // Left inside quarter
+          positions[defender.id] = { x: 18, y: los - 12 }; // Left inside quarter, 12 yards behind LOS
         } else if (defender.id === 'S2') {
-          positions[defender.id] = { x: 35, y: 48 }; // Right inside quarter
+          positions[defender.id] = { x: 35, y: los - 12 }; // Right inside quarter
         }
         break;
 
       case 'LB':
         // Three linebackers in underneath coverage
         if (defender.id === 'LB1') {
-          positions[defender.id] = { x: 20, y: 56 }; // Left flat
+          positions[defender.id] = { x: 20, y: los - 4 }; // Left flat, 4 yards behind LOS
         } else if (defender.id === 'LB2') {
-          positions[defender.id] = { x: 26.665, y: 55 }; // Middle hook
+          positions[defender.id] = { x: 26.665, y: los - 5 }; // Middle hook, 5 yards behind LOS
         } else if (defender.id === 'LB3') {
-          positions[defender.id] = { x: 33, y: 56 }; // Right flat
+          positions[defender.id] = { x: 33, y: los - 4 }; // Right flat
+        }
+        break;
+    }
+  });
+
+  return positions;
+}
+
+/**
+ * Generate Cover 2 defensive alignment
+ */
+export function generateCover2Alignment(
+  offensivePlayers: Player[],
+  defensivePlayers: Player[],
+  los: number
+): Record<string, Vector2D> {
+  const positions: Record<string, Vector2D> = {};
+
+  defensivePlayers.forEach(defender => {
+    switch (defender.playerType) {
+      case 'CB':
+        // CBs play press or bail technique
+        if (defender.id === 'CB1') {
+          positions[defender.id] = { x: 8, y: los - 2 }; // Press coverage, 2 yards behind LOS
+        } else if (defender.id === 'CB2') {
+          positions[defender.id] = { x: 45, y: los - 2 };
+        }
+        break;
+
+      case 'S':
+        // Safeties play deep halves
+        if (defender.id === 'S1') {
+          positions[defender.id] = { x: 13, y: los - 15 }; // Left deep half, 15 yards behind LOS
+        } else if (defender.id === 'S2') {
+          positions[defender.id] = { x: 40, y: los - 15 }; // Right deep half
+        }
+        break;
+
+      case 'LB':
+        // Linebackers play underneath zones
+        if (defender.id === 'LB1') {
+          positions[defender.id] = { x: 10, y: los - 5 }; // Left flat, 5 yards behind LOS
+        } else if (defender.id === 'LB2') {
+          positions[defender.id] = { x: 26.665, y: los - 7 }; // Middle hole, 7 yards behind LOS
+        } else if (defender.id === 'LB3') {
+          positions[defender.id] = { x: 43, y: los - 5 }; // Right flat
+        } else if (defender.id === 'LB4') {
+          positions[defender.id] = { x: 20, y: los - 6 }; // Left hook
+        }
+        break;
+    }
+  });
+
+  return positions;
+}
+
+/**
+ * Generate Cover 3 defensive alignment
+ */
+export function generateCover3Alignment(
+  offensivePlayers: Player[],
+  defensivePlayers: Player[],
+  los: number
+): Record<string, Vector2D> {
+  const positions: Record<string, Vector2D> = {};
+
+  defensivePlayers.forEach(defender => {
+    switch (defender.playerType) {
+      case 'CB':
+        // CBs play deep outside thirds
+        if (defender.id === 'CB1') {
+          positions[defender.id] = { x: 8, y: los - 8 }; // Deep third, 8 yards behind LOS
+        } else if (defender.id === 'CB2') {
+          positions[defender.id] = { x: 45, y: los - 8 };
+        }
+        break;
+
+      case 'S':
+        // FS plays deep middle third, SS plays in the box
+        if (defender.id === 'S1' || defender.id === 'FS') {
+          positions[defender.id] = { x: 26.665, y: los - 12 }; // Deep middle third, 12 yards behind LOS
+        } else if (defender.id === 'S2' || defender.id === 'SS') {
+          positions[defender.id] = { x: 20, y: los - 4 }; // Strong side curl/flat, 4 yards behind LOS
+        }
+        break;
+
+      case 'LB':
+        // Four underneath defenders
+        if (defender.id === 'LB1') {
+          positions[defender.id] = { x: 10, y: los - 5 }; // Strong side curl
+        } else if (defender.id === 'LB2') {
+          positions[defender.id] = { x: 26.665, y: los - 6 }; // Middle hook
+        } else if (defender.id === 'LB3') {
+          positions[defender.id] = { x: 43, y: los - 5 }; // Weak side curl
+        } else if (defender.id === 'LB4') {
+          positions[defender.id] = { x: 35, y: los - 4 }; // Weak side flat
         }
         break;
     }
@@ -512,7 +610,8 @@ export function generateCover4Alignment(
  */
 export function generateTampa2Alignment(
   offensivePlayers: Player[],
-  defensivePlayers: Player[]
+  defensivePlayers: Player[],
+  los: number
 ): Record<string, Vector2D> {
   const positions: Record<string, Vector2D> = {};
 
@@ -521,18 +620,18 @@ export function generateTampa2Alignment(
       case 'CB':
         // CBs play deep outside thirds
         if (defender.id === 'CB1') {
-          positions[defender.id] = { x: 8, y: 55 }; // Press-bail technique
+          positions[defender.id] = { x: 8, y: los - 5 }; // Press-bail technique, 5 yards behind LOS
         } else if (defender.id === 'CB2') {
-          positions[defender.id] = { x: 45, y: 55 };
+          positions[defender.id] = { x: 45, y: los - 5 };
         }
         break;
 
       case 'S':
         // Safeties play underneath robber roles
         if (defender.id === 'S1') {
-          positions[defender.id] = { x: 13, y: 48 }; // Left intermediate
+          positions[defender.id] = { x: 13, y: los - 12 }; // Left intermediate, 12 yards behind LOS
         } else if (defender.id === 'S2') {
-          positions[defender.id] = { x: 40, y: 48 }; // Right intermediate
+          positions[defender.id] = { x: 40, y: los - 12 }; // Right intermediate
         }
         break;
 
@@ -540,11 +639,11 @@ export function generateTampa2Alignment(
         // Mike LB drops to deep middle third, others play underneath
         if (defender.id === 'LB2') {
           // Mike linebacker - will drop to deep middle
-          positions[defender.id] = { x: 26.665, y: 55 };
+          positions[defender.id] = { x: 26.665, y: los - 5 };
         } else if (defender.id === 'LB1') {
-          positions[defender.id] = { x: 18, y: 56 }; // Left curl
+          positions[defender.id] = { x: 18, y: los - 4 }; // Left curl, 4 yards behind LOS
         } else if (defender.id === 'LB3') {
-          positions[defender.id] = { x: 35, y: 56 }; // Right curl
+          positions[defender.id] = { x: 35, y: los - 4 }; // Right curl
         }
         break;
     }
@@ -558,7 +657,8 @@ export function generateTampa2Alignment(
  */
 export function generateCover6Alignment(
   offensivePlayers: Player[],
-  defensivePlayers: Player[]
+  defensivePlayers: Player[],
+  los: number
 ): Record<string, Vector2D> {
   const formation = analyzeFormation(offensivePlayers);
   const positions: Record<string, Vector2D> = {};
@@ -571,31 +671,31 @@ export function generateCover6Alignment(
       case 'CB':
         if (defender.id === 'CB1') {
           // Boundary CB - plays Cover 2
-          positions[defender.id] = { x: 8, y: 55 };
+          positions[defender.id] = { x: 8, y: los - 5 }; // 5 yards behind LOS
         } else if (defender.id === 'CB2') {
           // Field CB - plays quarters
-          positions[defender.id] = { x: 45, y: 53 };
+          positions[defender.id] = { x: 45, y: los - 7 }; // 7 yards behind LOS
         }
         break;
 
       case 'S':
         if (defender.id === 'S1') {
           // Boundary safety - deep half
-          positions[defender.id] = { x: 13, y: 48 };
+          positions[defender.id] = { x: 13, y: los - 12 }; // 12 yards behind LOS
         } else if (defender.id === 'S2') {
           // Field safety - deep quarter
-          positions[defender.id] = { x: 35, y: 48 };
+          positions[defender.id] = { x: 35, y: los - 12 };
         }
         break;
 
       case 'LB':
         // Linebackers play underneath zones
         if (defender.id === 'LB1') {
-          positions[defender.id] = { x: 18, y: 56 };
+          positions[defender.id] = { x: 18, y: los - 4 }; // 4 yards behind LOS
         } else if (defender.id === 'LB2') {
-          positions[defender.id] = { x: 26.665, y: 55 };
+          positions[defender.id] = { x: 26.665, y: los - 5 }; // 5 yards behind LOS
         } else if (defender.id === 'LB3') {
-          positions[defender.id] = { x: 35, y: 56 };
+          positions[defender.id] = { x: 35, y: los - 4 };
         }
         break;
     }
@@ -609,7 +709,8 @@ export function generateCover6Alignment(
  */
 export function generateCover0Alignment(
   offensivePlayers: Player[],
-  defensivePlayers: Player[]
+  defensivePlayers: Player[],
+  los: number
 ): Record<string, Vector2D> {
   const formation = analyzeFormation(offensivePlayers);
   const positions: Record<string, Vector2D> = {};
@@ -643,16 +744,16 @@ export function generateCover0Alignment(
       case 'S':
         // Safeties blitz from depth
         if (defender.id === 'S1') {
-          positions[defender.id] = { x: 20, y: 58 }; // A gap blitz
+          positions[defender.id] = { x: 20, y: los - 2 }; // A gap blitz, 2 yards behind LOS
         } else if (defender.id === 'S2') {
-          positions[defender.id] = { x: 33, y: 58 }; // B gap blitz
+          positions[defender.id] = { x: 33, y: los - 2 }; // B gap blitz
         }
         break;
 
       case 'LB':
         if (responsibility?.type === 'blitz') {
           // Blitzing linebacker
-          positions[defender.id] = { x: 26.665, y: 57 }; // A gap
+          positions[defender.id] = { x: 26.665, y: los - 3 }; // A gap, 3 yards behind LOS
         } else {
           // Coverage linebacker on RB
           const rb = offensivePlayers.find(p => p.playerType === 'RB');
@@ -662,7 +763,7 @@ export function generateCover0Alignment(
               y: rb.position.y - 2
             };
           } else {
-            positions[defender.id] = { x: 23, y: 58 };
+            positions[defender.id] = { x: 23, y: los - 2 };
           }
         }
         break;
