@@ -164,9 +164,17 @@ export class FootballEngine {
   }
 
   public setCoverage(coverage: Coverage): void {
+    // Store the old coverage for transition detection
+    const previousCoverage = this.gameState.currentCoverage;
     this.gameState.coverage = coverage;
     this.gameState.currentCoverage = coverage;
-    this.setupDefense();
+    // Pass previous coverage to setupDefense for proper transition handling
+    this.setupDefense(previousCoverage);
+
+    // Force a full realignment when coverage changes to ensure significant position changes
+    if (previousCoverage && previousCoverage.type !== coverage.type) {
+      this.realignDefense();
+    }
   }
 
   public setSackTime(seconds: number): void {
@@ -1100,17 +1108,51 @@ export class FootballEngine {
     const centerX = 26.665;
     const losY = this.gameState.lineOfScrimmage;
 
+    // In Cover 2, safeties need to be aware of motion threats
+    const safeties = defensePlayers.filter(d => d.playerType === 'S');
+    const motionSide = motionPlayer.position.x > centerX ? 'right' : 'left';
+
     if (crossesFormation) {
       // Robber technique: Safety reads QB eyes and adjusts to motion side
-      const safeties = defensePlayers.filter(d => d.playerType === 'S');
       safeties.forEach(safety => {
         if (safety.coverageResponsibility?.zone) {
-          const motionShift = motionPlayer.position.x > centerX ? 2 : -2;
-          safety.position.x += motionShift;
+          // Ensure at least one safety is on the motion side
+          const isSafetyOnMotionSide = motionSide === 'right' ?
+            safety.position.x > centerX :
+            safety.position.x < centerX;
+
+          if (!isSafetyOnMotionSide) {
+            // Move safety significantly toward motion side
+            const motionShift = motionSide === 'right' ? 8 : -8;
+            safety.position.x += motionShift;
+          } else {
+            // Minor adjustment for safety already on motion side
+            const motionShift = motionSide === 'right' ? 2 : -2;
+            safety.position.x += motionShift;
+          }
+
           safety.velocity = { x: 0, y: 0 };
           safety.currentSpeed = 0;
         }
       });
+    } else {
+      // Even without crossing, safeties check motion side
+      const motionSideSafety = safeties.find(s => {
+        if (motionSide === 'right') {
+          return s.position.x > centerX;
+        } else {
+          return s.position.x < centerX;
+        }
+      });
+
+      // If no safety on motion side, move one there
+      if (!motionSideSafety && safeties.length > 0) {
+        const closestSafety = safeties[0];
+        const targetX = motionSide === 'right' ? centerX + 10 : centerX - 10;
+        closestSafety.position.x = targetX;
+        closestSafety.velocity = { x: 0, y: 0 };
+        closestSafety.currentSpeed = 0;
+      }
     }
 
     // Adjust underneath coverage to handle potential crossing routes
@@ -2791,7 +2833,7 @@ export class FootballEngine {
     });
   }
 
-  private setupDefense(): void {
+  private setupDefense(previousCoverage?: Coverage): void {
     if (!this.gameState.coverage) return;
 
     const coverage = this.gameState.coverage;
@@ -2799,8 +2841,10 @@ export class FootballEngine {
     const existingDefenders = this.gameState.players.filter(p => p.team === 'defense');
 
     // Check if we can preserve existing defenders (same coverage type)
+    // Use passed previousCoverage if available, otherwise use current
+    const oldCoverageType = previousCoverage?.type || this.gameState.currentCoverage?.type;
     const shouldPreserveDefenders = existingDefenders.length > 0 &&
-      this.gameState.currentCoverage?.type === coverage.type;
+      oldCoverageType === coverage.type;
 
     if (shouldPreserveDefenders) {
       // Update existing defenders' responsibilities and realign
@@ -2867,6 +2911,41 @@ export class FootballEngine {
           defender.position = this.getDefensivePosition(defender.id, coverage);
         }
       });
+
+      // Ensure we have exactly 7 defenders for Cover 1
+      // Add missing safeties if needed
+      while (defensivePlayers.length < 7) {
+        const safetyCount = defensivePlayers.filter(d => d.playerType === 'S').length;
+        const safetyId = safetyCount === 0 ? 'S1' : `S${safetyCount + 1}`;
+
+        const safetyCoverage: Player = {
+          id: safetyId,
+          position: { x: 26.665, y: this.gameState.lineOfScrimmage - 15 },
+          velocity: { x: 0, y: 0 },
+          team: 'defense',
+          playerType: 'S',
+          coverageResponsibility: {
+            defenderId: safetyId,
+            type: 'zone',
+            zone: {
+              center: { x: 26.665, y: this.gameState.lineOfScrimmage - 15 },
+              width: 30,
+              height: 40,
+              depth: 'deep'
+            }
+          },
+          isEligible: false,
+          maxSpeed: this.getPlayerSpeed('S'),
+          currentSpeed: 0,
+          isStar: false,
+          hasMotion: false,
+          hasMotionBoost: false,
+          motionBoostTimeLeft: 0,
+          isBlocking: false,
+        };
+
+        defensivePlayers.push(safetyCoverage);
+      }
 
       // Add defensive players to game state
       this.gameState.players.push(...defensivePlayers);
@@ -3249,6 +3328,88 @@ export class FootballEngine {
   ): any[] {
     let adjustedResponsibilities = [...originalResponsibilities];
 
+    // Check if this is Cover 0 (all-out blitz)
+    // Cover 0 is characterized by having blitzing safeties or multiple blitzers with no zone help
+    const blitzingDefenders = originalResponsibilities.filter(r => r.type === 'blitz');
+    const zoneDefenders = originalResponsibilities.filter(r => r.type === 'zone');
+    const isCover0 = (blitzingDefenders.length >= 3 && zoneDefenders.length === 0) ||
+                     originalResponsibilities.some(r => r.type === 'blitz' && r.defenderId.startsWith('S'));
+
+    // Map generic targets (WR1, WR2, etc.) to actual player IDs
+    const offensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
+    const eligibleReceivers = offensivePlayers.filter(p => p.isEligible);
+
+    // Sort receivers for consistent assignment
+    const sortedWRs = eligibleReceivers.filter(p => p.playerType === 'WR')
+      .sort((a, b) => a.position.x - b.position.x);
+    const sortedTEs = eligibleReceivers.filter(p => p.playerType === 'TE')
+      .sort((a, b) => a.position.x - b.position.x);
+    const sortedRBs = eligibleReceivers.filter(p => p.playerType === 'RB' || p.playerType === 'FB')
+      .sort((a, b) => a.position.x - b.position.x);
+
+    // Update responsibilities with actual player IDs
+    adjustedResponsibilities = adjustedResponsibilities.map(resp => {
+      if (resp.type === 'man' && resp.target) {
+        // Map generic target to actual player ID
+        if (resp.target.startsWith('WR')) {
+          const index = parseInt(resp.target.substring(2)) - 1;
+          if (sortedWRs[index]) {
+            return { ...resp, target: sortedWRs[index].id };
+          }
+        } else if (resp.target.startsWith('TE')) {
+          const index = parseInt(resp.target.substring(2)) - 1;
+          if (sortedTEs[index]) {
+            return { ...resp, target: sortedTEs[index].id };
+          }
+        } else if (resp.target.startsWith('RB') || resp.target.startsWith('FB')) {
+          const index = parseInt(resp.target.substring(2)) - 1;
+          if (sortedRBs[index]) {
+            return { ...resp, target: sortedRBs[index].id };
+          }
+        } else if (resp.target === 'QB1') {
+          const qb = offensivePlayers.find(p => p.playerType === 'QB');
+          if (qb) {
+            return { ...resp, target: qb.id };
+          }
+        }
+      }
+      return resp;
+    });
+
+    // For Cover 0, maintain all blitz and man assignments - don't add zone coverage
+    if (isCover0) {
+      // Ensure we have exactly 7 defenders but keep all man/blitz assignments
+      // Do NOT add any zone defenders for Cover 0
+      if (adjustedResponsibilities.length < 7) {
+        // Add more blitzers if needed
+        const defendersNeeded = 7 - adjustedResponsibilities.length;
+        for (let i = 0; i < defendersNeeded; i++) {
+          const newDefenderId = `LB${adjustedResponsibilities.filter(r => r.defenderId.startsWith('LB')).length + 1}`;
+          adjustedResponsibilities.push({
+            defenderId: newDefenderId,
+            type: 'blitz' as const,
+            gap: i % 2 === 0 ? 'A' : 'B',
+            side: i % 2 === 0 ? 'strong' : 'weak'
+          });
+        }
+      } else if (adjustedResponsibilities.length > 7) {
+        adjustedResponsibilities = adjustedResponsibilities.slice(0, 7);
+      }
+      // Make sure no zone defenders exist in Cover 0
+      adjustedResponsibilities = adjustedResponsibilities.filter(r => r.type !== 'zone');
+      // If we filtered out zone defenders and now have less than 7, add blitzers
+      while (adjustedResponsibilities.length < 7) {
+        const newDefenderId = `LB${adjustedResponsibilities.filter(r => r.defenderId.startsWith('LB')).length + 1}`;
+        adjustedResponsibilities.push({
+          defenderId: newDefenderId,
+          type: 'blitz' as const,
+          gap: 'A',
+          side: 'weak'
+        });
+      }
+      return adjustedResponsibilities;
+    }
+
     // First, ensure we have the right number of safeties
     const existingSafetyCount = adjustedResponsibilities.filter(r => r.defenderId.startsWith('S')).length;
     const safetiesNeeded = (optimalPersonnel.S || 2) - existingSafetyCount;
@@ -3296,10 +3457,11 @@ export class FootballEngine {
         // Add nickel backs
         for (let i = existingNBCount; i < optimalPersonnel.NB && i < 2; i++) {
           const nbId = i === 0 ? 'NB1' : `NB${i + 1}`;
+          const slotTarget = this.getSlotReceiver(formation, i);
           adjustedResponsibilities.push({
             defenderId: nbId,
             type: 'man' as const,
-            target: this.getSlotReceiver(formation, i),
+            target: slotTarget,
             zone: null
           });
         }
@@ -3329,6 +3491,23 @@ export class FootballEngine {
       prioritizedResponsibilities.push(...lbs.slice(0, spotsRemaining));
 
       adjustedResponsibilities = prioritizedResponsibilities.slice(0, 7);
+    } else if (adjustedResponsibilities.length < 7) {
+      // Add missing defenders - prioritize linebackers for base defense
+      const defendersNeeded = 7 - adjustedResponsibilities.length;
+      for (let i = 0; i < defendersNeeded; i++) {
+        const existingLBCount = adjustedResponsibilities.filter(r => r.defenderId.startsWith('LB')).length;
+        const newDefenderId = `LB${existingLBCount + 1}`;
+        adjustedResponsibilities.push({
+          defenderId: newDefenderId,
+          type: 'zone' as const,
+          zone: {
+            center: { x: 26.665, y: 5 },
+            width: 15,
+            height: 10,
+            depth: 'intermediate'
+          }
+        });
+      }
     }
 
     // Adjust linebacker responsibilities based on formation

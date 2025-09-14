@@ -33,6 +33,24 @@
       "FB": 0
     }
   },
+  "spread-2x2": {
+    "name": "2x2 Spread",
+    "positions": {
+      "QB1": { "x": 26.665, "y": -5 },
+      "RB1": { "x": 26.665, "y": -7 },
+      "WR1": { "x": 8, "y": 0 },
+      "WR2": { "x": 45, "y": 0 },
+      "WR3": { "x": 18, "y": -1 },
+      "TE1": { "x": 35, "y": -1 }
+    },
+    "personnel": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 3,
+      "TE": 1,
+      "FB": 0
+    }
+  },
   "empty": {
     "name": "Empty Backfield",
     "positions": {

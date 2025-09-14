@@ -258,5 +258,342 @@
         }
       }
     }
+  },
+  "hitch-seam": {
+    "name": "Hitch-Seam",
+    "description": "Quick game concept with hitches outside and seams inside to stress zone coverage",
+    "difficulty": "easy",
+    "formation": "spread-2x2",
+    "routes": {
+      "WR1": {
+        "type": "hitch",
+        "waypoints": [
+          { "x": 8, "y": 0 },
+          { "x": 8, "y": 5 },
+          { "x": 8, "y": 5.5 }
+        ],
+        "timing": [0, 0.8, 1.0],
+        "depth": 5
+      },
+      "WR2": {
+        "type": "hitch",
+        "waypoints": [
+          { "x": 45, "y": 0 },
+          { "x": 45, "y": 5 },
+          { "x": 45, "y": 5.5 }
+        ],
+        "timing": [0, 0.8, 1.0],
+        "depth": 5
+      },
+      "WR3": {
+        "type": "seam",
+        "waypoints": [
+          { "x": 18, "y": 0 },
+          { "x": 18, "y": 10 },
+          { "x": 20, "y": 20 },
+          { "x": 22, "y": 30 }
+        ],
+        "timing": [0, 1.2, 2.4, 3.6],
+        "depth": 30
+      },
+      "TE1": {
+        "type": "seam",
+        "waypoints": [
+          { "x": 35, "y": 0 },
+          { "x": 35, "y": 10 },
+          { "x": 33, "y": 20 },
+          { "x": 31, "y": 30 }
+        ],
+        "timing": [0, 1.2, 2.4, 3.6],
+        "depth": 30
+      },
+      "RB1": {
+        "type": "check-release",
+        "waypoints": [
+          { "x": 26.665, "y": -7 },
+          { "x": 26.665, "y": -5 },
+          { "x": 20, "y": 0 },
+          { "x": 15, "y": 3 }
+        ],
+        "timing": [0, 0.5, 1.5, 2.0],
+        "depth": 3
+      }
+    }
+  },
+  "curl-flat": {
+    "name": "Curl-Flat",
+    "description": "High-low concept with curls and flat routes to create zone conflicts",
+    "difficulty": "easy",
+    "formation": "trips-right",
+    "routes": {
+      "WR1": {
+        "type": "curl",
+        "waypoints": [
+          { "x": 45, "y": 0 },
+          { "x": 45, "y": 12 },
+          { "x": 43, "y": 14 },
+          { "x": 43, "y": 12 }
+        ],
+        "timing": [0, 1.4, 1.8, 2.0],
+        "depth": 12
+      },
+      "WR2": {
+        "type": "flat",
+        "waypoints": [
+          { "x": 40, "y": 0 },
+          { "x": 40, "y": 3 },
+          { "x": 48, "y": 4 },
+          { "x": 50, "y": 4 }
+        ],
+        "timing": [0, 0.4, 0.8, 1.2],
+        "depth": 4
+      },
+      "WR3": {
+        "type": "sit",
+        "waypoints": [
+          { "x": 35, "y": 0 },
+          { "x": 35, "y": 8 },
+          { "x": 33, "y": 9 },
+          { "x": 33, "y": 9 }
+        ],
+        "timing": [0, 1.0, 1.3, 1.5],
+        "depth": 9
+      },
+      "RB1": {
+        "type": "flat",
+        "waypoints": [
+          { "x": 26.665, "y": -6 },
+          { "x": 26.665, "y": -2 },
+          { "x": 10, "y": 0 },
+          { "x": 5, "y": 3 }
+        ],
+        "timing": [0, 0.3, 1.0, 1.5],
+        "depth": 3
+      }
+    }
+  },
+  "all-curls": {
+    "name": "All Curls",
+    "description": "Simple concept with all receivers running curl routes at 10 yards",
+    "difficulty": "easy",
+    "formation": "spread-2x2",
+    "routes": {
+      "WR1": {
+        "type": "curl",
+        "waypoints": [
+          { "x": 8, "y": 0 },
+          { "x": 8, "y": 10 },
+          { "x": 10, "y": 10 }
+        ],
+        "timing": [0, 1.2, 1.4],
+        "depth": 10
+      },
+      "WR2": {
+        "type": "curl",
+        "waypoints": [
+          { "x": 45, "y": 0 },
+          { "x": 45, "y": 10 },
+          { "x": 43, "y": 10 }
+        ],
+        "timing": [0, 1.2, 1.4],
+        "depth": 10
+      },
+      "WR3": {
+        "type": "curl",
+        "waypoints": [
+          { "x": 18, "y": 0 },
+          { "x": 18, "y": 10 },
+          { "x": 20, "y": 10 }
+        ],
+        "timing": [0, 1.2, 1.4],
+        "depth": 10
+      },
+      "TE1": {
+        "type": "curl",
+        "waypoints": [
+          { "x": 35, "y": 0 },
+          { "x": 35, "y": 10 },
+          { "x": 33, "y": 10 }
+        ],
+        "timing": [0, 1.2, 1.4],
+        "depth": 10
+      },
+      "RB1": {
+        "type": "check-release-curl",
+        "waypoints": [
+          { "x": 26.665, "y": -7 },
+          { "x": 26.665, "y": -3 },
+          { "x": 26.665, "y": 5 },
+          { "x": 26.665, "y": 5 }
+        ],
+        "timing": [0, 0.5, 1.2, 1.5],
+        "depth": 5
+      }
+    }
+  },
+  "stick": {
+    "name": "Stick",
+    "description": "Triangle stretch concept with stick route, flat, and vertical to stress zone coverage",
+    "difficulty": "medium",
+    "formation": "trips-right",
+    "routes": {
+      "WR1": {
+        "type": "vertical",
+        "waypoints": [
+          { "x": 45, "y": 0 },
+          { "x": 45, "y": 12 },
+          { "x": 45, "y": 20 }
+        ],
+        "timing": [0, 1.4, 2.4],
+        "depth": 20
+      },
+      "WR2": {
+        "type": "stick",
+        "waypoints": [
+          { "x": 40, "y": 0 },
+          { "x": 40, "y": 5 },
+          { "x": 37, "y": 5 },
+          { "x": 37, "y": 5 }
+        ],
+        "timing": [0, 0.6, 0.9, 1.3],
+        "depth": 5
+      },
+      "WR3": {
+        "type": "flat",
+        "waypoints": [
+          { "x": 35, "y": 0 },
+          { "x": 35, "y": 2 },
+          { "x": 48, "y": 3 },
+          { "x": 50, "y": 3 }
+        ],
+        "timing": [0, 0.3, 0.8, 1.2],
+        "depth": 3
+      },
+      "RB1": {
+        "type": "check-release",
+        "waypoints": [
+          { "x": 26.665, "y": -6 },
+          { "x": 26.665, "y": -4 },
+          { "x": 10, "y": 0 },
+          { "x": 5, "y": 3 }
+        ],
+        "timing": [0, 0.5, 1.5, 2.0],
+        "depth": 3
+      }
+    }
+  },
+  "spacing": {
+    "name": "Spacing",
+    "description": "Horizontal stretch with multiple speed outs to attack underneath zones",
+    "difficulty": "easy",
+    "formation": "trips-right",
+    "routes": {
+      "WR1": {
+        "type": "speed-out",
+        "waypoints": [
+          { "x": 45, "y": 0 },
+          { "x": 45, "y": 6 },
+          { "x": 50, "y": 6 },
+          { "x": 53.33, "y": 6 }
+        ],
+        "timing": [0, 0.7, 1.0, 1.5],
+        "depth": 6
+      },
+      "WR2": {
+        "type": "speed-out",
+        "waypoints": [
+          { "x": 40, "y": 0 },
+          { "x": 40, "y": 6 },
+          { "x": 45, "y": 6 },
+          { "x": 48, "y": 6 }
+        ],
+        "timing": [0, 0.7, 1.0, 1.5],
+        "depth": 6
+      },
+      "WR3": {
+        "type": "speed-out",
+        "waypoints": [
+          { "x": 35, "y": 0 },
+          { "x": 35, "y": 6 },
+          { "x": 40, "y": 6 },
+          { "x": 43, "y": 6 }
+        ],
+        "timing": [0, 0.7, 1.0, 1.5],
+        "depth": 6
+      },
+      "RB1": {
+        "type": "flat",
+        "waypoints": [
+          { "x": 26.665, "y": -6 },
+          { "x": 26.665, "y": -2 },
+          { "x": 10, "y": 0 },
+          { "x": 5, "y": 3 }
+        ],
+        "timing": [0, 0.3, 1.0, 1.5],
+        "depth": 3
+      }
+    }
+  },
+  "drive": {
+    "name": "Drive",
+    "description": "Deep drag paired with shallow dig to create high-low stretch on linebackers",
+    "difficulty": "medium",
+    "formation": "spread-2x2",
+    "routes": {
+      "WR1": {
+        "type": "shallow-drag",
+        "waypoints": [
+          { "x": 8, "y": 0 },
+          { "x": 8, "y": 3 },
+          { "x": 26.665, "y": 3 },
+          { "x": 45, "y": 3 },
+          { "x": 53.33, "y": 3 }
+        ],
+        "timing": [0, 0.4, 1.8, 2.3, 3.0],
+        "depth": 3
+      },
+      "WR2": {
+        "type": "deep-dig",
+        "waypoints": [
+          { "x": 45, "y": 0 },
+          { "x": 45, "y": 11 },
+          { "x": 26.665, "y": 11 },
+          { "x": 10, "y": 11 }
+        ],
+        "timing": [0, 1.3, 2.3, 3.0],
+        "depth": 11
+      },
+      "WR3": {
+        "type": "hitch",
+        "waypoints": [
+          { "x": 18, "y": 0 },
+          { "x": 18, "y": 8 },
+          { "x": 18, "y": 8 }
+        ],
+        "timing": [0, 1.0, 1.2],
+        "depth": 8
+      },
+      "TE1": {
+        "type": "seam",
+        "waypoints": [
+          { "x": 35, "y": 0 },
+          { "x": 35, "y": 10 },
+          { "x": 33, "y": 20 }
+        ],
+        "timing": [0, 1.2, 2.4],
+        "depth": 20
+      },
+      "RB1": {
+        "type": "check-release",
+        "waypoints": [
+          { "x": 26.665, "y": -7 },
+          { "x": 26.665, "y": -5 },
+          { "x": 26.665, "y": 0 },
+          { "x": 26.665, "y": 3 }
+        ],
+        "timing": [0, 0.5, 1.5, 2.0],
+        "depth": 3
+      }
+    }
   }
 }
