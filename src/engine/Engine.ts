@@ -470,6 +470,9 @@ export class FootballEngine {
     // First, reassign coverage responsibilities based on new formation
     this.reassignCoverageResponsibilities(offensePlayers, defensePlayers);
 
+    // Handle motion-specific defensive adjustments
+    this.handleMotionAdjustments(offensePlayers, defensePlayers);
+
     // Determine new formation strength (based on receiver positioning)
     const losY = this.gameState.lineOfScrimmage;
     const centerX = 26.665;
@@ -653,38 +656,231 @@ export class FootballEngine {
       // For zone coverage, update zone assignments based on formation strength
       const formation = analyzeFormation(offensePlayers);
 
-      defensePlayers.forEach(defender => {
-        if (defender.coverageResponsibility?.type === 'zone' && defender.coverageResponsibility.zone) {
-          const zone = defender.coverageResponsibility.zone;
+      // Handle different zone coverage types
+      if (coverage.type === 'cover-2' || coverage.type === 'cover-3' || coverage.type === 'cover-4') {
+        this.adjustZoneCoverageResponsibilities(defensePlayers, formation, coverage.type);
+      } else {
+        // Generic zone adjustments for other coverages
+        defensePlayers.forEach(defender => {
+          if (defender.coverageResponsibility?.type === 'zone' && defender.coverageResponsibility.zone) {
+            const zone = defender.coverageResponsibility.zone;
 
-          // Detect trips formation and adjust zones
-          if (formation.isTrips) {
-            const tripsStrength = formation.tripsSide || formation.strength;
+            // Detect trips formation and adjust zones
+            if (formation.isTrips) {
+              const tripsStrength = formation.tripsSide || formation.strength;
 
-            // Compress zones toward trips side
-            if (tripsStrength === 'right' && zone.center.x > 26.665) {
-              zone.center.x -= 2; // Shift toward trips
-            } else if (tripsStrength === 'left' && zone.center.x < 26.665) {
-              zone.center.x += 2; // Shift toward trips
+              // Compress zones toward trips side
+              if (tripsStrength === 'right' && zone.center.x > 26.665) {
+                zone.center.x -= 2; // Shift toward trips
+              } else if (tripsStrength === 'left' && zone.center.x < 26.665) {
+                zone.center.x += 2; // Shift toward trips
+              }
+            }
+
+            // Adjust for bunch formations
+            const bunchedReceivers = this.detectBunchFormation(offensePlayers);
+            if (bunchedReceivers.length >= 3) {
+              const bunchCenter = this.calculateBunchCenter(bunchedReceivers);
+
+              // Defenders in the bunch area should tighten coverage
+              const distanceToBunch = Math.abs(zone.center.x - bunchCenter.x);
+              if (distanceToBunch < 15) {
+                // Compress zone toward bunch
+                const adjustment = (bunchCenter.x - zone.center.x) * 0.2;
+                zone.center.x += adjustment;
+              }
             }
           }
+        });
+      }
+    }
+  }
 
-          // Adjust for bunch formations
-          const bunchedReceivers = this.detectBunchFormation(offensePlayers);
-          if (bunchedReceivers.length >= 3) {
-            const bunchCenter = this.calculateBunchCenter(bunchedReceivers);
+  private adjustZoneCoverageResponsibilities(defensePlayers: Player[], formation: any, coverageType: string): void {
+    const centerX = 26.665;
+    const losY = this.gameState.lineOfScrimmage;
 
-            // Defenders in the bunch area should tighten coverage
-            const distanceToBunch = Math.abs(zone.center.x - bunchCenter.x);
-            if (distanceToBunch < 15) {
-              // Compress zone toward bunch
-              const adjustment = (bunchCenter.x - zone.center.x) * 0.2;
-              zone.center.x += adjustment;
+    // NFL-realistic zone adjustment based on formation strength
+    const strengthSide = formation.strength || 'right';
+    const isTripsLeft = formation.isTrips && formation.tripsSide === 'left';
+    const isTripsRight = formation.isTrips && formation.tripsSide === 'right';
+
+    defensePlayers.forEach(defender => {
+      if (!defender.coverageResponsibility?.zone) return;
+
+      const zone = defender.coverageResponsibility.zone;
+      const isRightSideDefender = zone.center.x > centerX;
+      const isDeepDefender = zone.center.y > losY + 10;
+
+      switch (coverageType) {
+        case 'cover-2':
+          // Safeties rotate to formation strength
+          if (defender.playerType === 'S' && isDeepDefender) {
+            if (strengthSide === 'right' && isRightSideDefender) {
+              zone.center.x += 3; // Strong safety cheats over
+            } else if (strengthSide === 'left' && !isRightSideDefender) {
+              zone.center.x -= 3; // Free safety cheats over
             }
+          }
+          break;
+
+        case 'cover-3':
+          // Middle linebacker drops deeper in Cover 3 Match
+          if (defender.playerType === 'LB' && zone.center.y < losY + 8) {
+            zone.center.y += 2; // Drop deeper to handle crossing routes
+          }
+
+          // Corner coverage adjustments for trips
+          if (defender.playerType === 'CB') {
+            if (isTripsRight && isRightSideDefender) {
+              zone.width *= 0.8; // Tighten zone for trips coverage
+            } else if (isTripsLeft && !isRightSideDefender) {
+              zone.width *= 0.8; // Tighten zone for trips coverage
+            }
+          }
+          break;
+
+        case 'cover-4':
+          // Quarters coverage - safeties split field in half
+          if (defender.playerType === 'S') {
+            if (isTripsRight && isRightSideDefender) {
+              zone.center.x += 2; // Help with trips side
+            } else if (isTripsLeft && !isRightSideDefender) {
+              zone.center.x -= 2; // Help with trips side
+            }
+          }
+          break;
+      }
+
+      // Common adjustments for all zone coverages
+      if (formation.isTrips) {
+        const tripsStrength = formation.tripsSide || formation.strength;
+
+        // Shift underneath coverage toward trips
+        if (!isDeepDefender) {
+          if (tripsStrength === 'right' && zone.center.x > centerX - 5) {
+            zone.center.x += 1;
+          } else if (tripsStrength === 'left' && zone.center.x < centerX + 5) {
+            zone.center.x -= 1;
           }
         }
-      });
+      }
+    });
+  }
+
+  private handleMotionAdjustments(offensePlayers: Player[], defensePlayers: Player[]): void {
+    // Check if there's an active motion player
+    const motionPlayer = offensePlayers.find(p => p.hasMotion);
+    if (!motionPlayer || !this.gameState.coverage) return;
+
+    const coverage = this.gameState.coverage;
+    const centerX = 26.665;
+
+    // NFL motion rules: defense must adjust based on coverage type
+    switch (coverage.type) {
+      case 'cover-1':
+      case 'cover-0':
+        // Man coverage: defender follows the motion
+        const assignedDefender = defensePlayers.find(d =>
+          d.coverageResponsibility?.type === 'man' &&
+          d.coverageResponsibility?.target === motionPlayer.id
+        );
+
+        if (assignedDefender) {
+          // Defender follows motion with proper leverage
+          const motionDirection = motionPlayer.position.x > centerX ? 'right' : 'left';
+
+          // Maintain inside leverage in man coverage
+          if (motionDirection === 'right') {
+            assignedDefender.position.x = motionPlayer.position.x - 1; // Inside leverage
+          } else {
+            assignedDefender.position.x = motionPlayer.position.x + 1; // Inside leverage
+          }
+
+          // Adjust depth based on route concept
+          assignedDefender.position.y = motionPlayer.position.y - 0.5; // Slight cushion
+        }
+        break;
+
+      case 'cover-2':
+      case 'cover-3':
+      case 'cover-4':
+        // Zone coverage: check for potential rubs/picks
+        const nearbyDefenders = defensePlayers.filter(d => {
+          const distance = Math.sqrt(
+            Math.pow(d.position.x - motionPlayer.position.x, 2) +
+            Math.pow(d.position.y - motionPlayer.position.y, 2)
+          );
+          return distance < 8 && d.coverageResponsibility?.type === 'zone';
+        });
+
+        // Communicate potential picks and adjust spacing
+        nearbyDefenders.forEach(defender => {
+          if (defender.coverageResponsibility?.zone) {
+            // Create space to handle potential crossing routes
+            const zone = defender.coverageResponsibility.zone;
+            const motionDirection = motionPlayer.position.x > centerX ? 1 : -1;
+
+            // Bump zone coverage slightly away from motion to handle picks
+            zone.center.x += motionDirection * 0.5;
+
+            // Tighten zone width for better pattern recognition
+            zone.width *= 0.9;
+          }
+        });
+        break;
     }
+
+    // Check for bunch/stack formation after motion
+    const allReceivers = offensePlayers.filter(p => p.isEligible);
+    const motionCreatesOverload = this.checkForOverloadAfterMotion(motionPlayer, allReceivers);
+
+    if (motionCreatesOverload.isOverload) {
+      // Rotate coverage to handle overload
+      this.handleOverloadCoverage(defensePlayers, motionCreatesOverload.side);
+    }
+  }
+
+  private checkForOverloadAfterMotion(motionPlayer: Player, allReceivers: Player[]): {isOverload: boolean, side: 'left' | 'right'} {
+    const centerX = 26.665;
+
+    // Count receivers on each side after motion
+    const leftReceivers = allReceivers.filter(r => r.position.x < centerX).length;
+    const rightReceivers = allReceivers.filter(r => r.position.x >= centerX).length;
+
+    // 3+ receivers on one side creates an overload
+    const isOverload = leftReceivers >= 3 || rightReceivers >= 3;
+    const side = leftReceivers >= 3 ? 'left' : 'right';
+
+    return { isOverload, side };
+  }
+
+  private handleOverloadCoverage(defensePlayers: Player[], overloadSide: 'left' | 'right'): void {
+    const centerX = 26.665;
+
+    // Rotate safeties toward overload
+    const safeties = defensePlayers.filter(d => d.playerType === 'S');
+    safeties.forEach(safety => {
+      if (overloadSide === 'right' && safety.position.x < centerX) {
+        // Free safety rotates right to help
+        safety.position.x += 5;
+      } else if (overloadSide === 'left' && safety.position.x > centerX) {
+        // Strong safety rotates left to help
+        safety.position.x -= 5;
+      }
+    });
+
+    // Adjust linebackers to fill underneath coverage
+    const linebackers = defensePlayers.filter(d => d.playerType === 'LB');
+    linebackers.forEach(lb => {
+      if (overloadSide === 'right' && lb.position.x < centerX + 10) {
+        // Shift toward overload
+        lb.position.x += 2;
+      } else if (overloadSide === 'left' && lb.position.x > centerX - 10) {
+        // Shift toward overload
+        lb.position.x -= 2;
+      }
+    });
   }
 
   public audibleRoute(playerId: string, newRouteType: RouteType): boolean {
@@ -712,6 +908,10 @@ export class FootballEngine {
     // Update player's route
     player.route = newRoute;
     this.gameState.audiblesUsed++;
+
+    // Trigger defensive adjustments for significant route changes
+    // This ensures coverage adjustments for hot routes and audibles
+    this.realignDefense();
 
     return true;
   }

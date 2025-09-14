@@ -22,8 +22,9 @@ interface GameStore {
   // Custom positions for drag-and-drop
   customPositions: Map<string, { x: number; y: number }>;
 
-  // Route update tracking
+  // Update tracking for UI re-rendering
   lastRouteUpdate?: number;
+  lastDefenseUpdate?: number;
 
   // Actions
   setConcept: (conceptName: string) => void;
@@ -118,8 +119,9 @@ export const useGameStore = create<GameStore>()(
           ...state,
           selectedConcept: conceptName,
           gameState: engine.getGameState(),
-          // Force re-render of routes by updating a timestamp
-          lastRouteUpdate: Date.now()
+          // Force re-render of routes and defense by updating timestamps
+          lastRouteUpdate: Date.now(),
+          lastDefenseUpdate: Date.now()
         }));
       },
 
@@ -134,7 +136,9 @@ export const useGameStore = create<GameStore>()(
         set((state) => ({
           ...state,
           selectedCoverage: coverageName,
-          gameState: engine.getGameState()
+          gameState: engine.getGameState(),
+          // Force re-render of defense by updating timestamp
+          lastDefenseUpdate: Date.now()
         }));
       },
 
@@ -170,7 +174,10 @@ export const useGameStore = create<GameStore>()(
         set((state) => ({
           ...state,
           selectedPersonnel: personnel,
-          gameState: engine.getGameState()
+          gameState: engine.getGameState(),
+          // Personnel changes affect both offense and defense
+          lastRouteUpdate: Date.now(),
+          lastDefenseUpdate: Date.now()
         }));
       },
 
@@ -218,8 +225,9 @@ export const useGameStore = create<GameStore>()(
           set((state) => ({
             ...state,
             gameState: engine.getGameState(),
-            // Force re-render of routes by updating a timestamp
-            lastRouteUpdate: Date.now()
+            // Force re-render of routes and defense by updating timestamps
+            lastRouteUpdate: Date.now(),
+            lastDefenseUpdate: Date.now()
           }));
         }
       },
@@ -244,8 +252,10 @@ export const useGameStore = create<GameStore>()(
           set((state) => ({
             ...state,
             gameState: engine.getGameState(),
-            // Force re-render of routes by updating a timestamp
-            lastRouteUpdate: Date.now()
+            // Force re-render of routes and potentially defense by updating timestamps
+            lastRouteUpdate: Date.now(),
+            // Defensive adjustments may be needed for route changes in some coverages
+            lastDefenseUpdate: Date.now()
           }));
         }
       },
@@ -347,8 +357,9 @@ export const useGameStore = create<GameStore>()(
           ...state,
           isPlaying: false,
           gameState: engine.getGameState(),
-          // Force route refresh on reset
-          lastRouteUpdate: Date.now()
+          // Force route and defense refresh on reset
+          lastRouteUpdate: Date.now(),
+          lastDefenseUpdate: Date.now()
         }));
       },
 
@@ -369,8 +380,9 @@ export const useGameStore = create<GameStore>()(
           ...state,
           isPlaying: false,
           gameState: engine.getGameState(),
-          // Force route refresh on new play
-          lastRouteUpdate: Date.now()
+          // Force route and defense refresh on new play
+          lastRouteUpdate: Date.now(),
+          lastDefenseUpdate: Date.now()
         }));
       },
 
