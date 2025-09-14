@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
+import { useState } from 'react';
+import { DndContext, DragEndEvent, DragStartEvent, DragMoveEvent, DragOverlay } from '@dnd-kit/core';
 import { usePlayers, useBall, useGamePhase, useIsShowingDefense, useIsShowingRoutes, useGameState, useGameStore } from '@/store/gameStore';
 import type { Player, Ball } from '@/engine/types';
 import ZoneBubbles from './ZoneBubbles';
@@ -30,6 +30,7 @@ export default function EnhancedFieldCanvas({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedPlayer, setDraggedPlayer] = useState<Player | null>(null);
   const [formationErrors, setFormationErrors] = useState<string[]>([]);
+  const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
 
   // Scale factors for field dimensions (VERTICAL FIELD)
   const scaleX = width / 53.33;
@@ -82,6 +83,18 @@ export default function EnhancedFieldCanvas({
     const player = players.find(p => p.id === playerId);
     if (player) {
       setDraggedPlayer(player);
+      const pos = fieldToSvg(player.position.x, player.position.y);
+      setDragPosition(pos);
+    }
+  };
+
+  const handleDragMove = (event: DragMoveEvent) => {
+    if (draggedPlayer && event.delta) {
+      const originalPos = fieldToSvg(draggedPlayer.position.x, draggedPlayer.position.y);
+      setDragPosition({
+        x: originalPos.x + event.delta.x,
+        y: originalPos.y + event.delta.y
+      });
     }
   };
 
@@ -89,6 +102,7 @@ export default function EnhancedFieldCanvas({
     const { active, over } = event;
     setActiveId(null);
     setDraggedPlayer(null);
+    setDragPosition(null);
 
     if (!over) return;
 
@@ -293,7 +307,7 @@ export default function EnhancedFieldCanvas({
   };
 
   return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd}>
       <div className={`relative ${className}`}>
         <svg
           width={width}
@@ -310,12 +324,12 @@ export default function EnhancedFieldCanvas({
           {renderEnhancedFieldMarkings()}
 
           {/* Connection lines when dragging */}
-          {activeId && draggedPlayer && gamePhase === 'pre-snap' && (
+          {activeId && draggedPlayer && dragPosition && gamePhase === 'pre-snap' && (
             <g opacity="0.6">
               {anchors
                 .filter(anchor => !occupiedAnchors.has(anchor.id))
                 .map(anchor => {
-                  const fromPos = fieldToSvg(draggedPlayer.position.x, draggedPlayer.position.y);
+                  const fromPos = dragPosition; // Use current drag position
                   const toPos = fieldToSvg(anchor.position.x, anchor.position.y);
                   return (
                     <line
@@ -406,30 +420,37 @@ export default function EnhancedFieldCanvas({
           </div>
         )}
 
-        {/* Drag overlay */}
-        <DragOverlay>
+        {/* Drag overlay - shows the player being dragged */}
+        <DragOverlay dropAnimation={null}>
           {activeId && draggedPlayer && (
-            <svg width="40" height="40" style={{ position: 'fixed', pointerEvents: 'none', zIndex: 1000 }}>
-              <circle
-                cx="20"
-                cy="20"
-                r="12"
-                fill="#0066cc"
-                stroke="#004499"
-                strokeWidth="2"
-                opacity="0.8"
-              />
-              <text
-                x="20"
-                y="24"
-                textAnchor="middle"
-                fill="#ffffff"
-                fontSize="10"
-                fontWeight="bold"
-              >
-                {draggedPlayer.playerType}
-              </text>
-            </svg>
+            <div style={{ cursor: 'grabbing' }}>
+              <svg width="60" height="60" style={{ pointerEvents: 'none' }}>
+                <g transform="translate(30, 30)">
+                  <circle
+                    cx={0}
+                    cy={0}
+                    r={10}
+                    fill="#0066cc"
+                    stroke="#004499"
+                    strokeWidth="2"
+                    opacity="0.9"
+                  />
+                  <text
+                    x={0}
+                    y={4}
+                    textAnchor="middle"
+                    fill="#ffffff"
+                    fontSize="10"
+                    fontWeight="bold"
+                  >
+                    {draggedPlayer.playerType}
+                  </text>
+                  {draggedPlayer.isStar && (
+                    <text x={0} y={-14} textAnchor="middle" fill="#ffdd00" fontSize="14">⭐</text>
+                  )}
+                </g>
+              </svg>
+            </div>
           )}
         </DragOverlay>
       </div>
