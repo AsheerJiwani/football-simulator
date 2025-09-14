@@ -8,22 +8,23 @@ import coveragesData from '@/data/coverages.json';
 export const DataLoader = {
   // Get all available formations
   getFormations: (): Record<string, Formation> => {
-    return formationsData;
+    return formationsData as any;
   },
 
   // Get a specific formation by name
   getFormation: (name: string): Formation | null => {
-    return formationsData[name as keyof typeof formationsData] || null;
+    const formation = (formationsData as any)[name];
+    return formation || null;
   },
 
   // Get all play concepts
-  getConcepts: (): Record<string, Omit<PlayConcept, 'formation'> & { formation: string }> => {
-    return conceptsData;
+  getConcepts: (): Record<string, any> => {
+    return conceptsData as any;
   },
 
   // Get a specific play concept with formation data included
   getConcept: (name: string): PlayConcept | null => {
-    const conceptData = conceptsData[name as keyof typeof conceptsData];
+    const conceptData = (conceptsData as any)[name];
     if (!conceptData) return null;
 
     const formation = DataLoader.getFormation(conceptData.formation);
@@ -32,24 +33,25 @@ export const DataLoader = {
     return {
       ...conceptData,
       formation,
-    };
+    } as PlayConcept;
   },
 
   // Get all available coverages
   getCoverages: (): Record<string, any> => {
-    return coveragesData;
+    return coveragesData as any;
   },
 
   // Get a specific coverage by name
   getCoverage: (name: string): Coverage | null => {
-    const coverageData = coveragesData[name as keyof typeof coveragesData];
+    const coverageData = (coveragesData as any)[name];
     if (!coverageData) return null;
 
     // Transform the JSON data to match our Coverage interface
     return {
       name: coverageData.name,
-      type: coverageData.type,
+      type: coverageData.type as any,
       safetyCount: coverageData.safetyCount,
+      description: coverageData.description,
       responsibilities: coverageData.responsibilities.map((resp: any) => ({
         playerId: resp.defenderId,
         type: resp.type,
@@ -119,8 +121,8 @@ export const GameData = {
 
   // Get concept difficulty level
   getConceptDifficulty: (conceptName: string): 'easy' | 'medium' | 'hard' | null => {
-    const conceptData = conceptsData[conceptName as keyof typeof conceptsData];
-    return conceptData?.difficulty || null;
+    const conceptData = (conceptsData as any)[conceptName];
+    return (conceptData?.difficulty as 'easy' | 'medium' | 'hard') || null;
   },
 
   // Filter concepts by difficulty

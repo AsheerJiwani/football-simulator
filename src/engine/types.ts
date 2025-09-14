@@ -50,7 +50,7 @@ export interface Formation {
 }
 
 export interface Personnel {
-  QB: 1;
+  QB: number;
   RB: number;
   WR: number;
   TE: number;
@@ -61,6 +61,7 @@ export interface Coverage {
   name: string;
   type: CoverageType;
   safetyCount: number;
+  description?: string;
   responsibilities: CoverageResponsibility[];
 }
 
@@ -88,23 +89,23 @@ export interface GameConfig {
   };
   tickRate: 60; // Hz
   physics: {
-    ballSpeed: 16; // yards per second
-    tackleRadius: 1.75; // yards
-    catchRadius: 1.0; // yards
-    motionBoostPercent: 0.09; // 9% speed boost
-    starBoostPercent: 0.10; // 10% speed boost
-    motionBoostDuration: 0.35; // seconds
+    ballSpeed: number; // yards per second
+    tackleRadius: number; // yards
+    catchRadius: number; // yards
+    motionBoostPercent: number; // speed boost percentage
+    starBoostPercent: number; // speed boost percentage
+    motionBoostDuration: number; // seconds
   };
   playerSpeeds: {
-    QB: { min: 6.5, max: 7.0 };
-    RB: { min: 9.0, max: 9.5 };
-    WR: { min: 9.0, max: 9.5 };
-    TE: { min: 7.5, max: 8.0 };
-    FB: { min: 7.5, max: 8.0 };
-    CB: { min: 9.0, max: 9.5 };
-    S: { min: 9.0, max: 9.5 };
-    LB: { min: 7.5, max: 8.0 };
-    NB: { min: 9.0, max: 9.5 };
+    QB: { min: number, max: number };
+    RB: { min: number, max: number };
+    WR: { min: number, max: number };
+    TE: { min: number, max: number };
+    FB: { min: number, max: number };
+    CB: { min: number, max: number };
+    S: { min: number, max: number };
+    LB: { min: number, max: number };
+    NB: { min: number, max: number };
   };
   gameplay: {
     minSackTime: 2.0; // seconds
