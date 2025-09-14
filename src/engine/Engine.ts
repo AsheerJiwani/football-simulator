@@ -143,7 +143,11 @@ export class FootballEngine {
   // Public API Methods
 
   public getGameState(): GameState {
-    return { ...this.gameState };
+    return {
+      ...this.gameState,
+      players: [...this.gameState.players], // Ensure new array reference for React
+      lastUpdate: Date.now() // Force re-render timestamp
+    };
   }
 
   public setPlayConcept(concept: PlayConcept): void {

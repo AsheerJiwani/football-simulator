@@ -128,15 +128,14 @@ export const useGameStore = create<GameStore>()(
         engine.setPlayConcept(concept);
         const newState = engine.getGameState();
 
-        set((state) => ({
-          ...state,
+        set({
           selectedConcept: conceptName,
           gameState: newState,
-          stateVersion: state.stateVersion + 1,
+          stateVersion: get().stateVersion + 1,
           // Force re-render of routes and defense by updating timestamps
           lastRouteUpdate: Date.now(),
           lastDefenseUpdate: Date.now()
-        }));
+        });
       },
 
       setCoverage: (coverageName: string) => {
@@ -155,14 +154,13 @@ export const useGameStore = create<GameStore>()(
         engine.setCoverage(coverage);
         const newState = engine.getGameState();
 
-        set((state) => ({
-          ...state,
+        set({
           selectedCoverage: coverageName,
           gameState: newState,
-          stateVersion: state.stateVersion + 1,
+          stateVersion: get().stateVersion + 1,
           // Force re-render of defense by updating timestamp
           lastDefenseUpdate: Date.now()
-        }));
+        });
       },
 
       setSackTime: (seconds: number) => {
@@ -448,6 +446,12 @@ export const usePlayers = () => useGameStore(state => state.gameState.players);
 export const useBall = () => useGameStore(state => state.gameState.ball);
 export const useIsShowingDefense = () => useGameStore(state => state.gameState.isShowingDefense);
 export const useIsShowingRoutes = () => useGameStore(state => state.gameState.isShowingRoutes);
+
+// Enhanced selector that includes lastUpdate for forcing re-renders
+export const usePlayersWithUpdate = () => useGameStore(state => ({
+  players: state.gameState.players,
+  lastUpdate: state.gameState.lastUpdate
+}));
 
 // Computed selectors
 export const usePlayOutcome = () => useGameStore(state => state.gameState.outcome);

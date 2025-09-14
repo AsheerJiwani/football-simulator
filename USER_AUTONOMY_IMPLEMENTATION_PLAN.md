@@ -79,7 +79,34 @@ Seamless integration between offensive user controls and defensive AI responses,
 - [x] Verified defenders are positioned correctly relative to LOS
 - [x] Ensured UI components receive state updates properly
 
-**Step 5.3.3: Add Plays & Coverages - Detailed Implementation Plan**
+**Step 5.3.3: Fix Coverage/Play Selection Rendering Issues (COMPLETED)**
+
+**Root Cause Analysis:**
+1. **Shallow Copy Issue in getGameState()**
+   - The `getGameState()` method returns `{ ...this.gameState }` which is a shallow copy
+   - The `players` array reference might be the same, causing React not to detect changes
+   - Even though we fixed immutable updates in setupPlayers/setupDefense, the shallow copy might negate this
+
+2. **Store Selector Issue**
+   - `usePlayers()` selector directly returns `state.gameState.players`
+   - If the players array reference doesn't change, React won't re-render
+   - The stateVersion we added should help, but the selector isn't using it
+
+3. **Initial State vs Update State**
+   - Initial setup in createInitialEngine() works (shows players on load)
+   - Updates through setConcept/setCoverage might not be propagating correctly
+
+**Implementation Completed:**
+- [x] Fixed getGameState() to return deep copy with new players array reference
+- [x] Added temporary debug logging to verify state changes
+- [x] Updated store update logic for better immutability
+- [x] Enhanced selector with lastUpdate tracking
+- [x] Fixed component key generation to use stable keys
+- [x] Tested coverage changes render new defensive alignments
+- [x] Tested play changes render new offensive formations
+- [x] Cleaned up debug logging after verification
+
+**Step 5.3.4: Add Plays & Coverages - Detailed Implementation Plan**
 
 **A. Offensive Play Concepts (Pass-Only Focus)**
 

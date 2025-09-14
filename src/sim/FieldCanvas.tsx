@@ -174,7 +174,7 @@ export default function FieldCanvas({
 
     // Player dot with position label
     return (
-      <g key={player.id}>
+      <g key={`${player.id}-${player.team}-${player.playerType}`}>
         {/* Player dot */}
         <circle
           cx={position.x}

@@ -179,6 +179,7 @@ export interface GameState {
   ballOn: number; // Current field position (yard line)
   isFirstDown: boolean;
   hashPosition: HashPosition; // Current hash position for ball placement
+  lastUpdate?: number; // Timestamp for forcing React re-renders
 }
 
 export type GamePhase = 'pre-snap' | 'post-snap' | 'ball-thrown' | 'play-over';
