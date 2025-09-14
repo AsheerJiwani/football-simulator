@@ -20,6 +20,7 @@ export default function DraggablePlayer({
     attributes,
     listeners,
     setNodeRef,
+    transform,
     isDragging
   } = useDraggable({
     id: player.id,
@@ -34,28 +35,20 @@ export default function DraggablePlayer({
   // Cast the ref to the correct type for SVG elements
   const svgNodeRef = setNodeRef as unknown as React.Ref<SVGGElement>;
 
-  // When dragging, hide the original player (DragOverlay will show it)
-  // When not dragging, show the player at its current position
-  if (isDragging) {
-    // Return an invisible placeholder to maintain the drag reference
-    return (
-      <g
-        ref={svgNodeRef}
-        {...(disabled || player.team === 'defense' ? {} : listeners)}
-        {...(disabled || player.team === 'defense' ? {} : attributes)}
-        style={{ opacity: 0, pointerEvents: 'none' }}
-      />
-    );
-  }
+  // Apply transform when dragging to move the player with cursor
+  const x = svgCoords.x + (transform?.x || 0);
+  const y = svgCoords.y + (transform?.y || 0);
 
   return (
     <g
       ref={svgNodeRef}
       {...(disabled || player.team === 'defense' ? {} : listeners)}
       {...(disabled || player.team === 'defense' ? {} : attributes)}
-      transform={`translate(${svgCoords.x}, ${svgCoords.y})`}
+      transform={`translate(${x}, ${y})`}
       style={{
-        cursor: disabled || player.team === 'defense' ? 'default' : 'grab'
+        cursor: disabled || player.team === 'defense' ? 'default' : isDragging ? 'grabbing' : 'grab',
+        opacity: isDragging ? 0.8 : 1,
+        transition: isDragging ? 'none' : 'transform 0.2s ease'
       }}
     >
       {children}
