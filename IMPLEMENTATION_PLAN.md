@@ -140,10 +140,13 @@
 - Add motion and audibles
 - Implement Hash-based Snap logic and adjustements to positioning (offense and zone coverage) (utilize research agent to draft a .md file with nfl rules regarding "next-play setup on left or right or in between hash")
 - Implement "Next Play" mechanics
-- Implement drag-and-drop positioning
+- Implement drag-and-drop positioning (receivers can be placed in multiple default positions across and/or close-behind the LOS based on their initial position (utilize research agent for exact positions))
 - Improve fluidity of movement mechanics (incredibly detailed movement mechanics including how far a defender should lag behind after a receiver cuts in man coverge, how fast defenders run in zones, how leverage affects defender's advantage based on receiver route in certain coverages, how close defenders trail receivers naturally, zone handoffs, safety tracking, etc.)
-- Design production-grade UI with an interactive control panel and the field should take up majority of the webpage as the main focus. Field size should render as at least 50% of the screen, while maintaining integrity of all simulation code.
-- Add more plays and coverages
+- Design production-grade UI with an interactive control panel and the field should take up majority of the webpage as the main focus. Field size should render as at least 50% of the screen, while maintaining integrity of all simulation code. Sidebar controls include Audibles, motions, Snap ball trigger, reset ball button, next play button.
+Top Panel includes Play, Coverage, Sack Time, Star Player button to choose who benefits from star player upgrade, Show Routes toggle, and Show Defense toggle
+All controls implemented into Sidebar and Top Panel with beautiful, spacious layout, and do not interfere with field on webpage.
+- Implement zone bubbles & man assignment lines (line attached to defender with a bubble shape displaying their zone assignment in zone coverage, or a line attached to their man in man coverage, utilize research agent for each coverage)
+- Add more plays and coverages with zone bubbles
 - Perfect defensive coverage concepts (man: cushion/press, zone: find ways to perfect realistic nfl-mechanics, match: find ways to perfect realistic nfl-mechanics, rotations)
 - Build Challenge Mode
 - Integrate authentication

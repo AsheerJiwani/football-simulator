@@ -27,6 +27,7 @@ interface GameStore {
   setPersonnel: (personnel: string) => void;
   setShowDefense: (show: boolean) => void;
   setShowRoutes: (show: boolean) => void;
+  setHashPosition: (hash: 'left' | 'middle' | 'right') => void;
   sendInMotion: (playerId: string, motionType?: string) => void;
   setPassProtection: (rbBlocking: boolean, teBlocking: boolean, fbBlocking: boolean) => void;
   setAudible: (playerId: string, routeType: string) => void;
@@ -177,6 +178,17 @@ export const useGameStore = create<GameStore>()(
         const { engine } = get();
         if (!engine) return;
         engine.setShowRoutes(show);
+
+        set((state) => ({
+          ...state,
+          gameState: engine.getGameState()
+        }));
+      },
+
+      setHashPosition: (hash: 'left' | 'middle' | 'right') => {
+        const { engine } = get();
+        if (!engine) return;
+        engine.setHashPosition(hash);
 
         set((state) => ({
           ...state,
@@ -404,4 +416,6 @@ export const useYardsToGo = () => useGameStore(state => state.gameState.yardsToG
 export const useBallOn = () => useGameStore(state => state.gameState.ballOn);
 export const useIsFirstDown = () => useGameStore(state => state.gameState.isFirstDown);
 export const useAdvanceToNextPlay = () => useGameStore(state => state.advanceToNextPlay);
+export const useHashPosition = () => useGameStore(state => state.gameState.hashPosition);
+export const useSetHashPosition = () => useGameStore(state => state.setHashPosition);
 

@@ -13,6 +13,7 @@ import type {
   PersonnelPackage,
   Motion,
   MotionType,
+  HashPosition,
 } from './types';
 
 import { Vector, Physics, Field, Random, Route as RouteUtil } from '@/lib/math';
@@ -51,6 +52,8 @@ export class FootballEngine {
         length: 120, // Now represents y-axis (vertical)
         width: 53.33, // Now represents x-axis (horizontal)
         endZoneDepth: 10,
+        hashWidth: 6.17, // yards between hash marks (18 feet 6 inches)
+        hashFromCenter: 3.08, // yards from center to hash mark
       },
       tickRate: 60,
       physics: {
@@ -114,8 +117,18 @@ export class FootballEngine {
 
   private createBall(): Ball {
     const los = this.gameState?.lineOfScrimmage || 70;
+    const hashPos = this.gameState?.hashPosition || 'middle';
+
+    // Calculate x position based on hash
+    let xPos = 26.665; // Middle of field
+    if (hashPos === 'left') {
+      xPos = 26.665 - this.config.fieldDimensions.hashFromCenter;
+    } else if (hashPos === 'right') {
+      xPos = 26.665 + this.config.fieldDimensions.hashFromCenter;
+    }
+
     return {
-      position: { x: 26.665, y: los }, // Ball at LOS, middle hash (vertical field)
+      position: { x: xPos, y: los },
       velocity: { x: 0, y: 0 },
       state: 'held',
       timeInAir: 0,
@@ -150,6 +163,21 @@ export class FootballEngine {
       Math.min(this.config.gameplay.maxSackTime, seconds)
     );
     this.gameState.sackTime = clampedTime;
+  }
+
+  public setHashPosition(hash: HashPosition): void {
+    if (this.gameState.phase === 'pre-snap') {
+      this.gameState.hashPosition = hash;
+      // Update ball position
+      this.gameState.ball = this.createBall();
+      // Re-setup players to adjust to new hash position
+      if (this.gameState.playConcept) {
+        this.setupPlayers();
+      }
+      if (this.gameState.coverage) {
+        this.setupDefense();
+      }
+    }
   }
 
   public setGameMode(mode: 'free-play' | 'challenge'): void {
@@ -203,7 +231,7 @@ export class FootballEngine {
   public advanceToNextPlay(): void {
     if (!this.gameState.outcome) return;
 
-    const { type, yards } = this.gameState.outcome;
+    const { type, yards, endPosition } = this.gameState.outcome;
     let newLOS = this.gameState.lineOfScrimmage;
 
     // Calculate new field position based on outcome
@@ -213,6 +241,21 @@ export class FootballEngine {
       newLOS += yards; // Negative yards for sack
     }
     // Incomplete pass stays at same spot
+
+    // Determine hash position based on where play ended
+    if (endPosition && (type === 'catch' || type === 'sack')) {
+      const leftHash = 26.665 - this.config.fieldDimensions.hashFromCenter;
+      const rightHash = 26.665 + this.config.fieldDimensions.hashFromCenter;
+
+      if (endPosition.x < leftHash) {
+        this.gameState.hashPosition = 'left';
+      } else if (endPosition.x > rightHash) {
+        this.gameState.hashPosition = 'right';
+      } else {
+        this.gameState.hashPosition = 'middle';
+      }
+    }
+    // Incomplete passes stay at same hash
 
     // Check for first down
     const yardsGained = newLOS - this.gameState.lineOfScrimmage;
@@ -1200,12 +1243,20 @@ export class FootballEngine {
     const concept = this.gameState.playConcept;
     this.gameState.players = [];
 
+    // Calculate hash offset for offensive alignment
+    let hashOffset = 0;
+    if (this.gameState.hashPosition === 'left') {
+      hashOffset = -this.config.fieldDimensions.hashFromCenter;
+    } else if (this.gameState.hashPosition === 'right') {
+      hashOffset = this.config.fieldDimensions.hashFromCenter;
+    }
+
     // Create offensive players based on formation
     Object.entries(concept.formation.positions).forEach(([playerId, position]) => {
       const playerType = this.getPlayerTypeFromId(playerId);
-      // Adjust position relative to current LOS (formations assume LOS at y=60)
+      // Adjust position relative to current LOS and hash
       const adjustedPosition = {
-        x: position.x,
+        x: position.x + hashOffset, // Apply hash offset to x position
         y: position.y - 60 + this.gameState.lineOfScrimmage
       };
       const player: Player = {

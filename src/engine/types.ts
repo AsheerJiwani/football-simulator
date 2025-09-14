@@ -89,11 +89,15 @@ export interface Zone {
   depth: number; // numeric depth in yards
 }
 
+export type HashPosition = 'left' | 'middle' | 'right';
+
 export interface GameConfig {
   fieldDimensions: {
     length: 120; // 120 yards (including end zones)
     width: 53.33; // yards
     endZoneDepth: 10; // yards
+    hashWidth: 6.17; // yards between hash marks (18 feet 6 inches)
+    hashFromCenter: 3.08; // yards from center to hash mark
   };
   tickRate: 60; // Hz
   physics: {
@@ -163,7 +167,7 @@ export interface GameState {
   driveStartPosition: number; // Where the drive started
   ballOn: number; // Current field position (yard line)
   isFirstDown: boolean;
-  hashPosition: 'left' | 'middle' | 'right'; // Hash mark position
+  hashPosition: HashPosition; // Current hash position for ball placement
 }
 
 export type GamePhase = 'pre-snap' | 'post-snap' | 'ball-thrown' | 'play-over';
@@ -189,6 +193,7 @@ export interface PlayOutcome {
   yards: number;
   openness: number; // percentage (0-100)
   catchProbability: number; // percentage (0-100)
+  endPosition?: Vector2D; // Where the play ended (for hash determination)
 }
 
 // Utility type for field coordinates

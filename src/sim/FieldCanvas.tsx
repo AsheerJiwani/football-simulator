@@ -2,6 +2,7 @@
 
 import { usePlayers, useBall, useGamePhase, useIsShowingDefense, useIsShowingRoutes, useGameState } from '@/store/gameStore';
 import type { Player, Ball } from '@/engine/types';
+import ZoneBubbles from './ZoneBubbles';
 
 interface FieldCanvasProps {
   width?: number;
@@ -342,6 +343,16 @@ export default function FieldCanvas({
 
         {/* Route paths */}
         {renderRoutes()}
+
+        {/* Zone bubbles - render before players so they appear behind */}
+        {gameState.coverage && (
+          <ZoneBubbles
+            coverage={gameState.coverage}
+            fieldToSvg={fieldToSvg}
+            width={width}
+            height={height}
+          />
+        )}
 
         {/* Players */}
         {players.map(renderPlayer)}
