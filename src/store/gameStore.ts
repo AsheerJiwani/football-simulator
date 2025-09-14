@@ -174,11 +174,14 @@ export const useGameStore = create<GameStore>()(
         if (!engine) return;
         engine.setPersonnel(personnel as any);
 
+        // Force immediate validation of defensive setup after personnel change
+        engine.validateSetup();
+
         set((state) => ({
           ...state,
           selectedPersonnel: personnel,
           gameState: engine.getGameState(),
-          // Personnel changes affect both offense and defense
+          // Personnel changes affect both offense and defense - force complete re-render
           lastRouteUpdate: Date.now(),
           lastDefenseUpdate: Date.now()
         }));
@@ -225,10 +228,13 @@ export const useGameStore = create<GameStore>()(
         const success = engine.sendInMotion(playerId, motionType as any);
 
         if (success) {
+          // Enhanced: Ensure defensive adjustments are applied immediately after motion
+          engine.validateSetup();
+
           set((state) => ({
             ...state,
             gameState: engine.getGameState(),
-            // Force re-render of routes and defense by updating timestamps
+            // Enhanced: Motion affects all aspects of the game - force complete re-render
             lastRouteUpdate: Date.now(),
             lastDefenseUpdate: Date.now()
           }));
@@ -252,12 +258,20 @@ export const useGameStore = create<GameStore>()(
         const success = engine.audibleRoute(playerId, routeType as any);
 
         if (success) {
+          // Enhanced: Some route changes may require defensive adjustments
+          // Especially in pattern-matching coverages like Cover 4
+          const gameState = engine.getGameState();
+          const coverage = gameState.coverage;
+          if (coverage && (coverage.type === 'cover-4' || coverage.type === 'quarters')) {
+            // Pattern-matching coverages may need to adjust to route changes
+            engine.validateSetup();
+          }
+
           set((state) => ({
             ...state,
             gameState: engine.getGameState(),
-            // Force re-render of routes and potentially defense by updating timestamps
+            // Enhanced: Route changes can affect defensive reads
             lastRouteUpdate: Date.now(),
-            // Defensive adjustments may be needed for route changes in some coverages
             lastDefenseUpdate: Date.now()
           }));
         }
@@ -268,14 +282,20 @@ export const useGameStore = create<GameStore>()(
           const newPositions = new Map(state.customPositions);
           newPositions.set(playerId, position);
 
-          // Update engine with custom position
+          // Enhanced: Update engine with custom position and trigger defensive analysis
           const { engine } = get();
           if (engine) {
             const players = engine.getGameState().players;
             const player = players.find(p => p.id === playerId);
             if (player) {
               player.position = position;
-              engine.updatePlayerPosition(playerId, position);
+              // This will trigger formation analysis and defensive realignment
+              const success = engine.updatePlayerPosition(playerId, position);
+
+              if (success && player.team === 'offense') {
+                // Force immediate defensive re-evaluation for offensive position changes
+                engine.validateSetup();
+              }
             }
           }
 
@@ -283,7 +303,8 @@ export const useGameStore = create<GameStore>()(
             ...state,
             customPositions: newPositions,
             gameState: engine?.getGameState() || state.gameState,
-            // Force re-render when player positions change
+            // Enhanced: Force both route and defense updates for position changes
+            lastRouteUpdate: Date.now(),
             lastDefenseUpdate: Date.now()
           };
         });

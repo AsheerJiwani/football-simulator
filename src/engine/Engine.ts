@@ -486,13 +486,22 @@ export class FootballEngine {
     // If no defenders exist yet, return (defense not set up)
     if (defensePlayers.length === 0) return;
 
+    // Enhanced formation analysis using NFL-accurate rules
+    const formation = this.analyzeFormationComprehensive(offensePlayers);
+
+    // Apply NFL-accurate strength determination
+    const formationStrength = this.determineFormationStrength(formation, offensePlayers);
+
     // First, reassign coverage responsibilities based on new formation
-    this.reassignCoverageResponsibilities(offensePlayers, defensePlayers);
+    this.reassignCoverageResponsibilities(offensePlayers, defensePlayers, formation);
 
     // Handle motion-specific defensive adjustments
     this.handleMotionAdjustments(offensePlayers, defensePlayers);
 
-    // Determine new formation strength (based on receiver positioning)
+    // Apply NFL-accurate coverage-specific realignment
+    this.applyCoverageSpecificRealignment(coverage, defensePlayers, formation, formationStrength);
+
+    // Determine new formation strength (based on receiver positioning - LEGACY FALLBACK)
     const losY = this.gameState.lineOfScrimmage;
     const centerX = 26.665;
 
@@ -605,6 +614,136 @@ export class FootballEngine {
     return bunched;
   }
 
+  private analyzeFormationComprehensive(offensePlayers: Player[]): any {
+    const centerX = 26.665;
+    const losY = this.gameState.lineOfScrimmage;
+    const receivers = offensePlayers.filter(p => p.isEligible);
+    const te = offensePlayers.find(p => p.playerType === 'TE');
+    const rb = offensePlayers.find(p => p.playerType === 'RB');
+
+    // Count receivers by side
+    const leftReceivers = receivers.filter(r => r.position.x < centerX - 5);
+    const rightReceivers = receivers.filter(r => r.position.x > centerX + 5);
+    const slotReceivers = receivers.filter(r =>
+      Math.abs(r.position.x - centerX) <= 5 && r.playerType !== 'QB'
+    );
+
+    // NFL-accurate formation detection
+    const isTrips = leftReceivers.length >= 3 || rightReceivers.length >= 3;
+    const tripsSide = leftReceivers.length >= 3 ? 'left' : (rightReceivers.length >= 3 ? 'right' : null);
+
+    // Bunch formation: 3+ receivers within 3 yards of each other
+    const bunchGroups = this.detectBunchFormation(offensePlayers);
+    const isBunch = bunchGroups.length >= 3;
+
+    // Stack formation: 2+ receivers vertically aligned (same X coordinate ±1 yard)
+    const stacks = this.detectStackFormation(receivers);
+    const isStack = stacks.length > 0;
+
+    // Spread formation: 4+ receivers spread across field
+    const isSpread = receivers.length >= 4 && !isTrips && !isBunch;
+
+    // Personnel package detection
+    const personnel = this.getPersonnelPackage(offensePlayers);
+
+    return {
+      isTrips,
+      tripsSide,
+      isBunch,
+      bunchGroups,
+      isStack,
+      stacks,
+      isSpread,
+      personnel,
+      leftReceivers: leftReceivers.length,
+      rightReceivers: rightReceivers.length,
+      slotReceivers: slotReceivers.length,
+      hasTightEnd: !!te,
+      tightEndSide: te ? (te.position.x < centerX ? 'left' : 'right') : null,
+      hasRunningBack: !!rb,
+      receiverCount: receivers.length
+    };
+  }
+
+  private detectStackFormation(receivers: Player[]): Array<Player[]> {
+    const stacks: Array<Player[]> = [];
+    const used = new Set<string>();
+
+    for (let i = 0; i < receivers.length; i++) {
+      if (used.has(receivers[i].id)) continue;
+
+      const stack = [receivers[i]];
+      used.add(receivers[i].id);
+
+      for (let j = i + 1; j < receivers.length; j++) {
+        if (used.has(receivers[j].id)) continue;
+
+        // Check if vertically aligned (same X ±1 yard, different Y)
+        if (Math.abs(receivers[i].position.x - receivers[j].position.x) <= 1 &&
+            Math.abs(receivers[i].position.y - receivers[j].position.y) >= 1) {
+          stack.push(receivers[j]);
+          used.add(receivers[j].id);
+        }
+      }
+
+      if (stack.length >= 2) {
+        stacks.push(stack);
+      }
+    }
+
+    return stacks;
+  }
+
+  private getPersonnelPackage(offensePlayers: Player[]): string {
+    const rbs = offensePlayers.filter(p => p.playerType === 'RB' || p.playerType === 'FB').length;
+    const tes = offensePlayers.filter(p => p.playerType === 'TE').length;
+    const wrs = offensePlayers.filter(p => p.playerType === 'WR').length;
+
+    // Standard personnel packages
+    if (rbs === 1 && tes === 1 && wrs === 3) return '11';
+    if (rbs === 1 && tes === 2 && wrs === 2) return '12';
+    if (rbs === 2 && tes === 1 && wrs === 2) return '21';
+    if (rbs === 1 && tes === 0 && wrs === 4) return '10';
+    if (rbs === 0 && tes === 1 && wrs === 4) return '01';
+
+    return '11'; // Default fallback
+  }
+
+  private determineFormationStrength(formation: any, offensePlayers: Player[]): 'left' | 'right' {
+    const centerX = 26.665;
+
+    // NFL strength determination rules from research
+    // 1. Tight end side = strength (if TE present)
+    if (formation.hasTightEnd) {
+      return formation.tightEndSide;
+    }
+
+    // 2. Trips formation = trips side = strength
+    if (formation.isTrips) {
+      return formation.tripsSide;
+    }
+
+    // 3. Count total offensive threats by side (receivers + TEs + RBs in backfield)
+    const leftThreats = offensePlayers.filter(p =>
+      p.position.x < centerX && (p.isEligible || p.playerType === 'RB')
+    ).length;
+
+    const rightThreats = offensePlayers.filter(p =>
+      p.position.x > centerX && (p.isEligible || p.playerType === 'RB')
+    ).length;
+
+    // 4. Balanced formations = field side strength (wider side)
+    if (leftThreats === rightThreats) {
+      // Determine field side based on hash position
+      const hash = this.gameState.hashPosition;
+      if (hash === 'left') return 'right'; // Field side is right
+      if (hash === 'right') return 'left'; // Field side is left
+      return 'right'; // Default to right for middle hash
+    }
+
+    return leftThreats > rightThreats ? 'left' : 'right';
+  }
+
   private calculateBunchCenter(players: Player[]): Vector2D {
     const sumX = players.reduce((sum, p) => sum + p.position.x, 0);
     const sumY = players.reduce((sum, p) => sum + p.position.y, 0);
@@ -615,7 +754,7 @@ export class FootballEngine {
     };
   }
 
-  private reassignCoverageResponsibilities(offensePlayers: Player[], defensePlayers: Player[]): void {
+  private reassignCoverageResponsibilities(offensePlayers: Player[], defensePlayers: Player[], formation?: any): void {
     const coverage = this.gameState.coverage;
     if (!coverage) return;
 
@@ -794,70 +933,53 @@ export class FootballEngine {
 
     const coverage = this.gameState.coverage;
     const centerX = 26.665;
+    const originalSide = motionPlayer.position.x < centerX ? 'left' : 'right';
+    const motionCrossesFormation = this.doesMotionCrossFormation(motionPlayer, offensePlayers);
 
-    // NFL motion rules: defense must adjust based on coverage type
+    // Enhanced NFL motion rules from research
     switch (coverage.type) {
       case 'cover-1':
-      case 'cover-0':
-        // Man coverage: defender follows the motion
-        const assignedDefender = defensePlayers.find(d =>
-          d.coverageResponsibility?.type === 'man' &&
-          d.coverageResponsibility?.target === motionPlayer.id
-        );
-
-        if (assignedDefender) {
-          // Defender follows motion with proper leverage
-          const motionDirection = motionPlayer.position.x > centerX ? 'right' : 'left';
-
-          // Maintain inside leverage in man coverage
-          if (motionDirection === 'right') {
-            assignedDefender.position.x = motionPlayer.position.x - 1; // Inside leverage
-          } else {
-            assignedDefender.position.x = motionPlayer.position.x + 1; // Inside leverage
-          }
-
-          // Adjust depth based on route concept
-          assignedDefender.position.y = motionPlayer.position.y - 0.5; // Slight cushion
+        // Cover 1 motion rules: Rock & Roll or Lock coverage
+        if (motionCrossesFormation) {
+          this.handleCover1RockAndRoll(motionPlayer, defensePlayers, offensePlayers);
+        } else {
+          this.handleCover1Lock(motionPlayer, defensePlayers);
         }
         break;
 
+      case 'cover-0':
+        // Cover 0: Pure man coverage - defender follows with tight coverage
+        this.handleCover0Motion(motionPlayer, defensePlayers);
+        break;
+
       case 'cover-2':
+        // Cover 2 motion rules: Robber and spin techniques
+        this.handleCover2Motion(motionPlayer, defensePlayers, motionCrossesFormation);
+        break;
+
       case 'cover-3':
+        // Cover 3 motion rules: Buzz and spin coverage
+        this.handleCover3Motion(motionPlayer, defensePlayers, motionCrossesFormation);
+        break;
+
       case 'cover-4':
-        // Zone coverage: check for potential rubs/picks
-        const nearbyDefenders = defensePlayers.filter(d => {
-          const distance = Math.sqrt(
-            Math.pow(d.position.x - motionPlayer.position.x, 2) +
-            Math.pow(d.position.y - motionPlayer.position.y, 2)
-          );
-          return distance < 8 && d.coverageResponsibility?.type === 'zone';
-        });
+      case 'quarters':
+        // Cover 4 motion rules: Pattern matching adjustments
+        this.handleCover4Motion(motionPlayer, defensePlayers, motionCrossesFormation);
+        break;
+      case 'tampa-2':
+        // Tampa 2 motion rules: MLB awareness of seam threats
+        this.handleTampa2Motion(motionPlayer, defensePlayers);
+        break;
 
-        // Communicate potential picks and adjust spacing
-        nearbyDefenders.forEach(defender => {
-          if (defender.coverageResponsibility?.zone) {
-            // Create space to handle potential crossing routes
-            const zone = defender.coverageResponsibility.zone;
-            const motionDirection = motionPlayer.position.x > centerX ? 1 : -1;
-
-            // Bump zone coverage slightly away from motion to handle picks
-            zone.center.x += motionDirection * 0.5;
-
-            // Tighten zone width for better pattern recognition
-            zone.width *= 0.9;
-          }
-        });
+      case 'cover-6':
+        // Cover 6 motion rules: Field/boundary side adjustments
+        this.handleCover6Motion(motionPlayer, defensePlayers, motionCrossesFormation);
         break;
     }
 
-    // Check for bunch/stack formation after motion
-    const allReceivers = offensePlayers.filter(p => p.isEligible);
-    const motionCreatesOverload = this.checkForOverloadAfterMotion(motionPlayer, allReceivers);
-
-    if (motionCreatesOverload.isOverload) {
-      // Rotate coverage to handle overload
-      this.handleOverloadCoverage(defensePlayers, motionCreatesOverload.side);
-    }
+    // Enhanced formation analysis after motion
+    this.handlePostMotionFormationChanges(motionPlayer, offensePlayers, defensePlayers);
   }
 
   private checkForOverloadAfterMotion(motionPlayer: Player, allReceivers: Player[]): {isOverload: boolean, side: 'left' | 'right'} {
@@ -872,6 +994,301 @@ export class FootballEngine {
     const side = leftReceivers >= 3 ? 'left' : 'right';
 
     return { isOverload, side };
+  }
+
+  private doesMotionCrossFormation(motionPlayer: Player, offensePlayers: Player[]): boolean {
+    const centerX = 26.665;
+
+    // Find the player's original position (before motion)
+    // Since we don't store original position, we'll check if motion moves them across center
+    // This is a simplified check - in a complete system we'd track the motion path
+    const qb = offensePlayers.find(p => p.playerType === 'QB');
+    const qbX = qb?.position.x || centerX;
+
+    // Check if player crossed the formation center (QB position or field center)
+    const crossedCenter = (motionPlayer.position.x < qbX - 5 && qbX > centerX) ||
+                         (motionPlayer.position.x > qbX + 5 && qbX < centerX);
+
+    return crossedCenter;
+  }
+
+  private handleCover1RockAndRoll(motionPlayer: Player, defensePlayers: Player[], offensePlayers: Player[]): void {
+    // Rock & Roll: Safeties exchange assignments on crossing motion
+    const safeties = defensePlayers.filter(d => d.playerType === 'S');
+    const fs = safeties.find(s => s.id === 'FS');
+    const ss = safeties.find(s => s.id === 'SS');
+
+    if (fs && ss && fs.coverageResponsibility && ss.coverageResponsibility) {
+      // Exchange assignments
+      const tempTarget = fs.coverageResponsibility.target;
+      fs.coverageResponsibility.target = ss.coverageResponsibility.target;
+      ss.coverageResponsibility.target = tempTarget;
+
+      // Update positions based on new assignments
+      if (fs.coverageResponsibility?.target) {
+        const newTarget = offensePlayers.find(p => p.id === fs.coverageResponsibility?.target);
+        if (newTarget) {
+          fs.position.x = newTarget.position.x;
+          fs.position.y = this.gameState.lineOfScrimmage + 8;
+        }
+      }
+
+      if (ss.coverageResponsibility?.target) {
+        const newTarget = offensePlayers.find(p => p.id === ss.coverageResponsibility?.target);
+        if (newTarget) {
+          ss.position.x = newTarget.position.x;
+          ss.position.y = this.gameState.lineOfScrimmage + 8;
+        }
+      }
+    }
+  }
+
+  private handleCover1Lock(motionPlayer: Player, defensePlayers: Player[]): void {
+    // Lock: Stay with assigned man regardless of motion
+    const assignedDefender = defensePlayers.find(d =>
+      d.coverageResponsibility?.type === 'man' &&
+      d.coverageResponsibility?.target === motionPlayer.id
+    );
+
+    if (assignedDefender) {
+      // Follow motion with proper leverage - outside leverage in Cover 1
+      const centerX = 26.665;
+      const outsideLeverage = motionPlayer.position.x < centerX ? -1 : 1;
+
+      assignedDefender.position.x = motionPlayer.position.x + outsideLeverage;
+      assignedDefender.position.y = motionPlayer.position.y + 1; // Slight cushion
+      assignedDefender.velocity = { x: 0, y: 0 };
+      assignedDefender.currentSpeed = 0;
+    }
+  }
+
+  private handleCover0Motion(motionPlayer: Player, defensePlayers: Player[]): void {
+    // Cover 0: Pure man coverage - tight coverage with inside leverage
+    const assignedDefender = defensePlayers.find(d =>
+      d.coverageResponsibility?.type === 'man' &&
+      d.coverageResponsibility?.target === motionPlayer.id
+    );
+
+    if (assignedDefender) {
+      const centerX = 26.665;
+      const insideLeverage = motionPlayer.position.x < centerX ? 0.5 : -0.5;
+
+      // Tight press coverage
+      assignedDefender.position.x = motionPlayer.position.x + insideLeverage;
+      assignedDefender.position.y = motionPlayer.position.y + 0.5; // Very tight cushion
+      assignedDefender.velocity = { x: 0, y: 0 };
+      assignedDefender.currentSpeed = 0;
+    }
+  }
+
+  private handleCover2Motion(motionPlayer: Player, defensePlayers: Player[], crossesFormation: boolean): void {
+    const centerX = 26.665;
+    const losY = this.gameState.lineOfScrimmage;
+
+    if (crossesFormation) {
+      // Robber technique: Safety reads QB eyes and adjusts to motion side
+      const safeties = defensePlayers.filter(d => d.playerType === 'S');
+      safeties.forEach(safety => {
+        if (safety.coverageResponsibility?.zone) {
+          const motionShift = motionPlayer.position.x > centerX ? 2 : -2;
+          safety.position.x += motionShift;
+          safety.velocity = { x: 0, y: 0 };
+          safety.currentSpeed = 0;
+        }
+      });
+    }
+
+    // Adjust underneath coverage to handle potential crossing routes
+    const underneathDefenders = defensePlayers.filter(d =>
+      d.coverageResponsibility?.zone &&
+      d.position.y < losY + 10
+    );
+
+    underneathDefenders.forEach(defender => {
+      if (defender.coverageResponsibility?.zone) {
+        const zone = defender.coverageResponsibility.zone;
+        const motionDirection = motionPlayer.position.x > centerX ? 1 : -1;
+
+        // Bump coverage away from motion to handle picks
+        zone.center.x += motionDirection * 0.5;
+        defender.position.x = zone.center.x;
+        defender.velocity = { x: 0, y: 0 };
+        defender.currentSpeed = 0;
+      }
+    });
+  }
+
+  private handleCover3Motion(motionPlayer: Player, defensePlayers: Player[], crossesFormation: boolean): void {
+    const centerX = 26.665;
+    const losY = this.gameState.lineOfScrimmage;
+
+    if (crossesFormation) {
+      // Buzz: Safety drops to hook/curl, replaces linebacker
+      const ss = defensePlayers.find(d => d.playerType === 'S' && d.id !== 'FS');
+      if (ss && ss.coverageResponsibility?.zone?.name?.includes('box')) {
+        // SS drops to hook zone
+        ss.position.y = losY + 8;
+        ss.position.x = motionPlayer.position.x > centerX ? centerX + 5 : centerX - 5;
+      }
+    }
+
+    // Adjust deep thirds based on motion
+    const deepDefenders = defensePlayers.filter(d =>
+      (d.playerType === 'CB' || d.playerType === 'S') &&
+      d.coverageResponsibility?.zone &&
+      d.position.y > losY + 10
+    );
+
+    deepDefenders.forEach(defender => {
+      if (defender.coverageResponsibility?.zone) {
+        const motionShift = motionPlayer.position.x > centerX ? 1 : -1;
+        // Slight adjustment toward motion
+        defender.position.x += motionShift;
+        defender.velocity = { x: 0, y: 0 };
+        defender.currentSpeed = 0;
+      }
+    });
+  }
+
+  private handleCover4Motion(motionPlayer: Player, defensePlayers: Player[], crossesFormation: boolean): void {
+    const centerX = 26.665;
+    const verticalThreshold = 8; // Pattern matching trigger
+
+    // Cover 4 pattern matching - watch for vertical routes after motion
+    const deepDefenders = defensePlayers.filter(d =>
+      (d.playerType === 'CB' || d.playerType === 'S') &&
+      d.coverageResponsibility?.zone
+    );
+
+    deepDefenders.forEach(defender => {
+      if (defender.coverageResponsibility?.zone) {
+        // Prepare for potential man coverage switch if receiver runs vertical
+        const motionShift = motionPlayer.position.x > centerX ? 1.5 : -1.5;
+        defender.position.x += motionShift;
+        defender.velocity = { x: 0, y: 0 };
+        defender.currentSpeed = 0;
+      }
+    });
+
+    // Underneath defenders tighten for potential crossing routes
+    const underneathDefenders = defensePlayers.filter(d =>
+      (d.playerType === 'LB' || d.playerType === 'NB') &&
+      d.coverageResponsibility?.zone
+    );
+
+    underneathDefenders.forEach(defender => {
+      if (defender.coverageResponsibility?.zone) {
+        const zone = defender.coverageResponsibility.zone;
+        // Wall off potential crossers
+        zone.width *= 0.8;
+        defender.velocity = { x: 0, y: 0 };
+        defender.currentSpeed = 0;
+      }
+    });
+  }
+
+  private handleTampa2Motion(motionPlayer: Player, defensePlayers: Player[]): void {
+    const centerX = 26.665;
+    const losY = this.gameState.lineOfScrimmage;
+
+    // MLB awareness of seam threats created by motion
+    const mlb = defensePlayers.find(d =>
+      d.playerType === 'LB' &&
+      d.id === 'MLB' &&
+      d.coverageResponsibility?.zone?.name === 'deep-middle'
+    );
+
+    if (mlb) {
+      // Adjust to motion side to cover potential seam
+      const motionShift = motionPlayer.position.x > centerX ? 2 : -2;
+      mlb.position.x = centerX + motionShift;
+      mlb.velocity = { x: 0, y: 0 };
+      mlb.currentSpeed = 0;
+    }
+
+    // Safeties adjust halves based on motion
+    const safeties = defensePlayers.filter(d => d.playerType === 'S');
+    safeties.forEach(safety => {
+      if (safety.coverageResponsibility?.zone) {
+        const motionShift = motionPlayer.position.x > centerX ? 1 : -1;
+        safety.position.x += motionShift;
+        safety.velocity = { x: 0, y: 0 };
+        safety.currentSpeed = 0;
+      }
+    });
+  }
+
+  private handleCover6Motion(motionPlayer: Player, defensePlayers: Player[], crossesFormation: boolean): void {
+    const centerX = 26.665;
+    const isFieldSide = (pos: number) => pos > centerX;
+
+    defensePlayers.forEach(defender => {
+      if (!defender.coverageResponsibility) return;
+
+      const onFieldSide = isFieldSide(defender.position.x);
+      const motionToFieldSide = motionPlayer.position.x > centerX;
+
+      if (onFieldSide && motionToFieldSide) {
+        // Field side quarters coverage - adjust for motion
+        this.handleCover4Motion(motionPlayer, [defender], crossesFormation);
+      } else if (!onFieldSide && !motionToFieldSide) {
+        // Boundary side Cover 2 - adjust for motion
+        this.handleCover2Motion(motionPlayer, [defender], crossesFormation);
+      }
+    });
+  }
+
+  private handlePostMotionFormationChanges(
+    motionPlayer: Player,
+    offensePlayers: Player[],
+    defensePlayers: Player[]
+  ): void {
+    // Check for new formation after motion
+    const allReceivers = offensePlayers.filter(p => p.isEligible);
+    const motionCreatesOverload = this.checkForOverloadAfterMotion(motionPlayer, allReceivers);
+
+    if (motionCreatesOverload.isOverload) {
+      // Rotate coverage to handle overload
+      this.handleOverloadCoverage(defensePlayers, motionCreatesOverload.side);
+    }
+
+    // Check for bunch formation created by motion
+    const bunchedReceivers = this.detectBunchFormation(offensePlayers);
+    if (bunchedReceivers.length >= 3) {
+      // Tighten underneath coverage for bunch
+      const underneathDefenders = defensePlayers.filter(d =>
+        d.coverageResponsibility?.zone &&
+        d.position.y < this.gameState.lineOfScrimmage + 10
+      );
+
+      const bunchCenter = this.calculateBunchCenter(bunchedReceivers);
+      underneathDefenders.forEach(defender => {
+        const distance = Math.abs(defender.position.x - bunchCenter.x);
+        if (distance < 12 && defender.coverageResponsibility?.zone) {
+          // Compress zone toward bunch
+          const adjustment = (bunchCenter.x - defender.position.x) * 0.2;
+          defender.position.x += adjustment;
+          defender.velocity = { x: 0, y: 0 };
+          defender.currentSpeed = 0;
+        }
+      });
+    }
+
+    // Check for stack formations created by motion
+    const receivers = offensePlayers.filter(p => p.isEligible);
+    const stacks = this.detectStackFormation(receivers);
+    if (stacks.length > 0) {
+      // Communicate potential pick plays
+      defensePlayers.forEach(defender => {
+        if (defender.coverageResponsibility?.type === 'man') {
+          // Wider spacing to avoid picks in man coverage
+          const leverage = defender.position.x < 26.665 ? -0.5 : 0.5;
+          defender.position.x += leverage;
+          defender.velocity = { x: 0, y: 0 };
+          defender.currentSpeed = 0;
+        }
+      });
+    }
   }
 
   private handleOverloadCoverage(defensePlayers: Player[], overloadSide: 'left' | 'right'): void {
@@ -902,6 +1319,387 @@ export class FootballEngine {
     });
   }
 
+  private applyCoverageSpecificRealignment(
+    coverage: Coverage,
+    defensePlayers: Player[],
+    formation: any,
+    formationStrength: 'left' | 'right'
+  ): void {
+    const centerX = 26.665;
+    const losY = this.gameState.lineOfScrimmage;
+
+    // Apply NFL-accurate coverage adjustments based on formation
+    switch (coverage.type) {
+      case 'cover-1':
+        this.applyCover1Adjustments(defensePlayers, formation, formationStrength);
+        break;
+      case 'cover-2':
+        this.applyCover2Adjustments(defensePlayers, formation, formationStrength);
+        break;
+      case 'cover-3':
+        this.applyCover3Adjustments(defensePlayers, formation, formationStrength);
+        break;
+      case 'cover-4':
+      case 'quarters':
+        this.applyCover4Adjustments(defensePlayers, formation, formationStrength);
+        break;
+      case 'tampa-2':
+        this.applyTampa2Adjustments(defensePlayers, formation, formationStrength);
+        break;
+      case 'cover-6':
+        this.applyCover6Adjustments(defensePlayers, formation, formationStrength);
+        break;
+      case 'cover-0':
+        this.applyCover0Adjustments(defensePlayers, formation, formationStrength);
+        break;
+    }
+  }
+
+  private applyCover1Adjustments(defensePlayers: Player[], formation: any, strength: 'left' | 'right'): void {
+    const centerX = 26.665;
+    const losY = this.gameState.lineOfScrimmage;
+
+    defensePlayers.forEach(defender => {
+      if (!defender.coverageResponsibility) return;
+
+      switch (defender.playerType) {
+        case 'CB':
+          // Cornerback adjustments for Cover 1
+          if (defender.coverageResponsibility.type === 'man' && defender.coverageResponsibility.target) {
+            // Outside leverage, 6-7 yard depth, funnel inside (from research)
+            const leverage = defender.position.x < centerX ? -0.5 : 0.5; // Outside leverage
+            defender.position.y = losY + 7; // 7 yard depth
+            defender.position.x += leverage;
+
+            // Bunch formation adjustment
+            if (formation.isBunch) {
+              defender.position.y = losY + 4; // Tighter coverage on bunch
+            }
+          }
+          break;
+
+        case 'S':
+          if (defender.id === 'FS') {
+            // Free Safety - center field, 12-15 yard depth, hash-to-hash
+            defender.position = { x: centerX, y: losY + 14 };
+
+            // Trips adjustment - favor trips side slightly
+            if (formation.isTrips) {
+              const tripsShift = formation.tripsSide === 'left' ? -2 : 2;
+              defender.position.x += tripsShift;
+            }
+          } else {
+            // Strong Safety adjustments
+            if (formation.hasTightEnd || formation.isTrips) {
+              // SS plays closer to LOS for run support
+              defender.position.y = losY + 8;
+              // Shift toward strength
+              defender.position.x += strength === 'right' ? 3 : -3;
+            }
+          }
+          break;
+
+        case 'LB':
+          // Linebacker adjustments for Cover 1
+          if (defender.coverageResponsibility.type === 'man') {
+            // Man coverage on RB/TE - inside leverage, 5-6 yard depth
+            defender.position.y = losY + 5;
+            if (formation.personnel === '12') {
+              // Two TE sets - drop deeper for seam coverage
+              defender.position.y = losY + 7;
+            }
+          }
+          break;
+
+        case 'NB':
+          // Nickel back adjustments
+          if (formation.slotReceivers > 0) {
+            // Inside leverage on slot, 4-5 yard depth (from research)
+            defender.position.y = losY + 4;
+            const slotLeverage = defender.position.x < centerX ? 0.5 : -0.5; // Inside leverage
+            defender.position.x += slotLeverage;
+          }
+          break;
+      }
+
+      // Reset velocity after position adjustment
+      defender.velocity = { x: 0, y: 0 };
+      defender.currentSpeed = 0;
+    });
+  }
+
+  private applyCover2Adjustments(defensePlayers: Player[], formation: any, strength: 'left' | 'right'): void {
+    const centerX = 26.665;
+    const losY = this.gameState.lineOfScrimmage;
+
+    defensePlayers.forEach(defender => {
+      if (!defender.coverageResponsibility) return;
+
+      switch (defender.playerType) {
+        case 'CB':
+          // Cover 2 - underneath technique, 4-6 yard depth, inside leverage
+          if (defender.coverageResponsibility.type === 'zone') {
+            defender.position.y = losY + 5;
+            const insideLeverage = defender.position.x < centerX ? 0.5 : -0.5;
+            defender.position.x += insideLeverage;
+
+            // Trips adjustment - squeeze coverage
+            if (formation.isTrips) {
+              const tripsShift = formation.tripsSide === strength ? 1 : -1;
+              defender.position.x += tripsShift;
+            }
+          }
+          break;
+
+        case 'S':
+          // Safeties play deep halves, 12-14 yard depth
+          if (defender.coverageResponsibility.zone) {
+            defender.position.y = losY + 13;
+
+            // Split field at hash marks
+            if (defender.position.x < centerX) {
+              defender.position.x = centerX - 9.5; // Left hash
+            } else {
+              defender.position.x = centerX + 9.5; // Right hash
+            }
+
+            // Formation strength adjustment
+            if (formation.isTrips && formation.tripsSide === strength) {
+              const strengthShift = strength === 'right' ? 3 : -3;
+              if ((defender.position.x > centerX && strength === 'right') ||
+                  (defender.position.x < centerX && strength === 'left')) {
+                defender.position.x += strengthShift;
+              }
+            }
+          }
+          break;
+
+        case 'LB':
+          // Hook/curl/flat zones, 6-8 yard depth
+          if (defender.coverageResponsibility.zone) {
+            defender.position.y = losY + 7;
+
+            // Personnel package adjustments
+            if (formation.personnel === '12' || formation.personnel === '21') {
+              // Move up for run support
+              defender.position.y = losY + 5;
+            }
+          }
+          break;
+      }
+
+      defender.velocity = { x: 0, y: 0 };
+      defender.currentSpeed = 0;
+    });
+  }
+
+  private applyCover3Adjustments(defensePlayers: Player[], formation: any, strength: 'left' | 'right'): void {
+    const centerX = 26.665;
+    const losY = this.gameState.lineOfScrimmage;
+
+    defensePlayers.forEach(defender => {
+      if (!defender.coverageResponsibility) return;
+
+      switch (defender.playerType) {
+        case 'CB':
+          // Cover 3 - deep thirds, 12-15 yard depth, outside leverage
+          if (defender.coverageResponsibility.zone) {
+            defender.position.y = losY + 13;
+            const outsideLeverage = defender.position.x < centerX ? -1 : 1;
+            defender.position.x += outsideLeverage;
+
+            // Trips formation - tighten zone for trips coverage
+            if (formation.isTrips) {
+              const tripsShift = formation.tripsSide === strength ? 2 : -2;
+              if ((defender.position.x > centerX && formation.tripsSide === 'right') ||
+                  (defender.position.x < centerX && formation.tripsSide === 'left')) {
+                defender.position.x -= tripsShift; // Move toward trips
+              }
+            }
+          }
+          break;
+
+        case 'S':
+          if (defender.id === 'FS') {
+            // Free Safety - deep middle third, 12-15 yard depth
+            defender.position = { x: centerX, y: losY + 14 };
+          } else if (defender.coverageResponsibility.zone?.name?.includes('box')) {
+            // Strong Safety rotated to box (Sky coverage)
+            defender.position.y = losY + 6;
+            defender.position.x = strength === 'right' ? centerX + 8 : centerX - 8;
+          }
+          break;
+
+        case 'LB':
+          // Hook/curl zones, 6-10 yard depth
+          if (defender.coverageResponsibility.zone) {
+            defender.position.y = losY + 8;
+
+            // MLB drops deeper in Cover 3 Match (from research)
+            if (defender.id === 'MLB') {
+              defender.position.y = losY + 10;
+            }
+
+            // Bunch formation adjustment
+            if (formation.isBunch) {
+              // Compress underneath coverage
+              const bunchCenter = this.calculateBunchCenter(formation.bunchGroups);
+              const distanceToBunch = Math.abs(defender.position.x - bunchCenter.x);
+              if (distanceToBunch < 10) {
+                defender.position.x += (bunchCenter.x - defender.position.x) * 0.3;
+              }
+            }
+          }
+          break;
+      }
+
+      defender.velocity = { x: 0, y: 0 };
+      defender.currentSpeed = 0;
+    });
+  }
+
+  private applyCover4Adjustments(defensePlayers: Player[], formation: any, strength: 'left' | 'right'): void {
+    // Cover 4 Quarters with pattern matching - MOD (Man Only Deep) rules
+    const centerX = 26.665;
+    const losY = this.gameState.lineOfScrimmage;
+
+    defensePlayers.forEach(defender => {
+      if (!defender.coverageResponsibility) return;
+
+      switch (defender.playerType) {
+        case 'CB':
+        case 'S':
+          // Deep quarters, 12-15 yard depth
+          if (defender.coverageResponsibility.zone) {
+            defender.position.y = losY + 13;
+
+            // Split field into quarters
+            if (defender.playerType === 'CB') {
+              // Outside quarters
+              defender.position.x = defender.position.x < centerX ? 10 : 43.33;
+            } else {
+              // Inside quarters (Safeties)
+              defender.position.x = defender.position.x < centerX ? 18 : 35;
+            }
+
+            // Trips formation adjustment - help with trips side
+            if (formation.isTrips) {
+              const tripsShift = formation.tripsSide === 'right' ? 2 : -2;
+              if ((defender.position.x > centerX && formation.tripsSide === 'right') ||
+                  (defender.position.x < centerX && formation.tripsSide === 'left')) {
+                defender.position.x += tripsShift;
+              }
+            }
+          }
+          break;
+
+        case 'LB':
+        case 'NB':
+          // Underneath defenders - wall off crossers and carry verticals
+          if (defender.coverageResponsibility.zone) {
+            defender.position.y = losY + 7;
+
+            // Spread formation - widen underneath coverage
+            if (formation.isSpread) {
+              const spreadShift = defender.position.x < centerX ? -2 : 2;
+              defender.position.x += spreadShift;
+            }
+          }
+          break;
+      }
+
+      defender.velocity = { x: 0, y: 0 };
+      defender.currentSpeed = 0;
+    });
+  }
+
+  private applyTampa2Adjustments(defensePlayers: Player[], formation: any, strength: 'left' | 'right'): void {
+    const centerX = 26.665;
+    const losY = this.gameState.lineOfScrimmage;
+
+    defensePlayers.forEach(defender => {
+      if (!defender.coverageResponsibility) return;
+
+      switch (defender.playerType) {
+        case 'CB':
+          // Aggressive underneath zones, 5-7 yard depth
+          defender.position.y = losY + 6;
+          break;
+
+        case 'S':
+          // Deep halves outside the hash marks
+          defender.position.y = losY + 13;
+          if (defender.position.x < centerX) {
+            defender.position.x = centerX - 12; // Outside left hash
+          } else {
+            defender.position.x = centerX + 12; // Outside right hash
+          }
+          break;
+
+        case 'LB':
+          if (defender.id === 'MLB' && defender.coverageResponsibility.zone?.name === 'deep-middle') {
+            // Mike LB drops to deep hole between safeties, 12-18 yard depth
+            defender.position = { x: centerX, y: losY + 15 };
+          } else {
+            // Other LBs play hook/curl zones
+            defender.position.y = losY + 7;
+          }
+          break;
+      }
+
+      defender.velocity = { x: 0, y: 0 };
+      defender.currentSpeed = 0;
+    });
+  }
+
+  private applyCover6Adjustments(defensePlayers: Player[], formation: any, strength: 'left' | 'right'): void {
+    const centerX = 26.665;
+    const isFieldSide = (pos: number) => pos > centerX;
+
+    defensePlayers.forEach(defender => {
+      if (!defender.coverageResponsibility) return;
+
+      const onFieldSide = isFieldSide(defender.position.x);
+
+      if (onFieldSide) {
+        // Field side plays quarters coverage
+        this.applyCover4Adjustments([defender], formation, strength);
+      } else {
+        // Boundary side plays Cover 2 principles
+        this.applyCover2Adjustments([defender], formation, strength);
+      }
+
+      defender.velocity = { x: 0, y: 0 };
+      defender.currentSpeed = 0;
+    });
+  }
+
+  private applyCover0Adjustments(defensePlayers: Player[], formation: any, strength: 'left' | 'right'): void {
+    const losY = this.gameState.lineOfScrimmage;
+
+    defensePlayers.forEach(defender => {
+      if (!defender.coverageResponsibility) return;
+
+      if (defender.coverageResponsibility.type === 'man') {
+        // Tight man coverage with no help - press alignment, inside leverage
+        defender.position.y = losY + 1; // 0-1 yard depth
+        const insideLeverage = defender.position.x < 26.665 ? 0.5 : -0.5;
+        defender.position.x += insideLeverage;
+
+        // Stack formation - communicate picks
+        if (formation.isStack) {
+          // Slightly wider spacing to avoid picks
+          defender.position.x += insideLeverage;
+        }
+      } else if (defender.coverageResponsibility.type === 'blitz') {
+        // Aggressive blitz alignment
+        defender.position.y = losY + 2; // Closer to LOS for quick pressure
+      }
+
+      defender.velocity = { x: 0, y: 0 };
+      defender.currentSpeed = 0;
+    });
+  }
 
   public validateSetup(): void {
     // Ensure we have offense if play concept is set
@@ -1848,12 +2646,15 @@ export class FootballEngine {
     // Otherwise, recreate defense from scratch
     this.gameState.players = this.gameState.players.filter(p => p.team === 'offense');
 
-    // Apply dynamic personnel substitution and alignment for Cover 1
+    // Enhanced: Apply dynamic personnel substitution for ALL coverage types
+    // Analyze offensive formation and personnel
+    const formation = this.analyzeFormationComprehensive(offensivePlayers);
+    const optimalPersonnel = this.getOptimalDefensivePersonnelForCoverage(formation, coverage.type);
+
     if (coverage.type === 'cover-1') {
-      // Analyze offensive formation and personnel
-      const formation = analyzeFormation(offensivePlayers);
-      const optimalPersonnel = getOptimalDefensivePersonnel(formation.personnel);
-      const assignments = generateDefensiveAssignments(formation, optimalPersonnel);
+      // Use existing Cover 1 system but with enhanced analysis
+      const legacyFormation = analyzeFormation(offensivePlayers); // Keep for compatibility
+      const assignments = generateDefensiveAssignments(legacyFormation, optimalPersonnel);
 
       // Create defensive players based on dynamic assignments
       const defensivePlayers: Player[] = assignments.map(assignment => {
@@ -1905,9 +2706,15 @@ export class FootballEngine {
       this.gameState.players.push(...defensivePlayers);
 
     } else {
-      // For other coverages, create defenders and apply dynamic alignment
+      // Enhanced: For other coverages, apply personnel-based adjustments
+      const adjustedResponsibilities = this.adjustCoverageForPersonnel(
+        coverage.responsibilities,
+        formation,
+        optimalPersonnel
+      );
+
       const defensivePlayers: Player[] = [];
-      coverage.responsibilities.forEach((responsibility) => {
+      adjustedResponsibilities.forEach((responsibility) => {
         const playerType = this.getPlayerTypeFromId(responsibility.defenderId);
 
         // Adjust zone centers to be relative to current LOS
@@ -2107,5 +2914,206 @@ export class FootballEngine {
   private getPlayerSpeed(playerType: PlayerType): number {
     const speedRange = this.config.playerSpeeds[playerType];
     return Random.range(speedRange.min, speedRange.max);
+  }
+
+  private getOptimalDefensivePersonnelForCoverage(formation: any, coverageType: string): any {
+    // NFL-accurate personnel matchups based on offensive personnel and coverage
+    const offensivePersonnel = formation.personnel;
+
+    switch (coverageType) {
+      case 'cover-0':
+      case 'cover-1':
+        // Man coverage - match receivers with appropriate defenders
+        if (offensivePersonnel === '10') {
+          // 4 WRs - use Dime package (6 DBs, 1 LB)
+          return {
+            CB: 2,
+            S: 2,
+            NB: 2,
+            LB: 1
+          };
+        } else if (offensivePersonnel === '11') {
+          // 3 WRs, 1 TE - use Nickel package (5 DBs, 2 LBs)
+          return {
+            CB: 2,
+            S: 2,
+            NB: 1,
+            LB: 2
+          };
+        } else if (offensivePersonnel === '12') {
+          // 2 TEs - use Base package (4 DBs, 3 LBs)
+          return {
+            CB: 2,
+            S: 2,
+            LB: 3
+          };
+        } else if (offensivePersonnel === '21') {
+          // 2 RBs - use Heavy package (4 DBs, 3 LBs)
+          return {
+            CB: 2,
+            S: 2,
+            LB: 3
+          };
+        }
+        break;
+
+      case 'cover-2':
+        // Two-high safety coverage
+        if (offensivePersonnel === '10' || formation.isSpread) {
+          // Spread formations - Nickel/Dime with speed
+          return {
+            CB: 2,
+            S: 2,
+            NB: formation.receiverCount >= 4 ? 2 : 1,
+            LB: formation.receiverCount >= 4 ? 1 : 2
+          };
+        } else if (offensivePersonnel === '12' || offensivePersonnel === '21') {
+          // Heavy formations - Base defense
+          return {
+            CB: 2,
+            S: 2,
+            LB: 3
+          };
+        }
+        break;
+
+      case 'cover-3':
+        // Three-deep zones - adjust for run/pass tendencies
+        if (formation.isTrips) {
+          // Trips formations - need extra coverage
+          return {
+            CB: 2,
+            S: 2,
+            NB: 1,
+            LB: 2
+          };
+        } else if (offensivePersonnel === '21' || offensivePersonnel === '12') {
+          // Run-heavy personnel - add LB
+          return {
+            CB: 2,
+            S: 2,
+            LB: 3
+          };
+        }
+        break;
+
+      case 'cover-4':
+      case 'quarters':
+        // Four-deep coverage - pattern matching
+        if (formation.receiverCount >= 4) {
+          // Many receivers - Dime package
+          return {
+            CB: 2,
+            S: 2,
+            NB: 2,
+            LB: 1
+          };
+        }
+        break;
+
+      case 'tampa-2':
+        // Similar to Cover 2 but MLB drops deep
+        return {
+          CB: 2,
+          S: 2,
+          LB: 3 // Need MLB to drop
+        };
+
+      case 'cover-6':
+        // Field/boundary split coverage
+        if (formation.isTrips) {
+          return {
+            CB: 2,
+            S: 2,
+            NB: 1,
+            LB: 2
+          };
+        }
+        break;
+    }
+
+    // Default Nickel package for most situations
+    return {
+      CB: 2,
+      S: 2,
+      NB: 1,
+      LB: 2
+    };
+  }
+
+  private adjustCoverageForPersonnel(
+    originalResponsibilities: any[],
+    formation: any,
+    optimalPersonnel: any
+  ): any[] {
+    const adjustedResponsibilities = [...originalResponsibilities];
+
+    // Add additional defenders based on personnel needs
+    if (optimalPersonnel.NB && optimalPersonnel.NB > 0) {
+      // Add nickel backs for slot coverage
+      for (let i = 0; i < optimalPersonnel.NB; i++) {
+        const nbId = i === 0 ? 'NB1' : `NB${i + 1}`;
+
+        // Check if NB already exists in coverage
+        const existingNB = adjustedResponsibilities.find(r => r.defenderId === nbId);
+        if (!existingNB && formation.slotReceivers > i) {
+          adjustedResponsibilities.push({
+            defenderId: nbId,
+            type: 'man' as const,
+            target: this.getSlotReceiver(formation, i),
+            zone: null
+          });
+        }
+      }
+    }
+
+    // Adjust linebacker responsibilities based on formation
+    if (formation.personnel === '12' || formation.personnel === '21') {
+      // Heavy formations - linebackers play closer to LOS
+      adjustedResponsibilities.forEach(resp => {
+        if (resp.defenderId.startsWith('LB') && resp.zone) {
+          resp.zone.center.y -= 2; // Move 2 yards closer to LOS
+        }
+      });
+    }
+
+    // Adjust for trips formations
+    if (formation.isTrips) {
+      // Add bracket coverage on trips side
+      const tripsSide = formation.tripsSide;
+      adjustedResponsibilities.forEach(resp => {
+        if (resp.zone && resp.defenderId.startsWith('S')) {
+          // Safety help toward trips
+          const adjustment = tripsSide === 'right' ? 3 : -3;
+          resp.zone.center.x += adjustment;
+        }
+      });
+    }
+
+    // Adjust for bunch formations
+    if (formation.isBunch) {
+      // Tighten coverage in bunch area
+      adjustedResponsibilities.forEach(resp => {
+        if (resp.zone) {
+          const bunchCenter = this.calculateBunchCenter(formation.bunchGroups);
+          const distanceToBunch = Math.abs(resp.zone.center.x - bunchCenter.x);
+          if (distanceToBunch < 10) {
+            resp.zone.width *= 0.8; // Tighten zone
+          }
+        }
+      });
+    }
+
+    return adjustedResponsibilities;
+  }
+
+  private getSlotReceiver(formation: any, slotIndex: number): string | null {
+    // Find slot receivers based on formation analysis
+    // This is a simplified implementation - in a real system you'd track actual slot assignments
+    const centerX = 26.665;
+
+    // Return likely slot receiver IDs based on common naming conventions
+    const slotReceivers = ['WR3', 'WR4', 'TE1', 'RB1'];
+    return slotReceivers[slotIndex] || null;
   }
 }
