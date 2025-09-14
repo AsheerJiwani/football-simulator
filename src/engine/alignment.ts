@@ -215,10 +215,10 @@ export function getCover1Linebacker(targetReceiver: Player, los: number, role: '
     };
   }
 
-  // Coverage linebacker aligns over target
+  // Coverage linebacker aligns over target at x position, 5 yards above LOS
   return {
     x: targetReceiver.position.x,
-    y: targetReceiver.position.y + depth,
+    y: los + depth,  // 5 yards above LOS on defensive side
   };
 }
 
@@ -760,7 +760,7 @@ export function generateCover0Alignment(
           if (rb) {
             positions[defender.id] = {
               x: rb.position.x,
-              y: rb.position.y + 2
+              y: los + 5  // 5 yards above LOS on defensive side
             };
           } else {
             positions[defender.id] = { x: 23, y: los + 2 };
