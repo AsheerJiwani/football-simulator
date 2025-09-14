@@ -146,6 +146,7 @@
 Top Panel includes Play, Coverage, Sack Time, Star Player button to choose who benefits from star player upgrade, Show Routes toggle, and Show Defense toggle
 All controls implemented into Sidebar and Top Panel with beautiful, spacious layout, and do not interfere with field on webpage.
 - Implement zone bubbles & man assignment lines (line attached to defender with a bubble shape displaying their zone assignment in zone coverage, or a line attached to their man in man coverage, utilize research agent for each coverage)
+THE ABOVE TASKS ARE HANDLED IN PHASE_4_TASKS.md
 - Add more plays and coverages with zone bubbles
 - Perfect defensive coverage concepts (man: cushion/press, zone: find ways to perfect realistic nfl-mechanics, match: find ways to perfect realistic nfl-mechanics, rotations)
 - Build Challenge Mode

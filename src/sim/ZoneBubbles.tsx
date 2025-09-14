@@ -12,85 +12,413 @@ interface ZoneBubbleProps {
 
 interface ZoneDefinition {
   id: string;
-  center: { x: number; y: number };
-  width: number;
-  height: number;
+  shape: 'oval' | 'rectangle' | 'circle' | 'rounded_rectangle';
+  center: { x: number; y: number }; // Relative to LOS
+  dimensions: { width: number; height: number; radius?: number };
   type: 'deep' | 'underneath' | 'hole';
   label?: string;
+  opacity: number;
+  color: string;
 }
 
-// Zone definitions for each coverage type
+// Zone definitions based on NFL playbook research
 const getZoneDefinitions = (coverage: string): ZoneDefinition[] => {
   switch (coverage) {
     case 'cover-2':
       return [
-        // Deep zones
-        { id: 'deep-left', center: { x: 13, y: 25 }, width: 26, height: 30, type: 'deep', label: '1/2' },
-        { id: 'deep-right', center: { x: 40, y: 25 }, width: 26, height: 30, type: 'deep', label: '1/2' },
-        // Underneath zones
-        { id: 'flat-left', center: { x: 8, y: 8 }, width: 12, height: 10, type: 'underneath', label: 'Flat' },
-        { id: 'flat-right', center: { x: 45, y: 8 }, width: 12, height: 10, type: 'underneath', label: 'Flat' },
-        { id: 'hook-left', center: { x: 18, y: 10 }, width: 10, height: 12, type: 'underneath', label: 'Hook' },
-        { id: 'hook-right', center: { x: 35, y: 10 }, width: 10, height: 12, type: 'underneath', label: 'Hook' },
-        { id: 'middle', center: { x: 26.67, y: 12 }, width: 10, height: 12, type: 'underneath', label: 'Mid' },
+        // Deep halves - elongated ovals
+        {
+          id: 'deep-left',
+          shape: 'oval',
+          center: { x: 13.3, y: 20 },
+          dimensions: { width: 26.65, height: 30 },
+          type: 'deep',
+          label: '1/2',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
+        {
+          id: 'deep-right',
+          shape: 'oval',
+          center: { x: 40, y: 20 },
+          dimensions: { width: 26.65, height: 30 },
+          type: 'deep',
+          label: '1/2',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
+        // Underneath zones - rounded rectangles
+        {
+          id: 'flat-left',
+          shape: 'rounded_rectangle',
+          center: { x: 9, y: 6 },
+          dimensions: { width: 9, height: 12 },
+          type: 'underneath',
+          label: 'F',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'flat-right',
+          shape: 'rounded_rectangle',
+          center: { x: 44.3, y: 6 },
+          dimensions: { width: 9, height: 12 },
+          type: 'underneath',
+          label: 'F',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'hook-left',
+          shape: 'oval',
+          center: { x: 19, y: 8 },
+          dimensions: { width: 9.5, height: 6 },
+          type: 'underneath',
+          label: 'H',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'hook-right',
+          shape: 'oval',
+          center: { x: 34.3, y: 8 },
+          dimensions: { width: 9.5, height: 6 },
+          type: 'underneath',
+          label: 'H',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'hole',
+          shape: 'oval',
+          center: { x: 26.665, y: 10 },
+          dimensions: { width: 8, height: 6 },
+          type: 'underneath',
+          label: 'M',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
       ];
 
     case 'cover-3':
       return [
-        // Deep zones
-        { id: 'deep-left', center: { x: 9, y: 20 }, width: 18, height: 30, type: 'deep', label: '1/3' },
-        { id: 'deep-middle', center: { x: 26.67, y: 20 }, width: 18, height: 30, type: 'deep', label: '1/3' },
-        { id: 'deep-right', center: { x: 44, y: 20 }, width: 18, height: 30, type: 'deep', label: '1/3' },
+        // Deep thirds - rounded rectangles
+        {
+          id: 'deep-left',
+          shape: 'rounded_rectangle',
+          center: { x: 8.88, y: 18 },
+          dimensions: { width: 17.76, height: 30 },
+          type: 'deep',
+          label: '1/3',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
+        {
+          id: 'deep-middle',
+          shape: 'rounded_rectangle',
+          center: { x: 26.665, y: 18 },
+          dimensions: { width: 17.76, height: 30 },
+          type: 'deep',
+          label: '1/3',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
+        {
+          id: 'deep-right',
+          shape: 'rounded_rectangle',
+          center: { x: 44.42, y: 18 },
+          dimensions: { width: 17.76, height: 30 },
+          type: 'deep',
+          label: '1/3',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
         // Underneath zones
-        { id: 'flat-left', center: { x: 8, y: 8 }, width: 12, height: 10, type: 'underneath', label: 'Flat' },
-        { id: 'flat-right', center: { x: 45, y: 8 }, width: 12, height: 10, type: 'underneath', label: 'Flat' },
-        { id: 'hook-left', center: { x: 20, y: 10 }, width: 12, height: 12, type: 'underneath', label: 'Hook' },
-        { id: 'hook-right', center: { x: 33, y: 10 }, width: 12, height: 12, type: 'underneath', label: 'Hook' },
+        {
+          id: 'curl-flat-left',
+          shape: 'rounded_rectangle',
+          center: { x: 10, y: 6 },
+          dimensions: { width: 12, height: 12 },
+          type: 'underneath',
+          label: 'C/F',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'curl-flat-right',
+          shape: 'rounded_rectangle',
+          center: { x: 43.3, y: 6 },
+          dimensions: { width: 12, height: 12 },
+          type: 'underneath',
+          label: 'C/F',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'hook-left',
+          shape: 'oval',
+          center: { x: 20, y: 8 },
+          dimensions: { width: 8, height: 6 },
+          type: 'underneath',
+          label: 'H',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'hook-right',
+          shape: 'oval',
+          center: { x: 33.3, y: 8 },
+          dimensions: { width: 8, height: 6 },
+          type: 'underneath',
+          label: 'H',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
       ];
 
     case 'cover-4':
+    case 'quarters':
       return [
-        // Deep zones (quarters)
-        { id: 'deep-1', center: { x: 7, y: 20 }, width: 13, height: 30, type: 'deep', label: '1/4' },
-        { id: 'deep-2', center: { x: 20, y: 20 }, width: 13, height: 30, type: 'deep', label: '1/4' },
-        { id: 'deep-3', center: { x: 33, y: 20 }, width: 13, height: 30, type: 'deep', label: '1/4' },
-        { id: 'deep-4', center: { x: 46, y: 20 }, width: 13, height: 30, type: 'deep', label: '1/4' },
+        // Deep quarters - rectangles
+        {
+          id: 'deep-1',
+          shape: 'rectangle',
+          center: { x: 6.66, y: 16 },
+          dimensions: { width: 13.32, height: 30 },
+          type: 'deep',
+          label: '1/4',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
+        {
+          id: 'deep-2',
+          shape: 'rectangle',
+          center: { x: 19.99, y: 16 },
+          dimensions: { width: 13.32, height: 30 },
+          type: 'deep',
+          label: '1/4',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
+        {
+          id: 'deep-3',
+          shape: 'rectangle',
+          center: { x: 33.34, y: 16 },
+          dimensions: { width: 13.32, height: 30 },
+          type: 'deep',
+          label: '1/4',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
+        {
+          id: 'deep-4',
+          shape: 'rectangle',
+          center: { x: 46.67, y: 16 },
+          dimensions: { width: 13.32, height: 30 },
+          type: 'deep',
+          label: '1/4',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
         // Underneath zones
-        { id: 'hook-left', center: { x: 18, y: 10 }, width: 12, height: 12, type: 'underneath', label: 'Hook' },
-        { id: 'hook-middle', center: { x: 26.67, y: 10 }, width: 10, height: 12, type: 'underneath', label: 'Mid' },
-        { id: 'hook-right', center: { x: 35, y: 10 }, width: 12, height: 12, type: 'underneath', label: 'Hook' },
+        {
+          id: 'hook-left',
+          shape: 'oval',
+          center: { x: 18, y: 8 },
+          dimensions: { width: 10, height: 6 },
+          type: 'underneath',
+          label: 'H',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'hook-middle',
+          shape: 'oval',
+          center: { x: 26.665, y: 8 },
+          dimensions: { width: 8, height: 6 },
+          type: 'underneath',
+          label: 'M',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'hook-right',
+          shape: 'oval',
+          center: { x: 35.3, y: 8 },
+          dimensions: { width: 10, height: 6 },
+          type: 'underneath',
+          label: 'H',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
       ];
 
     case 'tampa-2':
       return [
-        // Deep zones
-        { id: 'deep-left', center: { x: 13, y: 25 }, width: 26, height: 30, type: 'deep', label: '1/2' },
-        { id: 'deep-right', center: { x: 40, y: 25 }, width: 26, height: 30, type: 'deep', label: '1/2' },
-        { id: 'deep-hole', center: { x: 26.67, y: 18 }, width: 12, height: 15, type: 'hole', label: 'Hole' },
+        // Deep halves - truncated ovals
+        {
+          id: 'deep-left',
+          shape: 'oval',
+          center: { x: 11, y: 22 },
+          dimensions: { width: 22, height: 28 },
+          type: 'deep',
+          label: '1/2',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
+        {
+          id: 'deep-right',
+          shape: 'oval',
+          center: { x: 42.3, y: 22 },
+          dimensions: { width: 22, height: 28 },
+          type: 'deep',
+          label: '1/2',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
+        // Robber/hole zone - circle
+        {
+          id: 'deep-hole',
+          shape: 'circle',
+          center: { x: 26.665, y: 15 },
+          dimensions: { width: 10, height: 10, radius: 5 },
+          type: 'hole',
+          label: 'Rob',
+          opacity: 0.6,
+          color: '#F5A623'
+        },
         // Underneath zones
-        { id: 'flat-left', center: { x: 8, y: 8 }, width: 12, height: 10, type: 'underneath', label: 'Flat' },
-        { id: 'flat-right', center: { x: 45, y: 8 }, width: 12, height: 10, type: 'underneath', label: 'Flat' },
-        { id: 'hook-left', center: { x: 18, y: 10 }, width: 10, height: 12, type: 'underneath', label: 'Hook' },
-        { id: 'hook-right', center: { x: 35, y: 10 }, width: 10, height: 12, type: 'underneath', label: 'Hook' },
+        {
+          id: 'flat-left',
+          shape: 'rounded_rectangle',
+          center: { x: 9, y: 6 },
+          dimensions: { width: 9, height: 12 },
+          type: 'underneath',
+          label: 'F',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'flat-right',
+          shape: 'rounded_rectangle',
+          center: { x: 44.3, y: 6 },
+          dimensions: { width: 9, height: 12 },
+          type: 'underneath',
+          label: 'F',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'hook-left',
+          shape: 'oval',
+          center: { x: 18, y: 8 },
+          dimensions: { width: 8, height: 6 },
+          type: 'underneath',
+          label: 'H',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'hook-right',
+          shape: 'oval',
+          center: { x: 35.3, y: 8 },
+          dimensions: { width: 8, height: 6 },
+          type: 'underneath',
+          label: 'H',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
       ];
 
     case 'cover-6':
       return [
-        // Deep zones (quarter-quarter-half)
-        { id: 'deep-quarter-1', center: { x: 7, y: 20 }, width: 13, height: 30, type: 'deep', label: '1/4' },
-        { id: 'deep-quarter-2', center: { x: 20, y: 20 }, width: 13, height: 30, type: 'deep', label: '1/4' },
-        { id: 'deep-half', center: { x: 40, y: 25 }, width: 26, height: 30, type: 'deep', label: '1/2' },
+        // Quarter-quarter-half combination
+        {
+          id: 'deep-quarter-1',
+          shape: 'rectangle',
+          center: { x: 6.66, y: 16 },
+          dimensions: { width: 13.32, height: 30 },
+          type: 'deep',
+          label: '1/4',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
+        {
+          id: 'deep-quarter-2',
+          shape: 'rectangle',
+          center: { x: 19.99, y: 16 },
+          dimensions: { width: 13.32, height: 30 },
+          type: 'deep',
+          label: '1/4',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
+        {
+          id: 'deep-half',
+          shape: 'oval',
+          center: { x: 40, y: 20 },
+          dimensions: { width: 26.65, height: 30 },
+          type: 'deep',
+          label: '1/2',
+          opacity: 0.35,
+          color: '#4A90E2'
+        },
         // Underneath zones
-        { id: 'flat-left', center: { x: 8, y: 8 }, width: 12, height: 10, type: 'underneath', label: 'Flat' },
-        { id: 'hook-left', center: { x: 18, y: 10 }, width: 12, height: 12, type: 'underneath', label: 'Hook' },
-        { id: 'hook-middle', center: { x: 26.67, y: 10 }, width: 10, height: 12, type: 'underneath', label: 'Mid' },
-        { id: 'flat-right', center: { x: 45, y: 8 }, width: 12, height: 10, type: 'underneath', label: 'Flat' },
+        {
+          id: 'flat-left',
+          shape: 'rounded_rectangle',
+          center: { x: 9, y: 6 },
+          dimensions: { width: 9, height: 12 },
+          type: 'underneath',
+          label: 'F',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'hook-left',
+          shape: 'oval',
+          center: { x: 18, y: 8 },
+          dimensions: { width: 10, height: 6 },
+          type: 'underneath',
+          label: 'H',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'hook-middle',
+          shape: 'oval',
+          center: { x: 26.665, y: 8 },
+          dimensions: { width: 8, height: 6 },
+          type: 'underneath',
+          label: 'M',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
+        {
+          id: 'flat-right',
+          shape: 'rounded_rectangle',
+          center: { x: 44.3, y: 6 },
+          dimensions: { width: 9, height: 12 },
+          type: 'underneath',
+          label: 'F',
+          opacity: 0.45,
+          color: '#7ED321'
+        },
       ];
 
     case 'cover-1':
       // Cover 1 is man coverage with single high safety
       return [
-        { id: 'deep-middle', center: { x: 26.67, y: 15 }, width: 30, height: 20, type: 'deep', label: 'FS' },
+        {
+          id: 'deep-middle',
+          shape: 'circle',
+          center: { x: 26.665, y: 15 },
+          dimensions: { width: 20, height: 20, radius: 10 },
+          type: 'deep',
+          label: 'FS',
+          opacity: 0.3,
+          color: '#4A90E2'
+        },
       ];
 
     case 'cover-0':
@@ -99,6 +427,78 @@ const getZoneDefinitions = (coverage: string): ZoneDefinition[] => {
 
     default:
       return [];
+  }
+};
+
+// Helper to render different shapes
+const renderZoneShape = (
+  zone: ZoneDefinition,
+  topLeft: { x: number; y: number },
+  bottomRight: { x: number; y: number },
+  svgWidth: number,
+  svgHeight: number
+) => {
+  const centerX = (topLeft.x + bottomRight.x) / 2;
+  const centerY = (topLeft.y + bottomRight.y) / 2;
+
+  switch (zone.shape) {
+    case 'circle':
+      return (
+        <circle
+          cx={centerX}
+          cy={centerY}
+          r={zone.dimensions.radius! * (svgWidth / zone.dimensions.width)}
+          fill={zone.color}
+          fillOpacity={zone.opacity}
+          stroke={zone.color}
+          strokeWidth={2}
+        />
+      );
+
+    case 'oval':
+      return (
+        <ellipse
+          cx={centerX}
+          cy={centerY}
+          rx={svgWidth / 2}
+          ry={svgHeight / 2}
+          fill={zone.color}
+          fillOpacity={zone.opacity}
+          stroke={zone.color}
+          strokeWidth={2}
+        />
+      );
+
+    case 'rounded_rectangle':
+      return (
+        <rect
+          x={Math.min(topLeft.x, bottomRight.x)}
+          y={Math.min(topLeft.y, bottomRight.y)}
+          width={svgWidth}
+          height={svgHeight}
+          fill={zone.color}
+          fillOpacity={zone.opacity}
+          stroke={zone.color}
+          strokeWidth={2}
+          rx={Math.min(8, svgWidth * 0.1)}
+          ry={Math.min(8, svgHeight * 0.1)}
+        />
+      );
+
+    case 'rectangle':
+    default:
+      return (
+        <rect
+          x={Math.min(topLeft.x, bottomRight.x)}
+          y={Math.min(topLeft.y, bottomRight.y)}
+          width={svgWidth}
+          height={svgHeight}
+          fill={zone.color}
+          fillOpacity={zone.opacity}
+          stroke={zone.color}
+          strokeWidth={2}
+        />
+      );
   }
 };
 
@@ -118,57 +518,41 @@ export default function ZoneBubbles({ coverage, fieldToSvg }: ZoneBubbleProps) {
   const los = gameState.lineOfScrimmage;
 
   return (
-    <g className="zone-bubbles" opacity={0.3}>
+    <g className="zone-bubbles">
       {zones.map((zone) => {
         // Adjust zone position relative to LOS
         const adjustedCenter = {
           x: zone.center.x,
-          y: los + zone.center.y
+          y: los + zone.center.y // Zones are positioned on defensive side
         };
 
         // Convert to SVG coordinates
         const topLeft = fieldToSvg(
-          adjustedCenter.x - zone.width / 2,
-          adjustedCenter.y - zone.height / 2
+          adjustedCenter.x - zone.dimensions.width / 2,
+          adjustedCenter.y - zone.dimensions.height / 2
         );
         const bottomRight = fieldToSvg(
-          adjustedCenter.x + zone.width / 2,
-          adjustedCenter.y + zone.height / 2
+          adjustedCenter.x + zone.dimensions.width / 2,
+          adjustedCenter.y + zone.dimensions.height / 2
         );
 
         const svgWidth = Math.abs(bottomRight.x - topLeft.x);
         const svgHeight = Math.abs(bottomRight.y - topLeft.y);
 
-        // Color based on zone type
-        const fillColor = zone.type === 'deep'
-          ? '#3B82F6' // Blue for deep zones
-          : zone.type === 'hole'
-          ? '#10B981' // Green for hole zones
-          : '#F59E0B'; // Amber for underneath zones
-
         return (
           <g key={zone.id}>
-            <rect
-              x={Math.min(topLeft.x, bottomRight.x)}
-              y={Math.min(topLeft.y, bottomRight.y)}
-              width={svgWidth}
-              height={svgHeight}
-              fill={fillColor}
-              stroke={fillColor}
-              strokeWidth={1}
-              rx={8}
-              ry={8}
-            />
+            {renderZoneShape(zone, topLeft, bottomRight, svgWidth, svgHeight)}
             {zone.label && (
               <text
-                x={Math.min(topLeft.x, bottomRight.x) + svgWidth / 2}
-                y={Math.min(topLeft.y, bottomRight.y) + svgHeight / 2}
+                x={(topLeft.x + bottomRight.x) / 2}
+                y={(topLeft.y + bottomRight.y) / 2}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fill="white"
                 fontSize="10"
                 fontWeight="bold"
-                opacity={0.8}
+                opacity={1}
+                style={{ pointerEvents: 'none' }}
               >
                 {zone.label}
               </text>
