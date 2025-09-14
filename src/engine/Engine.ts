@@ -438,9 +438,20 @@ export class FootballEngine {
     // Update the player's position
     player.position = { ...position };
 
+    // Analyze the new formation for trips, bunch, etc.
+    const offensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
+    const formation = analyzeFormation(offensivePlayers);
+
+    // Update formation metadata in game state (for debugging/display)
+    if (formation.isTrips) {
+      console.log(`Formation: Trips ${formation.tripsSide}`);
+    }
+    if (this.detectBunchFormation(offensivePlayers).length >= 3) {
+      console.log('Bunch formation detected');
+    }
+
     // Realign defense based on new offensive formation
-    // For man coverage, adjust defender positions
-    // For zone coverage, recalculate zone centers
+    // This will reassign coverage responsibilities and update positions
     this.realignDefense();
 
     return true;
@@ -455,6 +466,9 @@ export class FootballEngine {
 
     // If no defenders exist yet, return (defense not set up)
     if (defensePlayers.length === 0) return;
+
+    // First, reassign coverage responsibilities based on new formation
+    this.reassignCoverageResponsibilities(offensePlayers, defensePlayers);
 
     // Determine new formation strength (based on receiver positioning)
     const losY = this.gameState.lineOfScrimmage;
@@ -474,8 +488,9 @@ export class FootballEngine {
     if (coverage.type === 'cover-1' || coverage.type === 'cover-0') {
       // Man coverage - realign defenders to follow their assigned receivers
       defensePlayers.forEach(defender => {
-        if (defender.coverageAssignment) {
-          const assignedReceiver = offensePlayers.find(p => p.id === defender.coverageAssignment);
+        // Check if defender has man coverage responsibility
+        if (defender.coverageResponsibility?.type === 'man' && defender.coverageResponsibility.target) {
+          const assignedReceiver = offensePlayers.find(p => p.id === defender.coverageResponsibility!.target);
           if (assignedReceiver) {
             // Position defender based on receiver's new position
             // Determine cushion based on defender type and coverage
@@ -576,6 +591,100 @@ export class FootballEngine {
       x: sumX / players.length,
       y: sumY / players.length
     };
+  }
+
+  private reassignCoverageResponsibilities(offensePlayers: Player[], defensePlayers: Player[]): void {
+    const coverage = this.gameState.coverage;
+    if (!coverage) return;
+
+    // For man coverage, reassign defenders to receivers based on new positions
+    if (coverage.type === 'cover-1' || coverage.type === 'cover-0') {
+      const eligibleReceivers = offensePlayers.filter(p => p.isEligible);
+      const centerX = 26.665;
+
+      // Sort receivers by position (outside to inside)
+      const leftReceivers = eligibleReceivers
+        .filter(r => r.position.x < centerX)
+        .sort((a, b) => a.position.x - b.position.x);
+
+      const rightReceivers = eligibleReceivers
+        .filter(r => r.position.x >= centerX)
+        .sort((a, b) => b.position.x - a.position.x);
+
+      // Reassign cornerbacks to outside receivers
+      const cornerbacks = defensePlayers.filter(d => d.playerType === 'CB');
+      let cbIndex = 0;
+
+      // Assign left CB to leftmost receiver
+      if (leftReceivers.length > 0 && cbIndex < cornerbacks.length) {
+        const cb = cornerbacks[cbIndex++];
+        if (cb.coverageResponsibility) {
+          cb.coverageResponsibility.target = leftReceivers[0].id;
+          cb.coverageResponsibility.type = 'man';
+        }
+      }
+
+      // Assign right CB to rightmost receiver
+      if (rightReceivers.length > 0 && cbIndex < cornerbacks.length) {
+        const cb = cornerbacks[cbIndex++];
+        if (cb.coverageResponsibility) {
+          cb.coverageResponsibility.target = rightReceivers[0].id;
+          cb.coverageResponsibility.type = 'man';
+        }
+      }
+
+      // Assign other defenders to remaining receivers
+      const remainingReceivers = [...leftReceivers.slice(1), ...rightReceivers.slice(1)];
+      const otherDefenders = defensePlayers.filter(d =>
+        d.playerType !== 'CB' &&
+        d.coverageResponsibility?.type === 'man'
+      );
+
+      remainingReceivers.forEach((receiver, index) => {
+        if (index < otherDefenders.length) {
+          const defender = otherDefenders[index];
+          if (defender.coverageResponsibility) {
+            defender.coverageResponsibility.target = receiver.id;
+          }
+        }
+      });
+
+    } else {
+      // For zone coverage, update zone assignments based on formation strength
+      const formation = analyzeFormation(offensePlayers);
+
+      defensePlayers.forEach(defender => {
+        if (defender.coverageResponsibility?.type === 'zone' && defender.coverageResponsibility.zone) {
+          const zone = defender.coverageResponsibility.zone;
+
+          // Detect trips formation and adjust zones
+          if (formation.isTrips) {
+            const tripsStrength = formation.tripsSide || formation.strength;
+
+            // Compress zones toward trips side
+            if (tripsStrength === 'right' && zone.center.x > 26.665) {
+              zone.center.x -= 2; // Shift toward trips
+            } else if (tripsStrength === 'left' && zone.center.x < 26.665) {
+              zone.center.x += 2; // Shift toward trips
+            }
+          }
+
+          // Adjust for bunch formations
+          const bunchedReceivers = this.detectBunchFormation(offensePlayers);
+          if (bunchedReceivers.length >= 3) {
+            const bunchCenter = this.calculateBunchCenter(bunchedReceivers);
+
+            // Defenders in the bunch area should tighten coverage
+            const distanceToBunch = Math.abs(zone.center.x - bunchCenter.x);
+            if (distanceToBunch < 15) {
+              // Compress zone toward bunch
+              const adjustment = (bunchCenter.x - zone.center.x) * 0.2;
+              zone.center.x += adjustment;
+            }
+          }
+        }
+      });
+    }
   }
 
   public audibleRoute(playerId: string, newRouteType: RouteType): boolean {
@@ -1471,9 +1580,22 @@ export class FootballEngine {
     if (!this.gameState.coverage) return;
 
     const coverage = this.gameState.coverage;
-    // Remove existing defensive players but keep offensive players
+    const offensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
+    const existingDefenders = this.gameState.players.filter(p => p.team === 'defense');
+
+    // Check if we can preserve existing defenders (same coverage type)
+    const shouldPreserveDefenders = existingDefenders.length > 0 &&
+      this.gameState.currentCoverage?.type === coverage.type;
+
+    if (shouldPreserveDefenders) {
+      // Update existing defenders' responsibilities and realign
+      this.reassignCoverageResponsibilities(offensivePlayers, existingDefenders);
+      this.realignDefense();
+      return;
+    }
+
+    // Otherwise, recreate defense from scratch
     this.gameState.players = this.gameState.players.filter(p => p.team === 'offense');
-    const offensivePlayers = this.gameState.players;
 
     // Apply dynamic personnel substitution and alignment for Cover 1
     if (coverage.type === 'cover-1') {
