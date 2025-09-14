@@ -29,23 +29,30 @@ interface GameStore {
   updateGameState: () => void;
 }
 
+// Create a separate function to initialize the engine to avoid re-creation
+const createInitialEngine = () => {
+  const engine = new FootballEngine();
+
+  // Load default data
+  const defaults = GameData.getDefaults();
+  const defaultConcept = DataLoader.getConcept(defaults.concept);
+  const defaultCoverage = DataLoader.getCoverage(defaults.coverage);
+
+  // Initialize engine with defaults
+  if (defaultConcept) {
+    engine.setPlayConcept(defaultConcept);
+  }
+  if (defaultCoverage) {
+    engine.setCoverage(defaultCoverage);
+  }
+  engine.setSackTime(defaults.sackTime);
+
+  return { engine, defaults };
+};
+
 export const useGameStore = create<GameStore>()(
-  subscribeWithSelector((set, get) => {
-    const engine = new FootballEngine();
-
-    // Load default data
-    const defaults = GameData.getDefaults();
-    const defaultConcept = DataLoader.getConcept(defaults.concept);
-    const defaultCoverage = DataLoader.getCoverage(defaults.coverage);
-
-    // Initialize engine with defaults
-    if (defaultConcept) {
-      engine.setPlayConcept(defaultConcept);
-    }
-    if (defaultCoverage) {
-      engine.setCoverage(defaultCoverage);
-    }
-    engine.setSackTime(defaults.sackTime);
+  (set, get) => {
+    const { engine, defaults } = createInitialEngine();
 
     return {
       // Initial state
@@ -65,10 +72,11 @@ export const useGameStore = create<GameStore>()(
         const { engine } = get();
         engine.setPlayConcept(concept);
 
-        set({
+        set((state) => ({
+          ...state,
           selectedConcept: conceptName,
           gameState: engine.getGameState()
-        });
+        }));
       },
 
       setCoverage: (coverageName: string) => {
@@ -78,30 +86,33 @@ export const useGameStore = create<GameStore>()(
         const { engine } = get();
         engine.setCoverage(coverage);
 
-        set({
+        set((state) => ({
+          ...state,
           selectedCoverage: coverageName,
           gameState: engine.getGameState()
-        });
+        }));
       },
 
       setSackTime: (seconds: number) => {
         const { engine } = get();
         engine.setSackTime(seconds);
 
-        set({
+        set((state) => ({
+          ...state,
           sackTime: seconds,
           gameState: engine.getGameState()
-        });
+        }));
       },
 
       setGameMode: (mode: 'free-play' | 'challenge') => {
         const { engine } = get();
         engine.setGameMode(mode);
 
-        set({
+        set((state) => ({
+          ...state,
           gameMode: mode,
           gameState: engine.getGameState()
-        });
+        }));
       },
 
       snap: () => {
@@ -109,25 +120,27 @@ export const useGameStore = create<GameStore>()(
         const success = engine.snap();
 
         if (success) {
-          set({
+          set((state) => ({
+            ...state,
             isPlaying: true,
             gameState: engine.getGameState()
-          });
+          }));
 
           // Start polling for game state updates during play
+          let pollCount = 0;
+          const maxPolls = 1000; // Prevent infinite polling (about 30 seconds at 33ms)
+
           const pollInterval = setInterval(() => {
+            pollCount++;
             const currentState = engine.getGameState();
-            const { isPlaying } = get();
 
-            set({ gameState: currentState });
+            set((state) => ({ ...state, gameState: currentState }));
 
-            if (currentState.phase === 'play-over') {
-              set({ isPlaying: false });
-              clearInterval(pollInterval);
-            } else if (!isPlaying) {
+            if (currentState.phase === 'play-over' || pollCount >= maxPolls) {
+              set((state) => ({ ...state, isPlaying: false }));
               clearInterval(pollInterval);
             }
-          }, 33);
+          }, 100); // Slower polling at 10fps to reduce load
         }
       },
 
@@ -136,7 +149,7 @@ export const useGameStore = create<GameStore>()(
         const success = engine.throwTo(receiverId);
 
         if (success) {
-          set({ gameState: engine.getGameState() });
+          set((state) => ({ ...state, gameState: engine.getGameState() }));
         }
       },
 
@@ -154,15 +167,16 @@ export const useGameStore = create<GameStore>()(
         if (concept) engine.setPlayConcept(concept);
         if (coverage) engine.setCoverage(coverage);
 
-        set({
+        set((state) => ({
+          ...state,
           isPlaying: false,
           gameState: engine.getGameState()
-        });
+        }));
       },
 
       updateGameState: () => {
         const { engine } = get();
-        set({ gameState: engine.getGameState() });
+        set((state) => ({ ...state, gameState: engine.getGameState() }));
       },
     };
   })
