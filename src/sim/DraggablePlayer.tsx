@@ -1,7 +1,6 @@
 'use client';
 
 import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 import type { Player } from '@/engine/types';
 
 interface DraggablePlayerProps {
@@ -28,30 +27,28 @@ export default function DraggablePlayer({
     disabled: disabled || player.team === 'defense',
     data: {
       player,
-      originalPosition: player.position
+      originalPosition: player.position,
+      svgCoords
     }
   });
 
   // Cast the ref to the correct type for SVG elements
   const svgNodeRef = setNodeRef as unknown as React.Ref<SVGGElement>;
 
-  const style = transform ? {
-    transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : 1,
-    cursor: disabled || player.team === 'defense' ? 'default' : 'grab',
-    zIndex: isDragging ? 1000 : 1,
-    transition: isDragging ? 'none' : 'transform 200ms ease'
-  } : {
-    cursor: disabled || player.team === 'defense' ? 'default' : 'grab'
-  };
+  // Calculate the transform position
+  const x = svgCoords.x + (transform?.x || 0);
+  const y = svgCoords.y + (transform?.y || 0);
 
   return (
     <g
       ref={svgNodeRef}
-      style={style}
       {...(disabled || player.team === 'defense' ? {} : listeners)}
       {...(disabled || player.team === 'defense' ? {} : attributes)}
-      transform={`translate(${svgCoords.x}, ${svgCoords.y})`}
+      transform={`translate(${x}, ${y})`}
+      style={{
+        cursor: disabled || player.team === 'defense' ? 'default' : isDragging ? 'grabbing' : 'grab',
+        opacity: isDragging ? 0.7 : 1
+      }}
     >
       {children}
     </g>

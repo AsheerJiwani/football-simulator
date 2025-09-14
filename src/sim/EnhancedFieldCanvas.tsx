@@ -28,6 +28,7 @@ export default function EnhancedFieldCanvas({
   const { setCustomPosition, clearCustomPositions } = useGameStore();
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [draggedPlayer, setDraggedPlayer] = useState<Player | null>(null);
   const [formationErrors, setFormationErrors] = useState<string[]>([]);
 
   // Scale factors for field dimensions (VERTICAL FIELD)
@@ -76,12 +77,18 @@ export default function EnhancedFieldCanvas({
   }
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
+    const playerId = event.active.id as string;
+    setActiveId(playerId);
+    const player = players.find(p => p.id === playerId);
+    if (player) {
+      setDraggedPlayer(player);
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setDraggedPlayer(null);
 
     if (!over) return;
 
@@ -298,15 +305,41 @@ export default function EnhancedFieldCanvas({
 
           {renderEnhancedFieldMarkings()}
 
+          {/* Connection lines when dragging */}
+          {activeId && draggedPlayer && gamePhase === 'pre-snap' && (
+            <g opacity="0.6">
+              {anchors
+                .filter(anchor => !occupiedAnchors.has(anchor.id))
+                .map(anchor => {
+                  const fromPos = fieldToSvg(draggedPlayer.position.x, draggedPlayer.position.y);
+                  const toPos = fieldToSvg(anchor.position.x, anchor.position.y);
+                  return (
+                    <line
+                      key={`line-${anchor.id}`}
+                      x1={fromPos.x}
+                      y1={fromPos.y}
+                      x2={toPos.x}
+                      y2={toPos.y}
+                      stroke="#00ff00"
+                      strokeWidth="2"
+                      strokeDasharray="4,4"
+                      opacity="0.5"
+                    />
+                  );
+                })}
+            </g>
+          )}
+
           {/* Formation anchors (only show pre-snap) */}
           {gamePhase === 'pre-snap' && anchors.map(anchor => {
             const pos = fieldToSvg(anchor.position.x, anchor.position.y);
+            const isAvailable = !occupiedAnchors.has(anchor.id);
             return (
               <DroppableAnchor
                 key={anchor.id}
-                anchor={{ ...anchor, isOccupied: occupiedAnchors.has(anchor.id) }}
+                anchor={{ ...anchor, isOccupied: !isAvailable }}
                 svgCoords={pos}
-                isHighlighted={activeId !== null}
+                isHighlighted={activeId !== null && isAvailable}
               />
             );
           })}
@@ -371,8 +404,28 @@ export default function EnhancedFieldCanvas({
 
         {/* Drag overlay */}
         <DragOverlay>
-          {activeId && (
-            <div className="w-6 h-6 bg-blue-500 rounded-full opacity-50" />
+          {activeId && draggedPlayer && (
+            <svg width="40" height="40" style={{ position: 'fixed', pointerEvents: 'none', zIndex: 1000 }}>
+              <circle
+                cx="20"
+                cy="20"
+                r="12"
+                fill="#0066cc"
+                stroke="#004499"
+                strokeWidth="2"
+                opacity="0.8"
+              />
+              <text
+                x="20"
+                y="24"
+                textAnchor="middle"
+                fill="#ffffff"
+                fontSize="10"
+                fontWeight="bold"
+              >
+                {draggedPlayer.playerType}
+              </text>
+            </svg>
           )}
         </DragOverlay>
       </div>

@@ -27,23 +27,38 @@ export function DroppableAnchor({
     data: { anchor }
   });
 
-  const fillColor = isOver ? '#22c55e' : isHighlighted ? '#3b82f6' : '#4b5563';
-  const opacity = anchor.isOccupied ? 0 : isOver ? 0.8 : isHighlighted ? 0.6 : 0.3;
+  const fillColor = isOver ? '#22c55e' : isHighlighted ? '#00ff00' : '#4b5563';
+  const opacity = anchor.isOccupied ? 0 : isOver ? 1 : isHighlighted ? 0.8 : 0.3;
+  const radius = isOver ? 6 : isHighlighted ? 5 : 3;
 
   // Cast the ref to the correct type for SVG elements
   const svgNodeRef = setNodeRef as unknown as React.Ref<SVGCircleElement>;
 
   return (
-    <circle
-      ref={svgNodeRef}
-      cx={svgCoords.x}
-      cy={svgCoords.y}
-      r={3}
-      fill={fillColor}
-      opacity={opacity}
-      strokeWidth={isOver ? 2 : 1}
-      stroke={isOver ? '#22c55e' : '#6b7280'}
-    />
+    <g>
+      <circle
+        ref={svgNodeRef}
+        cx={svgCoords.x}
+        cy={svgCoords.y}
+        r={radius}
+        fill={fillColor}
+        opacity={opacity}
+        strokeWidth={isOver ? 3 : isHighlighted ? 2 : 1}
+        stroke={isOver ? '#22c55e' : isHighlighted ? '#00ff00' : '#6b7280'}
+      />
+      {isHighlighted && !anchor.isOccupied && (
+        <circle
+          cx={svgCoords.x}
+          cy={svgCoords.y}
+          r={radius + 4}
+          fill="none"
+          stroke="#00ff00"
+          strokeWidth="1"
+          opacity="0.4"
+          strokeDasharray="2,2"
+        />
+      )}
+    </g>
   );
 }
 
