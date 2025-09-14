@@ -291,14 +291,26 @@ export default function FieldCanvas({
 
         // Start from player's current position (accounts for motion)
         const startPos = fieldToSvg(player.position.x, player.position.y);
-        const pathPoints = route.waypoints.map(waypoint =>
+
+        // For display, we need to ensure routes show properly from player position
+        // Skip the first waypoint if it's the same as player position to avoid doubling
+        const routeWaypoints = route.waypoints.filter((wp, idx) => {
+          if (idx === 0) {
+            // Skip first waypoint if it's at the player's position (avoid duplicate)
+            const dist = Math.abs(wp.x - player.position.x) + Math.abs(wp.y - player.position.y);
+            return dist > 0.5; // Only include if it's not the same position
+          }
+          return true;
+        });
+
+        const pathPoints = routeWaypoints.map(waypoint =>
           fieldToSvg(waypoint.x, waypoint.y)
         );
 
         // Add continuation path after final waypoint
-        if (pathPoints.length >= 2) {
-          const lastWaypoint = route.waypoints[route.waypoints.length - 1];
-          const secondLastWaypoint = route.waypoints[route.waypoints.length - 2];
+        if (routeWaypoints.length >= 2) {
+          const lastWaypoint = routeWaypoints[routeWaypoints.length - 1];
+          const secondLastWaypoint = routeWaypoints[routeWaypoints.length - 2];
 
           // Calculate direction from second-to-last to last waypoint
           const dx = lastWaypoint.x - secondLastWaypoint.x;

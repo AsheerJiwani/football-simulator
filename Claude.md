@@ -35,6 +35,8 @@ Always 7 defenders in coverage (some may blitz or spy).
 
 No penalties or flags.
 
+After the final 'break' in their route, receivers should continue running in the same direction until they reach the back of the endzone (y = 120 yards) or either sideline.
+
 🏈 Core User Controls
 
 Route Concepts: Choose from pre-loaded NFL plays (e.g., Smash, Mesh, Flood).
