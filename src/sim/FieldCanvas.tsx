@@ -295,6 +295,34 @@ export default function FieldCanvas({
           fieldToSvg(waypoint.x, waypoint.y)
         );
 
+        // Add continuation path after final waypoint
+        if (pathPoints.length >= 2) {
+          const lastWaypoint = route.waypoints[route.waypoints.length - 1];
+          const secondLastWaypoint = route.waypoints[route.waypoints.length - 2];
+
+          // Calculate direction from second-to-last to last waypoint
+          const dx = lastWaypoint.x - secondLastWaypoint.x;
+          const dy = lastWaypoint.y - secondLastWaypoint.y;
+          const magnitude = Math.sqrt(dx * dx + dy * dy);
+
+          if (magnitude > 0) {
+            const dirX = dx / magnitude;
+            const dirY = dy / magnitude;
+
+            // Extend the route 30 yards in the same direction or to boundary
+            let endX = lastWaypoint.x + dirX * 30;
+            let endY = lastWaypoint.y + dirY * 30;
+
+            // Clamp to field boundaries
+            endX = Math.max(0, Math.min(53.33, endX));
+            endY = Math.max(lastWaypoint.y, Math.min(120, endY)); // Don't go backward, max at back of endzone
+
+            // Add the continuation point
+            const continuationPoint = fieldToSvg(endX, endY);
+            pathPoints.push(continuationPoint);
+          }
+        }
+
         // Create SVG path string starting from player position
         const pathString = pathPoints.reduce((path, point, index) => {
           if (index === 0) return `M ${startPos.x} ${startPos.y} L ${point.x} ${point.y}`;
@@ -311,14 +339,16 @@ export default function FieldCanvas({
               fill="none"
               opacity="0.7"
             />
-            {/* Add route depth indicator at the end */}
-            <circle
-              cx={pathPoints[pathPoints.length - 1]?.x}
-              cy={pathPoints[pathPoints.length - 1]?.y}
-              r="4"
-              fill="#00FF00"
-              opacity="0.8"
-            />
+            {/* Add route depth indicator at the break point (second to last) */}
+            {pathPoints.length >= 2 && (
+              <circle
+                cx={pathPoints[pathPoints.length - 2]?.x}
+                cy={pathPoints[pathPoints.length - 2]?.y}
+                r="4"
+                fill="#00FF00"
+                opacity="0.8"
+              />
+            )}
           </g>
         );
       });

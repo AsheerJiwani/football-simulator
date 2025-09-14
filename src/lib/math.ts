@@ -204,7 +204,30 @@ export const Route = {
   getPositionAtTime: (waypoints: Vector2D[], timing: number[], currentTime: number): Vector2D => {
     if (waypoints.length === 0) return Vector.zero();
     if (currentTime <= 0) return waypoints[0];
-    if (currentTime >= timing[timing.length - 1]) return waypoints[waypoints.length - 1];
+
+    // If past the last waypoint, continue in the same direction
+    if (currentTime >= timing[timing.length - 1]) {
+      const lastWaypoint = waypoints[waypoints.length - 1];
+      const secondLastWaypoint = waypoints[waypoints.length - 2] || waypoints[waypoints.length - 1];
+
+      // Calculate direction from second-to-last to last waypoint
+      const direction = Vector.direction(secondLastWaypoint, lastWaypoint);
+
+      // Calculate how much time has passed since reaching the last waypoint
+      const extraTime = currentTime - timing[timing.length - 1];
+
+      // Assume player continues at 9.0 yards/second (average WR speed)
+      const extraDistance = extraTime * 9.0;
+
+      // Calculate new position
+      const continuedPosition = Vector.add(lastWaypoint, Vector.multiply(direction, extraDistance));
+
+      // Clamp to field boundaries
+      return {
+        x: Math.max(0, Math.min(53.33, continuedPosition.x)),
+        y: Math.max(0, Math.min(120, continuedPosition.y)) // Stop at back of endzone
+      };
+    }
 
     // Find which segment we're in
     for (let i = 0; i < timing.length - 1; i++) {
