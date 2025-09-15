@@ -261,7 +261,7 @@ PostSnapRules {
 ### Phase 3: Coverage System Perfection (Legacy - Merged into Phase 2)
 
 ### Phase 3: Movement Mechanics & Realism (2-3 days)
-**Goal**: Fluid, realistic player movement matching NFL game film
+**Goal**: Research concurrently to implement fluid, realistic player movement matching NFL game film
 
 #### 3.1 Receiver Movement
 - [ ] Implement proper break angles and deceleration

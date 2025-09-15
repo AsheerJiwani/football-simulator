@@ -45,6 +45,7 @@ interface GameStore {
   snap: () => void;
   throwTo: (receiverId: string) => void;
   reset: () => void;
+  resetToPlayStart: () => void;
   advanceToNextPlay: () => void;
   updateGameState: () => void;
   initializeEngine: () => void;
@@ -439,6 +440,20 @@ export const useGameStore = create<GameStore>()(
         }));
       },
 
+      resetToPlayStart: () => {
+        const { engine } = get();
+        if (!engine) return;
+
+        engine.resetToPlayStart();
+
+        set((state) => ({
+          ...state,
+          isPlaying: false,
+          gameState: engine.getGameState(),
+          stateVersion: state.stateVersion + 1
+        }));
+      },
+
       advanceToNextPlay: () => {
         const { engine, selectedConcept, selectedCoverage } = get();
         if (!engine) return;
@@ -606,6 +621,7 @@ export const useSetAudible = () => useGameStore(state => state.setAudible);
 export const useSnap = () => useGameStore(state => state.snap);
 export const useThrowTo = () => useGameStore(state => state.throwTo);
 export const useReset = () => useGameStore(state => state.reset);
+export const useResetToPlayStart = () => useGameStore(state => state.resetToPlayStart);
 export const useInitializeEngine = () => useGameStore(state => state.initializeEngine);
 
 // UI state hooks - individual selectors to avoid re-creating objects

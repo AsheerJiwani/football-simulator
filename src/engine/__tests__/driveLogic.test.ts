@@ -89,10 +89,19 @@ describe('Drive Logic and Dynamic LOS', () => {
     engine.snap();
 
     // Run for 2.5 seconds to trigger sack
+    let finalPhase = 'pre-snap';
+    let finalTime = 0;
     for (let i = 0; i < 150; i++) { // 2.5 seconds at 60 Hz
       engine.tick(1/60);
       const currentState = engine.getGameState();
+      finalPhase = currentState.phase;
+      finalTime = currentState.timeElapsed;
       if (currentState.phase === 'play-over') break;
+    }
+
+    // Debug info if test fails
+    if (finalPhase !== 'play-over') {
+      console.log('Final phase:', finalPhase, 'Time elapsed:', finalTime, 'Sack time:', engine.getGameState().sackTime);
     }
 
     // Verify play is over and advance to next play

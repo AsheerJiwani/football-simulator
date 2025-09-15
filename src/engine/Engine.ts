@@ -52,6 +52,14 @@ export class FootballEngine {
   private personnelMatcher: PersonnelMatcher;
   private coverageAdjustments: CoverageAdjustments;
   private postSnapRules: PostSnapRules;
+  private preSnapState?: {
+    currentDown: number;
+    yardsToGo: number;
+    lineOfScrimmage: number;
+    hashPosition: HashPosition;
+    playConcept?: PlayConcept;
+    coverage?: Coverage;
+  };
 
   constructor(config?: Partial<GameConfig>) {
     this.config = this.getDefaultConfig();
@@ -373,8 +381,8 @@ export class FootballEngine {
       this.setLineOfScrimmage(newLOS);
     }
 
-    // Reset play state
-    this.reset();
+    // Reset play state (but preserve drive state)
+    this.resetPlay();
   }
 
   public sendInMotion(playerId: string, motionType: MotionType = 'fly'): boolean {
@@ -2236,6 +2244,16 @@ export class FootballEngine {
     if (this.gameState.phase !== 'pre-snap') return false;
     if (!this.gameState.playConcept || !this.gameState.coverage) return false;
 
+    // Store pre-snap state for reset functionality
+    this.preSnapState = {
+      currentDown: this.gameState.currentDown,
+      yardsToGo: this.gameState.yardsToGo,
+      lineOfScrimmage: this.gameState.lineOfScrimmage,
+      hashPosition: this.gameState.hashPosition,
+      playConcept: this.gameState.playConcept,
+      coverage: this.gameState.coverage
+    };
+
     this.gameState.phase = 'post-snap';
     this.gameState.timeElapsed = 0;
 
@@ -2283,6 +2301,96 @@ export class FootballEngine {
   public reset(): void {
     this.stopGameLoop();
     this.gameState = this.initializeGameState();
+    this.defensiveMovement.reset();
+  }
+
+  public resetPlay(): void {
+    // Reset only play-specific state, preserving drive state
+    this.stopGameLoop();
+    this.gameState.phase = 'pre-snap';
+    this.gameState.outcome = undefined;
+    this.gameState.timeElapsed = 0;
+    this.gameState.ball.state = 'held';
+    this.gameState.ball.carrier = undefined;
+    this.gameState.ball.position = this.createBall().position;
+    this.gameState.ball.velocity = { x: 0, y: 0 };
+    this.gameState.isMotionActive = false;
+    this.gameState.motionPlayer = undefined;
+    this.gameState.audiblesUsed = 0;
+
+    // Reset player states but keep their base positions
+    this.gameState.players.forEach(player => {
+      player.hasMotion = false;
+      player.hasMotionBoost = false;
+      player.motionBoostTimeLeft = 0;
+      player.isBlocking = false;
+      player.currentSpeed = 0;
+      player.velocity = { x: 0, y: 0 };
+      player.isAccelerating = false;
+      player.isDecelerating = false;
+    });
+
+    // Re-setup players at new LOS if needed
+    if (this.gameState.playConcept) {
+      this.setupPlayers();
+    }
+    if (this.gameState.coverage) {
+      this.setupDefense();
+    }
+
+    this.defensiveMovement.reset();
+  }
+
+  public resetToPlayStart(): void {
+    // Reset to the beginning of the current play (before snap)
+    if (!this.preSnapState) {
+      // If no pre-snap state saved, just reset normally
+      this.resetPlay();
+      return;
+    }
+
+    // Stop any running game loop
+    this.stopGameLoop();
+
+    // Restore the pre-snap drive state
+    this.gameState.currentDown = this.preSnapState.currentDown;
+    this.gameState.yardsToGo = this.preSnapState.yardsToGo;
+    this.gameState.lineOfScrimmage = this.preSnapState.lineOfScrimmage;
+    this.gameState.hashPosition = this.preSnapState.hashPosition;
+
+    // Restore the original play and coverage
+    if (this.preSnapState.playConcept) {
+      this.setPlayConcept(this.preSnapState.playConcept);
+    }
+    if (this.preSnapState.coverage) {
+      this.setCoverage(this.preSnapState.coverage);
+    }
+
+    // Reset play-specific state
+    this.gameState.phase = 'pre-snap';
+    this.gameState.outcome = undefined;
+    this.gameState.timeElapsed = 0;
+    this.gameState.ball.state = 'held';
+    this.gameState.ball.carrier = undefined;
+    this.gameState.ball.position = this.createBall().position;
+    this.gameState.ball.velocity = { x: 0, y: 0 };
+    this.gameState.isMotionActive = false;
+    this.gameState.motionPlayer = undefined;
+    this.gameState.motion = undefined;
+    this.gameState.audiblesUsed = 0;
+
+    // Clear any player modifications (motions, audibles, etc.)
+    this.gameState.players.forEach(player => {
+      player.hasMotion = false;
+      player.hasMotionBoost = false;
+      player.motionBoostTimeLeft = 0;
+      player.isBlocking = false;
+      player.currentSpeed = 0;
+      player.velocity = { x: 0, y: 0 };
+      player.isAccelerating = false;
+      player.isDecelerating = false;
+    });
+
     this.defensiveMovement.reset();
   }
 
@@ -2334,7 +2442,7 @@ export class FootballEngine {
     }
   }
 
-  private tick(deltaTime: number): void {
+  public tick(deltaTime: number): void {
     if (this.gameState.phase === 'pre-snap' || this.gameState.phase === 'play-over') {
       return;
     }
@@ -3479,16 +3587,20 @@ export class FootballEngine {
   private updateSackTimeForBlockedBlitzers(): void {
     if (this.gameState.phase !== 'post-snap') return;
 
-    // Recalculate based on current blocking status
-    const originalSackTime = this.config.gameplay.defaultSackTime;
-    if (this.gameState.gameMode === 'challenge') {
-      this.gameState.sackTime = this.config.gameplay.challengeModeSackTime;
-    } else {
-      this.gameState.sackTime = originalSackTime;
-    }
+    // Don't update if there are no blitzers
+    const blitzers = this.gameState.players.filter(player =>
+      player.team === 'defense' &&
+      player.coverageResponsibility?.type === 'blitz'
+    );
 
-    // Reapply adjustments for unblocked blitzers
-    this.calculateAdjustedSackTime();
+    // Only recalculate if there are actually blitzers in the play
+    if (blitzers.length > 0) {
+      // Store the current sack time to preserve manual adjustments
+      const currentSackTime = this.gameState.sackTime;
+
+      // Reapply adjustments for unblocked blitzers
+      this.calculateAdjustedSackTime();
+    }
   }
 
   private getPlayerTypeFromId(playerId: string): PlayerType {

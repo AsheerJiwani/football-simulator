@@ -10,6 +10,9 @@ import {
   useSnap,
   useThrowTo,
   useReset,
+  useResetToPlayStart,
+  useAdvanceToNextPlay,
+  useGamePhase,
   useSelectedConcept,
   useSelectedCoverage,
   useSackTime,
@@ -40,6 +43,9 @@ export default function ControlsPanel() {
   const snap = useSnap();
   const throwTo = useThrowTo();
   const reset = useReset();
+  const resetToPlayStart = useResetToPlayStart();
+  const advanceToNextPlay = useAdvanceToNextPlay();
+  const gamePhase = useGamePhase();
 
   const selectedConcept = useSelectedConcept();
   const selectedCoverage = useSelectedCoverage();
@@ -274,17 +280,28 @@ export default function ControlsPanel() {
       </div>
 
       {/* Play Outcome */}
-      {playOutcome && (
+      {gamePhase === 'play-over' && playOutcome && (
         <div className="border-t border-gray-600 pt-4">
           <h3 className="text-lg font-semibold mb-3">Play Result</h3>
           <div className="bg-gray-700 p-4 rounded-lg">
-            <p className="text-xl font-bold text-center">{playOutcome}</p>
-            <button
-              onClick={reset}
-              className="w-full mt-3 bg-green-600 hover:bg-green-500 px-4 py-2 rounded-md transition-colors"
-            >
-              Run Another Play
-            </button>
+            <p className="text-xl font-bold text-center mb-4">{playOutcome}</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={resetToPlayStart}
+                className="bg-yellow-600 hover:bg-yellow-500 px-4 py-2 rounded-md transition-colors font-semibold"
+              >
+                Reset Play
+              </button>
+              <button
+                onClick={advanceToNextPlay}
+                className="bg-green-600 hover:bg-green-500 px-4 py-2 rounded-md transition-colors font-semibold"
+              >
+                Next Play
+              </button>
+            </div>
+            <p className="text-sm text-gray-400 text-center mt-3">
+              Reset Play: Try the same down again | Next Play: Advance to next down
+            </p>
           </div>
         </div>
       )}
