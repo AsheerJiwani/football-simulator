@@ -1,4 +1,4 @@
-import type { PlayConcept, Formation, Coverage, CoverageResponsibility, Zone, Vector2D } from '@/engine/types';
+import type { PlayConcept, Formation, Coverage, CoverageResponsibility, Zone, Vector2D, Route, RouteType } from '@/engine/types';
 import formationsData from '@/data/formations.json';
 import conceptsData from '@/data/concepts.json';
 import coveragesData from '@/data/coverages.json';
@@ -64,10 +64,27 @@ export const DataLoader = {
     const formation = DataLoader.getFormation(conceptData.formation);
     if (!formation) return null;
 
-    return {
-      ...conceptData,
+    // Convert routes from JSON format to Route format
+    const routes: Record<string, Route> = {};
+    Object.entries(conceptData.routes).forEach(([playerId, routeData]) => {
+      routes[playerId] = {
+        type: routeData.type as RouteType,
+        waypoints: routeData.waypoints,
+        timing: routeData.timing,
+        depth: routeData.depth
+      };
+    });
+
+    // Explicitly construct PlayConcept to avoid type issues
+    const playConcept: PlayConcept = {
+      name: conceptData.name,
+      description: conceptData.description,
+      difficulty: conceptData.difficulty,
       formation,
-    } as PlayConcept;
+      routes
+    };
+
+    return playConcept;
   },
 
   // Get all available coverages
