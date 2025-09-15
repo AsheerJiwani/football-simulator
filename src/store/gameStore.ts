@@ -377,31 +377,53 @@ export const useGameStore = create<GameStore>()(
           }));
 
           // Use a more stable polling mechanism with setInterval
-          const pollInterval = setInterval(() => {
-            const currentState = engine.getGameState();
+          // Store the interval ID to ensure proper cleanup
+          let pollInterval: NodeJS.Timeout | null = null;
 
-            set((state) => {
-              // Only update if specific state properties have actually changed
-              const hasPhaseChanged = state.gameState.phase !== currentState.phase;
-              const hasTimeChanged = state.gameState.timeElapsed !== currentState.timeElapsed;
-              const hasBallStateChanged = state.gameState.ball.state !== currentState.ball.state;
-              const hasPlayersChanged = state.gameState.players.length !== currentState.players.length;
-
-              if (hasPhaseChanged || hasTimeChanged || hasBallStateChanged || hasPlayersChanged) {
-                return {
-                  ...state,
-                  gameState: currentState,
-                  isPlaying: currentState.phase !== 'play-over'
-                };
-              }
-              return state;
-            });
-
-            // Stop polling when play is over
-            if (currentState.phase === 'play-over') {
+          const startPolling = () => {
+            if (pollInterval) {
               clearInterval(pollInterval);
             }
-          }, 16); // ~60fps
+
+            pollInterval = setInterval(() => {
+              const currentState = engine.getGameState();
+              const currentStore = get();
+
+              // Skip update if engine is no longer available
+              if (!currentStore.engine) {
+                if (pollInterval) {
+                  clearInterval(pollInterval);
+                  pollInterval = null;
+                }
+                return;
+              }
+
+              // Only update if specific state properties have actually changed
+              const hasPhaseChanged = currentStore.gameState.phase !== currentState.phase;
+              const hasTimeChanged = Math.abs((currentStore.gameState.timeElapsed || 0) - (currentState.timeElapsed || 0)) > 0.01;
+              const hasBallStateChanged = currentStore.gameState.ball.state !== currentState.ball.state;
+              const hasPositionChanged = JSON.stringify(currentStore.gameState.players.map(p => p.position)) !== JSON.stringify(currentState.players.map(p => p.position));
+
+              if (hasPhaseChanged || hasTimeChanged || hasBallStateChanged || hasPositionChanged) {
+                set((state) => ({
+                  ...state,
+                  gameState: currentState,
+                  isPlaying: currentState.phase !== 'play-over',
+                  stateVersion: state.stateVersion + 1
+                }));
+              }
+
+              // Stop polling when play is over
+              if (currentState.phase === 'play-over') {
+                if (pollInterval) {
+                  clearInterval(pollInterval);
+                  pollInterval = null;
+                }
+              }
+            }, 33); // ~30fps (reduced from 60fps to prevent excessive updates)
+          };
+
+          startPolling();
         }
       },
 
@@ -547,10 +569,10 @@ export const useBall = () => useGameStore(state => state.gameState.ball);
 export const useIsShowingDefense = () => useGameStore(state => state.gameState.isShowingDefense);
 export const useIsShowingRoutes = () => useGameStore(state => state.gameState.isShowingRoutes);
 
-// Enhanced selector that includes lastUpdate for forcing re-renders
+// Enhanced selector that includes stateVersion for forcing re-renders
 export const usePlayersWithUpdate = () => useGameStore(state => ({
   players: state.gameState.players,
-  lastUpdate: state.gameState.lastUpdate
+  lastUpdate: state.stateVersion
 }));
 
 // Computed selectors

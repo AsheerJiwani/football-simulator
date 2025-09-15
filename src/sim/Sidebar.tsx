@@ -1,6 +1,14 @@
 'use client';
 
-import { useGameStore, useGamePhase, useGameState } from '@/store/gameStore';
+import {
+  useGamePhase,
+  useGameState,
+  useSnap,
+  useThrowTo,
+  useReset,
+  useAdvanceToNextPlay,
+  useGameStore
+} from '@/store/gameStore';
 import { useState } from 'react';
 import AudibleControls from './AudibleControls';
 import MotionControls from './MotionControls';
@@ -9,7 +17,11 @@ import PersonnelSelector from './PersonnelSelector';
 import { DownAndDistance } from './DownAndDistance';
 
 export default function Sidebar() {
-  const { snap, throwTo, reset, advanceToNextPlay, clearCustomPositions } = useGameStore();
+  const snap = useSnap();
+  const throwTo = useThrowTo();
+  const reset = useReset();
+  const advanceToNextPlay = useAdvanceToNextPlay();
+  const clearCustomPositions = useGameStore(state => state.clearCustomPositions);
   const gamePhase = useGamePhase();
   const gameState = useGameState();
   const [selectedReceiver, setSelectedReceiver] = useState<string>('');

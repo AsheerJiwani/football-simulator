@@ -25,7 +25,8 @@ function EnhancedFieldCanvas({
   const isShowingDefense = useIsShowingDefense();
   const isShowingRoutes = useIsShowingRoutes();
   const gameState = useGameState();
-  const { setCustomPosition, clearCustomPositions } = useGameStore();
+  const setCustomPosition = useGameStore(state => state.setCustomPosition);
+  const clearCustomPositions = useGameStore(state => state.clearCustomPositions);
   const initializeEngine = useInitializeEngine();
 
   // Enhanced selector to force re-renders when state changes
@@ -33,8 +34,12 @@ function EnhancedFieldCanvas({
 
   // Initialize engine on client mount (only once)
   const hasInitialized = useRef(false);
+  const isInitializing = useRef(false);
+
   useEffect(() => {
-    if (!hasInitialized.current && typeof window !== 'undefined') {
+    if (!hasInitialized.current && !isInitializing.current && typeof window !== 'undefined') {
+      isInitializing.current = true;
+
       // Add a small delay to ensure all components are mounted
       const timer = setTimeout(() => {
         try {
@@ -42,12 +47,17 @@ function EnhancedFieldCanvas({
           hasInitialized.current = true;
         } catch (error) {
           console.error('Engine initialization failed:', error);
+        } finally {
+          isInitializing.current = false;
         }
       }, 100);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        isInitializing.current = false;
+      };
     }
-  }, []); // Empty dependency array to run only once
+  }, []); // Empty dependencies - only run once on mount since initializeEngine is stable
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedPlayer, setDraggedPlayer] = useState<Player | null>(null);

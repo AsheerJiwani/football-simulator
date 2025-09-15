@@ -1,28 +1,41 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useGameStore } from '@/store/gameStore';
+import {
+  useSelectedConcept,
+  useSelectedCoverage,
+  useSelectedPersonnel,
+  useSackTime,
+  useGameMode,
+  useGameState,
+  useSetConcept,
+  useSetCoverage,
+  useSetPersonnel,
+  useSetSackTime,
+  useSetGameMode,
+  useSetShowDefense,
+  useSetShowRoutes,
+  useSetHashPosition
+} from '@/store/gameStore';
 import { DataLoader } from '@/lib/dataLoader';
 import personnelData from '@/data/personnel.json';
 import CompactControls from './CompactControls';
 
 export default function TopPanel() {
-  const {
-    selectedConcept,
-    selectedCoverage,
-    selectedPersonnel,
-    sackTime,
-    gameMode,
-    gameState,
-    setConcept,
-    setCoverage,
-    setPersonnel,
-    setSackTime,
-    setGameMode,
-    setShowDefense,
-    setShowRoutes,
-    setHashPosition
-  } = useGameStore();
+  const selectedConcept = useSelectedConcept();
+  const selectedCoverage = useSelectedCoverage();
+  const selectedPersonnel = useSelectedPersonnel();
+  const sackTime = useSackTime();
+  const gameMode = useGameMode();
+  const gameState = useGameState();
+  const setConcept = useSetConcept();
+  const setCoverage = useSetCoverage();
+  const setPersonnel = useSetPersonnel();
+  const setSackTime = useSetSackTime();
+  const setGameMode = useSetGameMode();
+  const setShowDefense = useSetShowDefense();
+  const setShowRoutes = useSetShowRoutes();
+  const setHashPosition = useSetHashPosition();
 
   const conceptOptions = DataLoader.getConceptOptions();
   const coverageOptions = DataLoader.getCoverageOptions();
