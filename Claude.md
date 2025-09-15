@@ -300,7 +300,7 @@ This will prove the full loop works before expanding.
 
 ✅ Coding Guardrails for Claude
 
-Commit and push to Github when appropriate & after every plan is complete to ensure no compilation errors or eslint warnings that prevent compilation or cause "Failed to compile". Handle errors appropriately
+Commit and push to Github after each To-do list is complete is complete to ensure no compilation errors, Jest errors, or eslint warnings that prevent compilation or cause "Failed to compile". Handle errors appropriately
 
 Engine stays pure TypeScript: no React imports. Keep deterministic & testable.
 

@@ -2,16 +2,20 @@
 
 import { useGameStore } from '@/store/gameStore';
 import { DataLoader } from '@/lib/dataLoader';
+import personnelData from '@/data/personnel.json';
+import CompactControls from './CompactControls';
 
 export default function TopPanel() {
   const {
     selectedConcept,
     selectedCoverage,
+    selectedPersonnel,
     sackTime,
     gameMode,
     gameState,
     setConcept,
     setCoverage,
+    setPersonnel,
     setSackTime,
     setGameMode,
     setShowDefense,
@@ -19,13 +23,19 @@ export default function TopPanel() {
     setHashPosition
   } = useGameStore();
 
-  const concepts = Object.values(DataLoader.getConcepts());
-  const coverages = Object.values(DataLoader.getCoverages());
+  const conceptOptions = DataLoader.getConceptOptions();
+  const coverageOptions = DataLoader.getCoverageOptions();
+
+  const personnelOptions = Object.entries(personnelData).map(([key, data]) => ({
+    value: key,
+    label: data.name,
+    description: data.description
+  }));
 
   return (
     <div className="bg-gray-900 border-b-2 border-gray-700 p-4">
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
           {/* Play Concept Selector */}
           <div>
             <label className="block text-xs font-semibold text-gray-400 mb-1">Play Concept</label>
@@ -34,9 +44,9 @@ export default function TopPanel() {
               onChange={(e) => setConcept(e.target.value)}
               className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none transition-colors"
             >
-              {concepts.map(concept => (
-                <option key={concept.name} value={concept.name}>
-                  {concept.name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+              {conceptOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>
@@ -50,9 +60,25 @@ export default function TopPanel() {
               onChange={(e) => setCoverage(e.target.value)}
               className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:border-red-500 focus:outline-none transition-colors"
             >
-              {coverages.map(coverage => (
-                <option key={coverage.name} value={coverage.name}>
-                  {coverage.name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+              {coverageOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Personnel Selector */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-400 mb-1">Personnel</label>
+            <select
+              value={selectedPersonnel}
+              onChange={(e) => setPersonnel(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:border-green-500 focus:outline-none transition-colors"
+            >
+              {personnelOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>
@@ -153,6 +179,37 @@ export default function TopPanel() {
                 <span className="ml-2 text-xs text-gray-300">Defense</span>
               </label>
             </div>
+          </div>
+
+          {/* Game Status Indicators */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-400 mb-1">Status</label>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center">
+                <div className={`w-3 h-3 rounded-full ${
+                  gameState.isMotionActive ? 'bg-yellow-500 animate-pulse' :
+                  gameState.motionPlayer ? 'bg-green-500' : 'bg-gray-600'
+                }`}></div>
+                <span className="ml-2 text-xs text-gray-300">
+                  {gameState.isMotionActive ? `Motion: ${gameState.motionPlayer}` :
+                   gameState.motionPlayer ? 'Motion Ready' : 'No Motion'}
+                </span>
+              </div>
+              <div className="flex items-center">
+                <div className={`w-3 h-3 rounded-full ${
+                  gameState.audiblesUsed > 0 ? 'bg-blue-500' : 'bg-gray-600'
+                }`}></div>
+                <span className="ml-2 text-xs text-gray-300">
+                  Audibles: {gameState.audiblesUsed}/{gameState.maxAudibles}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Pre-Snap Controls */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-400 mb-1">Pre-Snap</label>
+            <CompactControls />
           </div>
 
           {/* Game Mode */}

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { DndContext, DragEndEvent, DragStartEvent } from '@dnd-kit/core';
-import { usePlayers, useBall, useGamePhase, useIsShowingDefense, useIsShowingRoutes, useGameState, useGameStore } from '@/store/gameStore';
+import { usePlayers, useBall, useGamePhase, useIsShowingDefense, useIsShowingRoutes, useGameState, useGameStore, usePlayersWithUpdate } from '@/store/gameStore';
 import type { Player, Ball } from '@/engine/types';
 import ZoneBubbles from './ZoneBubbles';
 import DraggablePlayer from './DraggablePlayer';
@@ -26,6 +26,9 @@ export default function EnhancedFieldCanvas({
   const isShowingRoutes = useIsShowingRoutes();
   const gameState = useGameState();
   const { setCustomPosition, clearCustomPositions } = useGameStore();
+
+  // Enhanced selector to force re-renders when state changes
+  const { players: playersWithUpdate, lastUpdate } = usePlayersWithUpdate();
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedPlayer, setDraggedPlayer] = useState<Player | null>(null);

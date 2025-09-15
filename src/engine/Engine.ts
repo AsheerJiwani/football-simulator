@@ -30,6 +30,12 @@ import {
   generateDefensiveAssignments,
   analyzeFormation
 } from './alignment';
+import {
+  coordinateZonesByCoverage,
+  applyDeeperThanDeepestRule,
+  calculateZoneOverlaps,
+  adjustZoneWidthsForReceiverDistribution
+} from './zoneCoordination';
 import { DefensiveMovement } from './movement';
 
 export class FootballEngine {
@@ -580,45 +586,128 @@ export class FootballEngine {
         }
       });
     } else {
-      // Zone coverage - adjust zone responsibilities based on formation
-      defensePlayers.forEach(defender => {
-        if (defender.coverageResponsibility?.zone) {
-          const zone = defender.coverageResponsibility.zone;
-          const originalCenter = { ...zone.center };
+      // Zone coverage - apply NFL-accurate zone coordination rules for zone coverages only
+      const isZoneCoverage = coverage.type === 'cover-2' ||
+                            coverage.type === 'cover-3' ||
+                            coverage.type === 'cover-4' ||
+                            coverage.type === 'cover-6' ||
+                            coverage.type === 'tampa-2' ||
+                            coverage.type === 'quarters';
 
-          // Shift zones toward formation strength
-          if (zone.name?.includes('strong')) {
-            const shiftAmount = strongSide === 'right' ? 3 : -3;
-            zone.center.x = originalCenter.x + shiftAmount;
-            defender.position.x = zone.center.x;
-          } else if (zone.name?.includes('weak')) {
-            const shiftAmount = strongSide === 'right' ? -3 : 3;
-            zone.center.x = originalCenter.x + shiftAmount;
-            defender.position.x = zone.center.x;
+      if (isZoneCoverage) {
+        const receivers = offensePlayers.filter(p => p.isEligible && p.playerType !== 'QB');
+
+        // Get coordinated positions from coverage-specific zone coordination
+        const coordinatedPositions = coordinateZonesByCoverage(
+          defensePlayers,
+          receivers,
+          coverage.name || coverage.type,
+          formation,
+          losY
+        );
+
+        // Apply "deeper than deepest" rule to deep zone defenders only
+        const deeperThanDeepestPositions = applyDeeperThanDeepestRule(
+          defensePlayers,
+          receivers,
+          losY
+        );
+
+        // Adjust zone widths based on receiver distribution (bunch vs spread)
+        const distributionAdjustments = adjustZoneWidthsForReceiverDistribution(
+          defensePlayers,
+          receivers,
+          formation
+        );
+
+        // Calculate zone overlaps for communication and handoff responsibilities
+        const zoneOverlaps = calculateZoneOverlaps(defensePlayers, losY);
+
+        // Apply all zone coordination adjustments
+        defensePlayers.forEach(defender => {
+          if (defender.coverageResponsibility?.type === 'zone') {
+            let newPosition = { ...defender.position };
+
+            // Apply coverage-specific coordination (highest priority)
+            if (coordinatedPositions[defender.id]) {
+              newPosition = coordinatedPositions[defender.id];
+            }
+
+            // Apply deeper than deepest adjustments (override if defender needs to be deeper)
+            if (deeperThanDeepestPositions[defender.id]) {
+              newPosition.y = Math.max(newPosition.y, deeperThanDeepestPositions[defender.id].y);
+              newPosition.x = deeperThanDeepestPositions[defender.id].x;
+            }
+
+            // Apply receiver distribution adjustments (fine-tune x position)
+            if (distributionAdjustments[defender.id]) {
+              newPosition.x = distributionAdjustments[defender.id].x;
+            }
+
+            // Update defender position
+            defender.position = newPosition;
+
+            // Update zone center if zone exists
+            if (defender.coverageResponsibility?.zone) {
+              defender.coverageResponsibility.zone.center = { ...newPosition };
+            }
+
+            // Add overlap information for pattern matching and communication
+            const relevantOverlaps = zoneOverlaps.filter(overlap =>
+              overlap.defenderId === defender.id || overlap.adjacentDefenderId === defender.id
+            );
+
+            if (relevantOverlaps.length > 0 && defender.coverageResponsibility) {
+              // Store overlap information for post-snap movement coordination
+              defender.coverageResponsibility.overlaps = relevantOverlaps;
+            }
+
+            // Reset velocity to prevent sliding
+            defender.velocity = { x: 0, y: 0 };
+            defender.currentSpeed = 0;
           }
+        });
+      } else {
+        // Fallback to legacy zone adjustments for non-zone coverages or Cover 0/1
+        defensePlayers.forEach(defender => {
+          if (defender.coverageResponsibility?.zone) {
+            const zone = defender.coverageResponsibility.zone;
+            const originalCenter = { ...zone.center };
 
-          // Adjust for bunch formations (receivers close together)
-          const bunchedReceivers = this.detectBunchFormation(offensePlayers);
-          if (bunchedReceivers.length > 0) {
-            // Tighten zone coverage near bunch
-            const bunchCenter = this.calculateBunchCenter(bunchedReceivers);
-            const distanceToBunch = Math.abs(zone.center.x - bunchCenter.x);
-
-            if (distanceToBunch < 10) {
-              // Adjust zone center toward bunch
-              const adjustment = (bunchCenter.x - zone.center.x) * 0.3;
-              zone.center.x += adjustment;
-
-              // Also update defender position to reflect new zone center
+            // Shift zones toward formation strength
+            if (zone.name?.includes('strong')) {
+              const shiftAmount = strongSide === 'right' ? 3 : -3;
+              zone.center.x = originalCenter.x + shiftAmount;
+              defender.position.x = zone.center.x;
+            } else if (zone.name?.includes('weak')) {
+              const shiftAmount = strongSide === 'right' ? -3 : 3;
+              zone.center.x = originalCenter.x + shiftAmount;
               defender.position.x = zone.center.x;
             }
-          }
 
-          // Reset velocity to prevent sliding
-          defender.velocity = { x: 0, y: 0 };
-          defender.currentSpeed = 0;
-        }
-      });
+            // Adjust for bunch formations (receivers close together)
+            const bunchedReceivers = this.detectBunchFormation(offensePlayers);
+            if (bunchedReceivers.length > 0) {
+              // Tighten zone coverage near bunch
+              const bunchCenter = this.calculateBunchCenter(bunchedReceivers);
+              const distanceToBunch = Math.abs(zone.center.x - bunchCenter.x);
+
+              if (distanceToBunch < 10) {
+                // Adjust zone center toward bunch
+                const adjustment = (bunchCenter.x - zone.center.x) * 0.3;
+                zone.center.x += adjustment;
+
+                // Also update defender position to reflect new zone center
+                defender.position.x = zone.center.x;
+              }
+            }
+
+            // Reset velocity to prevent sliding
+            defender.velocity = { x: 0, y: 0 };
+            defender.currentSpeed = 0;
+          }
+        });
+      }
     }
   }
 
@@ -2881,7 +2970,8 @@ export class FootballEngine {
     // Enhanced: Apply dynamic personnel substitution for ALL coverage types
     // Analyze offensive formation and personnel
     const formation = this.analyzeFormationComprehensive(offensivePlayers);
-    const optimalPersonnel = this.getOptimalDefensivePersonnelForCoverage(formation, coverage.type);
+    const legacyFormation = analyzeFormation(offensivePlayers); // For compatibility with new alignment functions
+    const optimalPersonnel = getOptimalDefensivePersonnel(legacyFormation.personnel);
 
     if (coverage.type === 'cover-1') {
       // Use existing Cover 1 system but with enhanced analysis
@@ -2974,37 +3064,39 @@ export class FootballEngine {
       this.gameState.players = [...offensivePlayers, ...newDefensivePlayers];
 
     } else {
-      // Enhanced: For other coverages, apply personnel-based adjustments
-      const adjustedResponsibilities = this.adjustCoverageForPersonnel(
-        coverage.responsibilities,
-        formation,
-        optimalPersonnel
-      );
+      // Enhanced: For all other coverages, use improved personnel matching system
+      const assignments = generateDefensiveAssignments(legacyFormation, optimalPersonnel);
 
+      // Build new defensive players from assignments
+      newDefensivePlayers = assignments.map(assignment => {
+        const playerType = assignment.playerType as PlayerType;
 
-      // Continue building new defensive players array
-      adjustedResponsibilities.forEach((responsibility) => {
-        const playerType = this.getPlayerTypeFromId(responsibility.defenderId);
-
-        // Adjust zone centers to be relative to current LOS
-        const adjustedResponsibility = { ...responsibility };
-        if (adjustedResponsibility.zone) {
-          adjustedResponsibility.zone = {
-            ...adjustedResponsibility.zone,
-            center: {
-              x: adjustedResponsibility.zone.center.x,
-              y: adjustedResponsibility.zone.center.y + this.gameState.lineOfScrimmage
-            }
+        // Create coverage responsibility based on assignment and coverage type
+        let responsibility;
+        if (coverage.type === 'cover-2' || coverage.type === 'cover-3' || coverage.type === 'cover-4') {
+          // Zone coverage for these types
+          responsibility = {
+            defenderId: assignment.defenderId,
+            type: 'zone' as const,
+            target: assignment.target,
+          };
+        } else {
+          // Man coverage for others
+          responsibility = {
+            defenderId: assignment.defenderId,
+            type: assignment.role === 'man-coverage' ? 'man' as const :
+                  assignment.role === 'spy' ? 'spy' as const : 'zone' as const,
+            target: assignment.target,
           };
         }
 
-        const defender: Player = {
-          id: responsibility.defenderId,
+        return {
+          id: assignment.defenderId,
           position: { x: 0, y: 0 }, // Will be set by alignment system
           velocity: { x: 0, y: 0 },
           team: 'defense',
           playerType,
-          coverageResponsibility: adjustedResponsibility,
+          coverageResponsibility: responsibility,
           isEligible: false,
           maxSpeed: this.getPlayerSpeed(playerType),
           currentSpeed: 0,
@@ -3013,55 +3105,85 @@ export class FootballEngine {
           hasMotionBoost: false,
           motionBoostTimeLeft: 0,
           isBlocking: false,
-        };
-
-        newDefensivePlayers.push(defender);
+        } as Player;
       });
 
-
-      // Apply dynamic alignment based on coverage type
+      // Apply appropriate alignment based on coverage type
       let alignmentPositions: Record<string, Vector2D> = {};
 
       switch (coverage.type) {
-        case 'cover-0':
-          alignmentPositions = generateCover0Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
-          break;
         case 'cover-2':
           alignmentPositions = generateCover2Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
         case 'cover-3':
           alignmentPositions = generateCover3Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
+        case 'cover-4':
+          alignmentPositions = generateCover4Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
+          break;
         case 'tampa-2':
           alignmentPositions = generateTampa2Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
-          break;
-        case 'cover-4':
-        case 'quarters':
-          alignmentPositions = generateCover4Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
         case 'cover-6':
           alignmentPositions = generateCover6Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
+        case 'cover-0':
+          alignmentPositions = generateCover0Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
+          break;
         default:
-          // For coverages without specific alignment functions, use fallback positioning
-          newDefensivePlayers.forEach(defender => {
-            defender.position = this.getDefensivePosition(defender.id, coverage);
+          // Fall back to old system for unknown coverages
+          const adjustedResponsibilities = this.adjustCoverageForPersonnel(
+            coverage.responsibilities,
+            formation,
+            optimalPersonnel
+          );
+
+          // Continue building new defensive players array for fallback
+          newDefensivePlayers = adjustedResponsibilities.map((responsibility) => {
+            const playerType = this.getPlayerTypeFromId(responsibility.defenderId);
+
+            // Adjust zone centers to be relative to current LOS
+            const adjustedResponsibility = { ...responsibility };
+            if (adjustedResponsibility.zone) {
+              adjustedResponsibility.zone = {
+                ...adjustedResponsibility.zone,
+                center: {
+                  x: adjustedResponsibility.zone.center.x,
+                  y: adjustedResponsibility.zone.center.y + this.gameState.lineOfScrimmage
+                }
+              };
+            }
+
+            return {
+              id: responsibility.defenderId,
+              position: { x: 0, y: 0 }, // Will be set by alignment system
+              velocity: { x: 0, y: 0 },
+              team: 'defense',
+              playerType,
+              coverageResponsibility: adjustedResponsibility,
+              isEligible: false,
+              maxSpeed: this.getPlayerSpeed(playerType),
+              currentSpeed: 0,
+              isStar: false,
+              hasMotion: false,
+              hasMotionBoost: false,
+              motionBoostTimeLeft: 0,
+              isBlocking: false,
+            } as Player;
           });
           break;
       }
 
       // Update defender positions with calculated alignments
-      if (Object.keys(alignmentPositions).length > 0) {
-        newDefensivePlayers.forEach(defender => {
-          const calculatedPosition = alignmentPositions[defender.id];
-          if (calculatedPosition) {
-            defender.position = calculatedPosition;
-          } else {
-            // Fallback to static positioning if dynamic calculation fails
-            defender.position = this.getDefensivePosition(defender.id, coverage);
-          }
-        });
-      }
+      newDefensivePlayers.forEach(defender => {
+        const calculatedPosition = alignmentPositions[defender.id];
+        if (calculatedPosition) {
+          defender.position = calculatedPosition;
+        } else {
+          // Fallback to static positioning if dynamic calculation fails
+          defender.position = this.getDefensivePosition(defender.id, coverage);
+        }
+      });
 
       // Create completely new players array
       this.gameState.players = [...offensivePlayers, ...newDefensivePlayers];
@@ -3186,163 +3308,7 @@ export class FootballEngine {
     return Random.range(speedRange.min, speedRange.max);
   }
 
-  private getOptimalDefensivePersonnelForCoverage(formation: any, coverageType: string): any {
-    // NFL-accurate personnel matchups based on offensive personnel and coverage
-    const offensivePersonnel = formation.personnel;
-
-    switch (coverageType) {
-      case 'cover-0':
-      case 'cover-1':
-        // Man coverage - match receivers with appropriate defenders
-        if (offensivePersonnel === '10') {
-          // 4 WRs - use Dime package (6 DBs, 1 LB)
-          return {
-            CB: 2,
-            S: 2,
-            NB: 2,
-            LB: 1
-          };
-        } else if (offensivePersonnel === '11') {
-          // 3 WRs, 1 TE - use Nickel package (5 DBs, 2 LBs)
-          return {
-            CB: 2,
-            S: 2,
-            NB: 1,
-            LB: 2
-          };
-        } else if (offensivePersonnel === '12') {
-          // 2 TEs - use Base package (4 DBs, 3 LBs)
-          return {
-            CB: 2,
-            S: 2,
-            LB: 3
-          };
-        } else if (offensivePersonnel === '21') {
-          // 2 RBs - use Heavy package (4 DBs, 3 LBs)
-          return {
-            CB: 2,
-            S: 2,
-            LB: 3
-          };
-        }
-        break;
-
-      case 'cover-2':
-        // Two-high safety coverage
-        if (offensivePersonnel === '10' || formation.isSpread) {
-          // Spread formations - Nickel/Dime with speed
-          return {
-            CB: 2,
-            S: 2,
-            NB: formation.receiverCount >= 4 ? 2 : 1,
-            LB: formation.receiverCount >= 4 ? 1 : 2
-          };
-        } else if (offensivePersonnel === '12' || offensivePersonnel === '21') {
-          // Heavy formations - Base defense
-          return {
-            CB: 2,
-            S: 2,
-            LB: 3
-          };
-        }
-        break;
-
-      case 'cover-3':
-        // Three-deep zones - adjust for run/pass tendencies
-        if (offensivePersonnel === '10') {
-          // 4 WRs - use Nickel package (5 DBs, 2 LBs)
-          return {
-            CB: 2,
-            S: 2,
-            NB: 1,
-            LB: 2
-          };
-        } else if (formation.isTrips) {
-          // Trips formations - need extra coverage
-          return {
-            CB: 2,
-            S: 2,
-            NB: 1,
-            LB: 2
-          };
-        } else if (offensivePersonnel === '21' || offensivePersonnel === '12') {
-          // Run-heavy personnel - add LB
-          return {
-            CB: 2,
-            S: 2,
-            LB: 3
-          };
-        }
-        break;
-
-      case 'cover-4':
-      case 'quarters':
-        // Four-deep coverage - pattern matching
-        if (offensivePersonnel === '10' || formation.receiverCount >= 4) {
-          // Many receivers - Dime package
-          return {
-            CB: 2,
-            S: 2,
-            NB: 2,
-            LB: 1
-          };
-        } else if (offensivePersonnel === '11') {
-          // Standard Nickel
-          return {
-            CB: 2,
-            S: 2,
-            NB: 1,
-            LB: 2
-          };
-        }
-        break;
-
-      case 'tampa-2':
-        // Similar to Cover 2 but MLB drops deep
-        if (offensivePersonnel === '10') {
-          // 4 WRs - need DBs but keep MLB
-          return {
-            CB: 2,
-            S: 2,
-            NB: 1,
-            LB: 2 // Keep MLB plus one other
-          };
-        }
-        return {
-          CB: 2,
-          S: 2,
-          LB: 3 // Need MLB to drop
-        };
-
-      case 'cover-6':
-        // Field/boundary split coverage
-        if (offensivePersonnel === '10') {
-          // 4 WRs - Nickel package
-          return {
-            CB: 2,
-            S: 2,
-            NB: 1,
-            LB: 2
-          };
-        } else if (formation.isTrips) {
-          return {
-            CB: 2,
-            S: 2,
-            NB: 1,
-            LB: 2
-          };
-        }
-        break;
-    }
-
-    // Default Nickel package for most situations
-    return {
-      CB: 2,
-      S: 2,
-      NB: 1,
-      LB: 2
-    };
-  }
+  // Removed old getOptimalDefensivePersonnelForCoverage - now using improved version from alignment.ts
 
   private adjustCoverageForPersonnel(
     originalResponsibilities: any[],

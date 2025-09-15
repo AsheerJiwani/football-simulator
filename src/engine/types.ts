@@ -90,6 +90,7 @@ export interface CoverageResponsibility {
   type: 'man' | 'zone' | 'spy' | 'blitz';
   target?: string; // player ID for man coverage (assignment)
   zone?: Zone; // zone area for zone coverage
+  overlaps?: ZoneOverlap[]; // zone overlap information for coordination
 }
 
 export interface Zone {
@@ -98,6 +99,13 @@ export interface Zone {
   width: number;
   height: number;
   depth: number; // numeric depth in yards
+}
+
+export interface ZoneOverlap {
+  defenderId: string;
+  adjacentDefenderId: string;
+  overlapDistance: number;
+  handoffPoint: Vector2D;
 }
 
 export type HashPosition = 'left' | 'middle' | 'right';

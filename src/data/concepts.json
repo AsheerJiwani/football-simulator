@@ -773,5 +773,178 @@
         "depth": 4
       }
     }
+  },
+  "y-option": {
+    "name": "Y-Option",
+    "description": "Air Raid concept with TE/Slot option route based on defensive leverage",
+    "difficulty": "medium",
+    "formation": "empty",
+    "routes": {
+      "WR1": {
+        "type": "go",
+        "waypoints": [
+          { "x": 10, "y": 0 },
+          { "x": 10, "y": 18 },
+          { "x": 10, "y": 30 }
+        ],
+        "timing": [0, 2.0, 3.3],
+        "depth": 30
+      },
+      "WR2": {
+        "type": "y-option",
+        "waypoints": [
+          { "x": 20, "y": 0 },
+          { "x": 20, "y": 6 },
+          { "x": 20, "y": 8 },
+          { "x": 20, "y": 18 }
+        ],
+        "timing": [0, 0.7, 0.9, 2.0],
+        "depth": 18,
+        "options": {
+          "vs-cushion": { "hitch": true, "hitchAt": { "x": 20, "y": 6 } },
+          "vs-press": { "seam": true },
+          "vs-outside": { "out": true, "outTo": { "x": 26, "y": 8 } }
+        }
+      },
+      "WR3": {
+        "type": "y-option",
+        "waypoints": [
+          { "x": 35, "y": 0 },
+          { "x": 35, "y": 6 },
+          { "x": 35, "y": 8 },
+          { "x": 35, "y": 18 }
+        ],
+        "timing": [0, 0.7, 0.9, 2.0],
+        "depth": 18,
+        "options": {
+          "vs-cushion": { "hitch": true, "hitchAt": { "x": 35, "y": 6 } },
+          "vs-press": { "seam": true },
+          "vs-inside": { "out": true, "outTo": { "x": 29, "y": 8 } }
+        }
+      },
+      "WR4": {
+        "type": "go",
+        "waypoints": [
+          { "x": 43, "y": 0 },
+          { "x": 43, "y": 18 },
+          { "x": 43, "y": 30 }
+        ],
+        "timing": [0, 2.0, 3.3],
+        "depth": 30
+      }
+    }
+  },
+  "shallow-cross": {
+    "name": "Shallow Cross",
+    "description": "Air Raid concept with shallow crossers and deep digs behind",
+    "difficulty": "medium",
+    "formation": "spread-2x2",
+    "routes": {
+      "WR1": {
+        "type": "shallow-cross",
+        "waypoints": [
+          { "x": 8, "y": 0 },
+          { "x": 8, "y": 3 },
+          { "x": 26.665, "y": 3 },
+          { "x": 45, "y": 3 },
+          { "x": 53.33, "y": 3 }
+        ],
+        "timing": [0, 0.3, 1.5, 2.3, 3.0],
+        "depth": 3
+      },
+      "WR2": {
+        "type": "shallow-cross",
+        "waypoints": [
+          { "x": 45, "y": 0 },
+          { "x": 45, "y": 3 },
+          { "x": 26.665, "y": 3 },
+          { "x": 8, "y": 3 },
+          { "x": 0, "y": 3 }
+        ],
+        "timing": [0, 0.3, 1.5, 2.3, 3.0],
+        "depth": 3
+      },
+      "WR3": {
+        "type": "dig",
+        "waypoints": [
+          { "x": 18, "y": 0 },
+          { "x": 18, "y": 10 },
+          { "x": 35, "y": 10 },
+          { "x": 45, "y": 10 }
+        ],
+        "timing": [0, 1.2, 2.0, 2.8],
+        "depth": 10
+      },
+      "TE1": {
+        "type": "dig",
+        "waypoints": [
+          { "x": 35, "y": 0 },
+          { "x": 35, "y": 10 },
+          { "x": 18, "y": 10 },
+          { "x": 8, "y": 10 }
+        ],
+        "timing": [0, 1.2, 2.0, 2.8],
+        "depth": 10
+      },
+      "RB1": {
+        "type": "flat",
+        "waypoints": [
+          { "x": 26.665, "y": -7 },
+          { "x": 26.665, "y": -3 },
+          { "x": 50, "y": 2 },
+          { "x": 53.33, "y": 2 }
+        ],
+        "timing": [0, 0.4, 1.2, 1.6],
+        "depth": 2
+      }
+    }
+  },
+  "six": {
+    "name": "Six",
+    "description": "Air Raid concept with all receivers running hitches at 6 yards",
+    "difficulty": "easy",
+    "formation": "empty",
+    "routes": {
+      "WR1": {
+        "type": "hitch",
+        "waypoints": [
+          { "x": 10, "y": 0 },
+          { "x": 10, "y": 6 },
+          { "x": 10, "y": 6 }
+        ],
+        "timing": [0, 0.7, 1.0],
+        "depth": 6
+      },
+      "WR2": {
+        "type": "hitch",
+        "waypoints": [
+          { "x": 20, "y": 0 },
+          { "x": 20, "y": 6 },
+          { "x": 20, "y": 6 }
+        ],
+        "timing": [0, 0.7, 1.0],
+        "depth": 6
+      },
+      "WR3": {
+        "type": "hitch",
+        "waypoints": [
+          { "x": 35, "y": 0 },
+          { "x": 35, "y": 6 },
+          { "x": 35, "y": 6 }
+        ],
+        "timing": [0, 0.7, 1.0],
+        "depth": 6
+      },
+      "WR4": {
+        "type": "hitch",
+        "waypoints": [
+          { "x": 43, "y": 0 },
+          { "x": 43, "y": 6 },
+          { "x": 43, "y": 6 }
+        ],
+        "timing": [0, 0.7, 1.0],
+        "depth": 6
+      }
+    }
   }
 }

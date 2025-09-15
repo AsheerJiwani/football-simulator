@@ -143,6 +143,26 @@ export const DataLoader = {
 
     return true;
   },
+
+  // UI Helper methods for dropdowns
+  getConceptOptions: () => {
+    const concepts = DataLoader.getConcepts();
+    return Object.entries(concepts).map(([key, concept]) => ({
+      value: key,           // JSON key for store
+      label: concept.name,  // Human-readable name for display
+      difficulty: concept.difficulty
+    }));
+  },
+
+  getCoverageOptions: () => {
+    const coverages = DataLoader.getCoverages();
+    return Object.entries(coverages).map(([key, coverage]) => ({
+      value: key,           // JSON key for store
+      label: coverage.name, // Human-readable name for display
+      type: coverage.type,
+      description: coverage.description
+    }));
+  },
 };
 
 // Helper functions for working with the loaded data

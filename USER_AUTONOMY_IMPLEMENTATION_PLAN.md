@@ -79,7 +79,7 @@ Seamless integration between offensive user controls and defensive AI responses,
 - [x] Verified defenders are positioned correctly relative to LOS
 - [x] Ensured UI components receive state updates properly
 
-**Step 5.3.3: Fix Coverage/Play Selection Rendering Issues (ONGOING)**
+**Step 5.3.3: Fix Coverage/Play Selection Rendering Issues (COMPLETED)**
 
 **Root Cause Analysis:**
 1. **Shallow Copy Issue in getGameState()**
@@ -96,7 +96,7 @@ Seamless integration between offensive user controls and defensive AI responses,
    - Initial setup in createInitialEngine() works (shows players on load)
    - Updates through setConcept/setCoverage might not be propagating correctly
 
-**Implementation Completed:** 
+**Implementation Completed:**
 - [x] Fixed getGameState() to return deep copy with new players array reference
 - [x] Added temporary debug logging to verify state changes
 - [x] Updated store update logic for better immutability
@@ -105,6 +105,14 @@ Seamless integration between offensive user controls and defensive AI responses,
 - [x] Tested coverage changes render new defensive alignments
 - [x] Tested play changes render new offensive formations
 - [x] Cleaned up debug logging after verification
+
+**Final Resolution (January 14, 2025):**
+- [x] Identified root cause: TopPanel dropdown value/key mismatch
+- [x] Created human-readable mapping system in DataLoader
+- [x] Added getConceptOptions() and getCoverageOptions() methods
+- [x] Updated TopPanel to use proper JSON keys as option values
+- [x] Verified all 14 concepts and 7 coverages are now selectable
+- [x] Confirmed play and coverage changes update the field correctly
 
 **Step 5.3.4: Add Plays & Coverages - Detailed Implementation Plan**
 
@@ -158,25 +166,40 @@ Seamless integration between offensive user controls and defensive AI responses,
      - Routes: Dual posts and corners creating crossing action
      - Test with Cover 2, Cover 4
 
-4. **Air Raid Concepts**
-   - [ ] Add "Y-Option" concept
-     - Formation: 2x2 (10 personnel - empty)
-     - Routes: TE/Slot runs option route based on leverage
-     - Test with all coverages for option adjustments
+4. **Air Raid Concepts** ✅
+   - [x] Add "Y-Option" concept
+     - Formation: Empty Backfield (10 personnel)
+     - Routes: Inside receivers run option routes (hitch vs seam vs out) based on leverage
+     - Tested with Cover 1, Cover 2 for option adjustments
+     - NFL-accurate mechanics: 6-yard decision point, 18-yard depth
 
-   - [ ] Add "Shallow Cross" concept
-     - Formation: 2x2 (11 personnel)
-     - Routes: Shallow crossers from both sides, deep digs behind
-     - Test with Cover 1, Cover 3
+   - [x] Add "Shallow Cross" concept
+     - Formation: 2x2 Spread (11 personnel)
+     - Routes: Shallow crossers at 3 yards, deep digs at 10 yards behind
+     - Tested with Cover 1, Cover 3 for pick/rub action
+     - NFL-accurate mechanics: Pick action timing, horizontal stress
 
-   - [ ] Add "6 (Six)" concept
-     - Formation: 3x1 (10 personnel)
-     - Routes: All hitches at 6 yards
-     - Test with Cover 0, Cover 1
+   - [x] Add "6 (Six)" concept
+     - Formation: Empty Backfield (10 personnel)
+     - Routes: All four receivers run hitches at 6 yards
+     - Tested with Cover 2, Cover 3 for zone stress
+     - NFL-accurate mechanics: Quick timing, horizontal stretch
 
 **B. Defensive Coverage Concepts**
 
-1. **Man Coverage Variations**
+1. **RESEARCH NFL-MECHANICS**
+   - [ ] Utilize research agent to PERFECT nfl pre-snap alignments for existing coverages & movements pre-snap & post-snap
+   - Step-by-step process -> Implement specific changes and integrate throughout code base for one coverage at a time.
+   - Repeatable process for future additions to defensive coverage concepts
+     - man coverage assignments/responsibilities based on personnel, formation, dynamic adjustments
+     - zone coverage assignments/responsibilities based on personnel, formation, dynamic adjustments
+     - match coverage assignments/responsibilities based on personnel, formation, dynamic adjustments
+
+2. **Defensive Coverage Changes**
+  - Track defensive coverage changes in alignment and movement mechanics starting here
+
+
+3. **Man Coverage Variations**
    - [ ] Add "Cover 1 Robber"
      - 1 high safety, 1 robber in hole, 5 man coverage
      - Research robber positioning rules
@@ -187,7 +210,7 @@ Seamless integration between offensive user controls and defensive AI responses,
      - Research proper leverage and depth
      - Test with deep concepts (Four Verts, Dagger)
 
-2. **Zone Coverage Variations**
+4. **Zone Coverage Variations**
    - [ ] Add "Cover 5" (2-Man Under)
      - 5 rushers, 2 deep zones, 4 underneath zones
      - Research exact zone distributions
@@ -203,7 +226,7 @@ Seamless integration between offensive user controls and defensive AI responses,
      - Research pattern-match rules
      - Test with Smash, Flood concepts
 
-3. **Exotic/Pressure Coverages**
+5. **Exotic/Pressure Coverages**
    - [ ] Add "Cover 1 Fire Zone"
      - 5 man pressure with zone drops
      - Research zone blitz responsibilities
@@ -307,7 +330,7 @@ Seamless integration between offensive user controls and defensive AI responses,
 - **Dynamic System**: Proven not hardcoded through extensive edge case testing
 - **Performance**: <100ms for 10+ rapid changes, 60fps maintained
 - **Test Coverage**: 69 comprehensive tests including edge cases
-- **Play Library**: 13 offensive concepts (5 original + 6 quick/WC + 3 deep) with NFL-accurate mechanics
+- **Play Library**: 16 offensive concepts (5 original + 6 quick/WC + 3 deep + 3 Air Raid) with NFL-accurate mechanics
 - **Formation Support**: 4 formations including new 2x2 Spread
 
 ## 📈 Metrics
@@ -317,7 +340,7 @@ Seamless integration between offensive user controls and defensive AI responses,
 | Performance | <100ms for cascade |
 | Code Coverage | All user actions tested |
 | NFL Accuracy | Research-backed mechanics |
-| Play Concepts Added | 9/12 planned (75%) |
+| Play Concepts Added | 12/12 planned (100%) ✅ |
 | Coverages Added | 0/9 planned (0%) |
 | Drive Logic | Fully implemented ✅ |
 
