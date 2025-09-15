@@ -4541,6 +4541,11 @@ export class FootballEngine {
     if (blitzPackage && this.gameState.players) {
       this.applyBlitzPackage(blitzPackage);
     }
+
+    // CRITICAL: After setting up defense, ensure realignment for proper positioning
+    // This applies coverage adjustments and ensures defenders are positioned correctly
+    // relative to the offensive formation
+    this.realignDefense();
   }
 
   /**
