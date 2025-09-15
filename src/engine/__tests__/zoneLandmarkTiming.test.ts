@@ -230,6 +230,11 @@ describe('NFL Zone Landmark and Timing Validation', () => {
           p.team === 'defense' && p.playerType === 'LB'
         );
 
+        // Debug logging
+        if (movement === '3-step') {
+          console.log(`[Test] Found ${linebackers.length} linebackers: ${linebackers.map(lb => `${lb.id}@${lb.position.y}`).join(', ')}`);
+        }
+
         linebackers.forEach(lb => {
           if (lb.coverageResponsibility?.type === 'zone') {
             // NFL Research: LB drop depth should correlate with QB drop

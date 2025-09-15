@@ -371,7 +371,19 @@ export class FootballEngine {
     if (this.gameState.playConcept) {
       this.setupPlayers();
       if (this.gameState.coverage) {
+        if (process.env.NODE_ENV === 'test') {
+          console.log(`[setLineOfScrimmage] Setting up defense with LOS=${this.gameState.lineOfScrimmage}, coverage=${this.gameState.coverage.name}`);
+        }
+        // Force complete defensive recreation to ensure positions update
         this.setupDefense();
+      } else {
+        if (process.env.NODE_ENV === 'test') {
+          console.log(`[setLineOfScrimmage] No coverage set, skipping defense setup`);
+        }
+      }
+    } else {
+      if (process.env.NODE_ENV === 'test') {
+        console.log(`[setLineOfScrimmage] No play concept set, skipping setup`);
       }
     }
   }
@@ -630,7 +642,8 @@ export class FootballEngine {
       coverage.type,
       defensePlayers,
       offensePlayers,
-      formationAnalysis
+      formationAnalysis,
+      this.gameState.lineOfScrimmage
     );
 
     // Apply adjustments to defenders
@@ -1323,7 +1336,8 @@ export class FootballEngine {
       coverage.type,
       this.gameState.motion,
       defensePlayers,
-      offensePlayers
+      offensePlayers,
+      this.gameState.lineOfScrimmage
     );
 
     // Apply motion adjustments
@@ -2002,13 +2016,33 @@ export class FootballEngine {
           break;
 
         case 'LB':
-          // Hook/curl zones, 6-10 yard depth
+          // Hook/curl zones, 6-10 yard depth based on QB movement
           if (defender.coverageResponsibility.zone) {
-            defender.position.y = losY + 8;
+            // Apply QB movement-based depth adjustment
+            const qbSteps = this.gameState.qbMovement?.config?.steps || 5;
+            let targetDepth = 8; // Default depth
+
+            if (qbSteps === 3) {
+              targetDepth = 6; // Shorter drops for quick game
+            } else if (qbSteps === 5) {
+              targetDepth = 8; // Standard drop
+            } else if (qbSteps === 7) {
+              targetDepth = 10; // Deeper for longer developing plays
+            }
+
+            defender.position.y = losY + targetDepth;
+
+            if (process.env.NODE_ENV === 'test') {
+              console.log(`[Cover3 Adjustment] ${defender.id} depth set to ${targetDepth} for ${qbSteps}-step (position: ${defender.position.y})`);
+            }
 
             // MLB drops deeper in Cover 3 Match (from research)
             if (defender.id === 'MLB') {
-              defender.position.y = losY + 10;
+              const mlbDepth = Math.min(targetDepth + 2, 10); // MLB deeper but max 10
+              defender.position.y = losY + mlbDepth;
+              if (process.env.NODE_ENV === 'test') {
+                console.log(`[Cover3 Adjustment] MLB depth adjusted to ${mlbDepth} (position: ${defender.position.y})`);
+              }
             }
 
             // Bunch formation adjustment
@@ -3009,8 +3043,11 @@ export class FootballEngine {
       hasTriggeredDefensiveResponse: false
     };
 
-    // Realign defense to adjust linebacker drops based on QB movement
-    this.realignDefense();
+    // Recreate defense with QB movement info for proper linebacker depth adjustment
+    // This ensures alignment functions get the QB movement type
+    if (this.gameState.coverage) {
+      this.setupDefense(this.gameState.coverage);
+    }
 
     return true;
   }
@@ -3988,6 +4025,10 @@ export class FootballEngine {
     if (!this.gameState.playConcept) return;
 
     const concept = this.gameState.playConcept;
+    console.log('🏈 setupPlayers: Setting up players for concept:', concept.name);
+    console.log('🏈 setupPlayers: Formation:', concept.formation.name);
+    console.log('🏈 setupPlayers: Formation positions:', concept.formation.positions);
+    console.log('🏈 setupPlayers: Current LOS:', this.gameState.lineOfScrimmage);
     // Create a new array with only defensive players to ensure immutability
     const defensivePlayers = this.gameState.players.filter(p => p.team === 'defense');
 
@@ -4040,12 +4081,14 @@ export class FootballEngine {
 
     // Create offensive players based on formation
     Object.entries(concept.formation.positions).forEach(([playerId, position]) => {
+      console.log(`🏈 setupPlayers: Creating player ${playerId}, base position:`, position);
       const playerType = this.getPlayerTypeFromId(playerId);
       // Adjust position relative to current LOS and hash
       const adjustedPosition = {
         x: position.x + hashOffset, // Apply hash offset to x position
         y: position.y + this.gameState.lineOfScrimmage // Position is now relative to LOS (y=0)
       };
+      console.log(`🏈 setupPlayers: Adjusted position for ${playerId}:`, adjustedPosition);
       // Adjust route waypoints relative to current LOS
       let adjustedRoute = undefined;
       if (concept.routes[playerId]) {
@@ -4092,9 +4135,19 @@ export class FootballEngine {
 
     // Create a completely new players array
     this.gameState.players = [...newOffensivePlayers, ...defensivePlayers];
+    console.log('🏈 setupPlayers: Final players array:', this.gameState.players.map(p => ({
+      id: p.id,
+      team: p.team,
+      position: p.position,
+      playerType: p.playerType
+    })));
   }
 
   private setupDefense(previousCoverage?: Coverage): void {
+    if (process.env.NODE_ENV === 'test') {
+      console.log(`[setupDefense] Called with LOS=${this.gameState.lineOfScrimmage}, coverage=${this.gameState.coverage?.name}`);
+    }
+
     if (!this.gameState.coverage) return;
 
     const coverage = this.gameState.coverage;
@@ -4108,8 +4161,13 @@ export class FootballEngine {
     // Check if we can preserve existing defenders (same coverage type)
     // Use passed previousCoverage if available, otherwise use current
     const oldCoverageType = previousCoverage?.type || this.gameState.currentCoverage?.type;
-    // Don't preserve defenders if LOS has changed significantly - force recreation for proper positioning
-    const losChanged = existingDefenders.some(d => Math.abs(d.position.y - this.gameState.lineOfScrimmage) > 10);
+    // Don't preserve defenders if LOS has changed at all - force recreation for proper positioning
+    // Check if any defender's depth doesn't match expected depth from current LOS
+    const losChanged = existingDefenders.length > 0 && existingDefenders.some(d => {
+      const currentDepth = d.position.y - this.gameState.lineOfScrimmage;
+      // If any defender is positioned incorrectly relative to current LOS, recreate
+      return currentDepth < 0 || currentDepth > 40; // No defender should be in front of LOS or too deep
+    });
     const shouldPreserveDefenders = existingDefenders.length > 0 &&
       oldCoverageType === coverage.type && !losChanged;
 
@@ -4319,12 +4377,26 @@ export class FootballEngine {
         }
       }
 
+      if (process.env.NODE_ENV === 'test') {
+        console.log(`[setupDefense] QB Movement: state=${this.gameState.qbMovement ? 'exists' : 'null'}, config=${qbMovement ? 'exists' : 'null'}, type=${qbMovementType || 'undefined'}`);
+      }
+
       switch (coverage.type) {
         case 'cover-2':
           alignmentPositions = generateCover2Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage, qbMovementType);
           break;
         case 'cover-3':
           alignmentPositions = generateCover3Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage, 'normal', qbMovementType);
+
+          // Debug log alignment positions
+          if (process.env.NODE_ENV === 'test') {
+            Object.entries(alignmentPositions).forEach(([id, pos]) => {
+              if (id.startsWith('LB')) {
+                const depth = pos.y - this.gameState.lineOfScrimmage;
+                console.log(`[setupDefense] Alignment calculated for ${id}: y=${pos.y}, depth=${depth}`);
+              }
+            });
+          }
           break;
         case 'cover-4':
         case 'quarters':
@@ -4403,6 +4475,12 @@ export class FootballEngine {
         const calculatedPosition = alignmentPositions[defender.id];
         if (calculatedPosition) {
           defender.position = calculatedPosition;
+
+          // Debug logging for calculated positions
+          if ((defender.playerType === 'LB' || defender.id === 'CB1') && process.env.NODE_ENV === 'test') {
+            const depth = defender.position.y - this.gameState.lineOfScrimmage;
+            console.log(`[setupDefense] ${defender.id} using calculated position: y=${defender.position.y}, depth=${depth}`);
+          }
         } else {
           // Enhanced fallback positioning for specific player types
           let fallbackPosition = this.getDefensivePosition(defender.id, coverage);
@@ -4412,12 +4490,26 @@ export class FootballEngine {
             fallbackPosition = this.getNickelBackFallbackPosition(defender.id, coverage, this.gameState.lineOfScrimmage);
           }
 
+          // Debug logging for linebacker positioning issues
+          if (defender.playerType === 'LB' && process.env.NODE_ENV === 'test') {
+            const depth = fallbackPosition.y - this.gameState.lineOfScrimmage;
+            console.warn(`[setupDefense] ${defender.id} using fallback position: y=${fallbackPosition.y}, depth=${depth}`);
+          }
+
           defender.position = fallbackPosition;
         }
       });
 
       // Create completely new players array
       this.gameState.players = [...offensivePlayers, ...newDefensivePlayers];
+
+      // Debug logging for CB1 position after update
+      if (process.env.NODE_ENV === 'test') {
+        const cb1 = this.gameState.players.find(p => p.id === 'CB1');
+        if (cb1) {
+          console.log(`[setupDefense] After update - CB1 at y=${cb1.position.y}, LOS=${this.gameState.lineOfScrimmage}, depth=${cb1.position.y - this.gameState.lineOfScrimmage}`);
+        }
+      }
     }
 
     // Apply blitz package adjustments if applicable
@@ -4477,10 +4569,17 @@ export class FootballEngine {
     if (coveragePosition) {
       // Coverage positions are now LOS-relative (y=0 is LOS)
       // Positive y = upfield/defensive side, negative y = offensive backfield
-      return {
+      const result = {
         x: coveragePosition.x,
         y: coveragePosition.y + los
       };
+
+      // Debug logging for position issues
+      if (process.env.NODE_ENV === 'test' && defenderId === 'CB1') {
+        console.log(`[getDefensivePosition] ${defenderId}: coverage.y=${coveragePosition.y}, los=${los}, result.y=${result.y}`);
+      }
+
+      return result;
     }
 
     // Fallback positions based on player type

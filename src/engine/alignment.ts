@@ -1105,6 +1105,11 @@ export function generateCover3Alignment(
   const leftReceivers = getReceiversByAlignment(formation.receiversLeft);
   const rightReceivers = getReceiversByAlignment(formation.receiversRight);
 
+  // Debug logging for Cover 3 defenders
+  if (process.env.NODE_ENV === 'test') {
+    console.log(`[Cover3 Defenders] Total: ${defensivePlayers.length}, IDs: ${defensivePlayers.map(d => d.id).join(', ')}`);
+  }
+
   // Assign positions by defensive role
   let cbCount = 0;
   let safetyCount = 0;
@@ -1179,13 +1184,34 @@ export function generateCover3Alignment(
             y: los + additionalDepth
           };
         }
+
+        // Debug logging for Cover 3 linebacker alignment
+        if (process.env.NODE_ENV === 'test' && defender.playerType === 'LB') {
+          const assignedDepth = positions[defender.id].y - los;
+          console.log(`[Cover3 Alignment] ${defender.id} (count=${lbCount}): depth=${assignedDepth}, qbMovement=${qbMovementType}`);
+        }
+
         lbCount++;
         break;
     }
   });
 
   // Apply zone spacing optimization to prevent overcrowding
-  const optimizedPositions = optimizeZoneSpacing(positions, los);
+  // Pass QB movement type to respect depth constraints
+  const optimizedPositions = optimizeZoneSpacing(positions, los, defensivePlayers, qbMovementType);
+
+  // Debug logging for position changes after optimization
+  if (process.env.NODE_ENV === 'test') {
+    Object.keys(positions).forEach(defenderId => {
+      if (defenderId.startsWith('LB')) {
+        const originalDepth = positions[defenderId].y - los;
+        const optimizedDepth = optimizedPositions[defenderId].y - los;
+        if (Math.abs(originalDepth - optimizedDepth) > 0.1) {
+          console.log(`[Cover3 Optimization] ${defenderId} depth changed from ${originalDepth} to ${optimizedDepth}`);
+        }
+      }
+    });
+  }
 
   // Ensure all defenders are positioned behind the line of scrimmage
   Object.keys(optimizedPositions).forEach(defenderId => {
@@ -1202,7 +1228,12 @@ export function generateCover3Alignment(
 /**
  * Optimize zone spacing to ensure NFL standard separation
  */
-function optimizeZoneSpacing(positions: Record<string, Vector2D>, los: number): Record<string, Vector2D> {
+function optimizeZoneSpacing(
+  positions: Record<string, Vector2D>,
+  los: number,
+  defenders?: Player[],
+  qbMovementType?: string
+): Record<string, Vector2D> {
   const optimized = { ...positions };
 
   // Group defenders by similar depth levels (within 5 yards)
@@ -1262,13 +1293,47 @@ function optimizeZoneSpacing(positions: Record<string, Vector2D>, los: number): 
   }
 
   // Additional pass: ensure vertical spacing within lanes
-  return optimizeVerticalSpacing(optimized, los);
+  return optimizeVerticalSpacing(optimized, los, defenders, qbMovementType);
+}
+
+/**
+ * Get maximum linebacker depth based on QB movement type
+ */
+function getLinebackerMaxDepth(qbMovementType?: string): number {
+  if (!qbMovementType) {
+    // No QB movement specified - use default
+    return 12;
+  }
+
+  // Handle step-based movements
+  if (qbMovementType === '3-step') {
+    return 10; // Max 10 yards for quick game
+  } else if (qbMovementType === '5-step') {
+    return 12; // Standard depth
+  } else if (qbMovementType === '7-step') {
+    return 15; // Deeper for longer developing plays
+  }
+
+  // Handle other movement types
+  if (qbMovementType === 'playaction' || qbMovementType === 'play-action') {
+    return 12; // Standard depth for play action
+  } else if (qbMovementType.includes('rollout')) {
+    return 10; // Shallower for rollouts
+  }
+
+  // Default
+  return 12;
 }
 
 /**
  * Optimize vertical spacing within defensive lanes
  */
-function optimizeVerticalSpacing(positions: Record<string, Vector2D>, los: number): Record<string, Vector2D> {
+function optimizeVerticalSpacing(
+  positions: Record<string, Vector2D>,
+  los: number,
+  defenderPlayers?: Player[],
+  qbMovementType?: string
+): Record<string, Vector2D> {
   const optimized = { ...positions };
 
   // Group defenders into lanes (within 10 yards horizontally)
@@ -1320,7 +1385,15 @@ function optimizeVerticalSpacing(positions: Record<string, Vector2D>, los: numbe
 
       for (let i = 0; i < lane.length; i++) {
         const [id, pos] = lane[i];
-        const newY = firstY + (i * availableSpace / (lane.length - 1));
+        let newY = firstY + (i * availableSpace / (lane.length - 1));
+
+        // Respect linebacker depth constraints based on QB movement
+        if (id.startsWith('LB')) {
+          const lbMaxDepth = getLinebackerMaxDepth(qbMovementType);
+          const maxY = los + lbMaxDepth;
+          newY = Math.min(newY, maxY);
+        }
+
         // Ensure defensive player never goes in front of LOS
         optimized[id] = { ...pos, y: Math.max(newY, minDefensiveY) };
       }
