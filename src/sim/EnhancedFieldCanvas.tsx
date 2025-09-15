@@ -29,6 +29,11 @@ function EnhancedFieldCanvas({
   const clearCustomPositions = useGameStore(state => state.clearCustomPositions);
   const initializeEngine = useInitializeEngine();
 
+  // Debug logging for player count
+  if (typeof window !== 'undefined') {
+    console.log('EnhancedFieldCanvas: Players count:', players.length);
+  }
+
   // We're using the regular players selector since we don't need forced re-renders
   // The component will re-render naturally when players change
 
@@ -337,6 +342,7 @@ function EnhancedFieldCanvas({
           fill={ballColor}
           stroke="#000000"
           strokeWidth="1"
+          data-player-type="ball"
         />
         {/* Ball trajectory line for thrown balls */}
         {ball.state === 'thrown' && ball.targetPlayer && (
@@ -437,6 +443,7 @@ function EnhancedFieldCanvas({
                 r="4"
                 fill="#00FF00"
                 opacity="0.8"
+                data-player-type="route-indicator"
               />
             )}
             {/* Add starting position indicator */}
@@ -446,6 +453,7 @@ function EnhancedFieldCanvas({
               r="3"
               fill="#00FF00"
               opacity="0.6"
+              data-player-type="route-start"
             />
           </g>
         );
@@ -499,10 +507,12 @@ function EnhancedFieldCanvas({
           cx={0}
           cy={0}
           r={isOffense ? 10 : 8}
-          fill={isOffense ? '#0066cc' : '#cc0000'}
+          fill={isOffense ? '#3B82F6' : '#EF4444'}
           stroke={isOffense ? '#004499' : '#990000'}
           strokeWidth="2"
           filter="url(#playerShadow)"
+          data-player-type="player"
+          data-team={isOffense ? 'offense' : 'defense'}
         />
         <text
           x={0}

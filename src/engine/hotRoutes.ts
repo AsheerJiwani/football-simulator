@@ -221,8 +221,14 @@ export class HotRoutesSystem {
         'cover-0': {}, // No coverage adjustments needed vs all-out blitz
         'cover-6': {},
         'quarters': {},
-        'tampa-2': {}
-      }
+        'tampa-2': {},
+        'cover-1-bracket': {},
+        'cover-1-robber': {},
+        'cover-1-lurk': {},
+        'cover-2-roll-to-1': {},
+        'quarters-poach': {},
+        'cover-2-invert': {}
+      } as Record<CoverageType, Partial<Record<RouteType, RouteType>>>
     }
   };
 
@@ -437,7 +443,7 @@ export class HotRoutesSystem {
     checkDown: 'slot' | 'outside' | 'tight' | 'RB';
     timing: number[];
   } {
-    const progressions: Record<CoverageType, any> = {
+    const progressions = {
       'cover-1': {
         primaryRead: 'outside', // Attack single safety
         secondaryRead: 'slot',
@@ -485,10 +491,46 @@ export class HotRoutesSystem {
         secondaryRead: 'tight',
         checkDown: 'slot',
         timing: [2.2, 2.8, 3.5]
+      },
+      'cover-1-bracket': {
+        primaryRead: 'outside',
+        secondaryRead: 'slot',
+        checkDown: 'RB',
+        timing: [1.8, 2.5, 3.2]
+      },
+      'cover-1-robber': {
+        primaryRead: 'outside',
+        secondaryRead: 'slot',
+        checkDown: 'RB',
+        timing: [1.8, 2.5, 3.2]
+      },
+      'cover-1-lurk': {
+        primaryRead: 'outside',
+        secondaryRead: 'slot',
+        checkDown: 'RB',
+        timing: [1.8, 2.5, 3.2]
+      },
+      'cover-2-roll-to-1': {
+        primaryRead: 'slot',
+        secondaryRead: 'outside',
+        checkDown: 'tight',
+        timing: [2.2, 2.8, 3.5]
+      },
+      'quarters-poach': {
+        primaryRead: 'slot',
+        secondaryRead: 'outside',
+        checkDown: 'tight',
+        timing: [2.0, 2.6, 3.2]
+      },
+      'cover-2-invert': {
+        primaryRead: 'slot',
+        secondaryRead: 'outside',
+        checkDown: 'tight',
+        timing: [2.2, 2.8, 3.5]
       }
     };
 
-    return progressions[coverage] || progressions['cover-3'];
+    return (progressions as any)[coverage] || progressions['cover-3'];
   }
 
   /**

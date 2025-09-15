@@ -32,24 +32,25 @@ export class CoverageAdjustments {
     coverage: CoverageType,
     defenders: Player[],
     offensivePlayers: Player[],
-    formation: FormationAnalysis
+    formation: FormationAnalysis,
+    los: number = 30
   ): CoverageAdjustment[] {
     switch (coverage) {
       case 'cover-0':
-        return this.adjustCover0(defenders, offensivePlayers, formation);
+        return this.adjustCover0(defenders, offensivePlayers, formation, los);
       case 'cover-1':
-        return this.adjustCover1(defenders, offensivePlayers, formation);
+        return this.adjustCover1(defenders, offensivePlayers, formation, los);
       case 'cover-2':
-        return this.adjustCover2(defenders, offensivePlayers, formation);
+        return this.adjustCover2(defenders, offensivePlayers, formation, los);
       case 'cover-3':
-        return this.adjustCover3(defenders, offensivePlayers, formation);
+        return this.adjustCover3(defenders, offensivePlayers, formation, los);
       case 'cover-4':
       case 'quarters':
-        return this.adjustCover4(defenders, offensivePlayers, formation);
+        return this.adjustCover4(defenders, offensivePlayers, formation, los);
       case 'cover-6':
-        return this.adjustCover6(defenders, offensivePlayers, formation);
+        return this.adjustCover6(defenders, offensivePlayers, formation, los);
       case 'tampa-2':
-        return this.adjustTampa2(defenders, offensivePlayers, formation);
+        return this.adjustTampa2(defenders, offensivePlayers, formation, los);
       default:
         return [];
     }
@@ -62,37 +63,38 @@ export class CoverageAdjustments {
     coverage: CoverageType,
     motion: Motion,
     defenders: Player[],
-    offensivePlayers: Player[]
+    offensivePlayers: Player[],
+    los: number = 30
   ): CoverageAdjustment[] {
     const motionResponse = this.getMotionResponse(coverage, motion.type);
     const adjustments: CoverageAdjustment[] = [];
 
     switch (motionResponse) {
       case 'lock':
-        return this.applyLockTechnique(motion, defenders, offensivePlayers);
+        return this.applyLockTechnique(motion, defenders, offensivePlayers, los);
       case 'travel':
-        return this.applyDefenseTravel(motion, defenders);
+        return this.applyDefenseTravel(motion, defenders, los);
       case 'buzz':
-        return this.applyBuzzRotation(motion, defenders);
+        return this.applyBuzzRotation(motion, defenders, los);
       case 'spin':
-        return this.applySpinRotation(motion, defenders);
+        return this.applySpinRotation(motion, defenders, los);
       case 'check':
-        return this.applyCheckCall(motion, defenders, offensivePlayers);
+        return this.applyCheckCall(motion, defenders, offensivePlayers, los);
       case 'pattern-adjust':
-        return this.applyPatternMatchAdjustment(motion, defenders, offensivePlayers);
+        return this.applyPatternMatchAdjustment(motion, defenders, offensivePlayers, los);
       case 'meg-trigger':
-        return this.applyMEGTrigger(motion, defenders, offensivePlayers);
+        return this.applyMEGTrigger(motion, defenders, offensivePlayers, los);
       case 'bump':
-        return this.applyBumpAdjustment(motion, defenders, offensivePlayers);
+        return this.applyBumpAdjustment(motion, defenders, offensivePlayers, los);
       case 'minimal':
       default:
-        return this.applyMinimalAdjustment(motion, defenders);
+        return this.applyMinimalAdjustment(motion, defenders, los);
     }
   }
 
   // Coverage-specific adjustment methods
 
-  private adjustCover0(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+  private adjustCover0(defenders: Player[], offensive: Player[], formation: FormationAnalysis, los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
 
     // vs Trips: Bump NCB to trips #3
@@ -103,7 +105,7 @@ export class CoverageAdjustments {
         const xPos = tripsSide === 'left' ? 15 : 38;
         adjustments.push({
           defenderId: ncb.id,
-          newPosition: { x: xPos, y: 4 },
+          newPosition: { x: xPos, y: los + 4 },
           leverage: 'head-up',
           technique: 'press'
         });
@@ -120,7 +122,7 @@ export class CoverageAdjustments {
         if (defender.playerType === 'CB' || defender.playerType === 'NB') {
           adjustments.push({
             defenderId: defender.id,
-            newPosition: { x: baseX + (index * 2), y: 3 + index },
+            newPosition: { x: baseX + (index * 2), y: los + 3 + index },
             leverage: 'inside',
             technique: 'box'
           });
@@ -136,7 +138,7 @@ export class CoverageAdjustments {
     for (let i = 0; i < lbs.length && i < rbs.length; i++) {
       adjustments.push({
         defenderId: lbs[i].id,
-        newPosition: { x: rbs[i].position.x, y: 5 },
+        newPosition: { x: rbs[i].position.x, y: los + 5 },
         newResponsibility: {
           defenderId: lbs[i].id,
           type: 'man',
@@ -149,7 +151,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private adjustCover1(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+  private adjustCover1(defenders: Player[], offensive: Player[], formation: FormationAnalysis, los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
 
     // Position FS in deep middle with shade to strength
@@ -158,7 +160,7 @@ export class CoverageAdjustments {
       const shadeX = formation.strength === 'left' ? -2 : formation.strength === 'right' ? 2 : 0;
       adjustments.push({
         defenderId: fs.id,
-        newPosition: { x: this.FIELD_CENTER + shadeX, y: 13.5 },
+        newPosition: { x: this.FIELD_CENTER + shadeX, y: los + 13.5 },
         technique: 'center-field'
       });
     }
@@ -169,7 +171,7 @@ export class CoverageAdjustments {
       const robberX = formation.strength === 'left' ? 20 : formation.strength === 'right' ? 33 : this.FIELD_CENTER;
       adjustments.push({
         defenderId: ss.id,
-        newPosition: { x: robberX, y: 10 },
+        newPosition: { x: robberX, y: los + 10 },
         leverage: 'inside',
         technique: 'robber'
       });
@@ -185,7 +187,7 @@ export class CoverageAdjustments {
         // FS comes down for man coverage
         adjustments.push({
           defenderId: fs.id,
-          newPosition: { x: cb.position.x + 5, y: 8 },
+          newPosition: { x: cb.position.x + 5, y: los + 8 },
           newResponsibility: {
             defenderId: fs.id,
             type: 'man',
@@ -197,7 +199,7 @@ export class CoverageAdjustments {
         // CB rotates to deep
         adjustments.push({
           defenderId: cb.id,
-          newPosition: { x: this.FIELD_CENTER, y: 15 },
+          newPosition: { x: this.FIELD_CENTER, y: los + 15 },
           technique: 'rotate-deep'
         });
       }
@@ -217,7 +219,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private adjustCover2(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+  private adjustCover2(defenders: Player[], offensive: Player[], formation: FormationAnalysis, los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
 
     // Position safeties in deep halves
@@ -226,14 +228,14 @@ export class CoverageAdjustments {
       // FS takes weak side half
       adjustments.push({
         defenderId: safeties[0].id,
-        newPosition: { x: formation.strength === 'left' ? 36 : 17, y: 15 },
+        newPosition: { x: formation.strength === 'left' ? 36 : 17, y: los + 15 },
         technique: 'deep-half'
       });
 
       // SS takes strong side half
       adjustments.push({
         defenderId: safeties[1].id,
-        newPosition: { x: formation.strength === 'left' ? 17 : 36, y: 15 },
+        newPosition: { x: formation.strength === 'left' ? 17 : 36, y: los + 15 },
         technique: 'deep-half'
       });
     }
@@ -255,7 +257,7 @@ export class CoverageAdjustments {
     for (const corner of corners) {
       adjustments.push({
         defenderId: corner.id,
-        newPosition: { x: corner.position.x, y: 6 },
+        newPosition: { x: corner.position.x, y: los + 6 },
         leverage: 'outside',
         technique: 'hard-press'
       });
@@ -270,7 +272,7 @@ export class CoverageAdjustments {
     if (mlb) {
       adjustments.push({
         defenderId: mlb.id,
-        newPosition: { x: this.FIELD_CENTER, y: 4.5 },
+        newPosition: { x: this.FIELD_CENTER, y: los + 4.5 },
         technique: 'hook'
       });
     }
@@ -278,7 +280,7 @@ export class CoverageAdjustments {
     if (weakLB) {
       adjustments.push({
         defenderId: weakLB.id,
-        newPosition: { x: formation.strength === 'left' ? 35 : 18, y: 4.5 },
+        newPosition: { x: formation.strength === 'left' ? 35 : 18, y: los + 4.5 },
         technique: 'seam-hook'
       });
     }
@@ -286,7 +288,7 @@ export class CoverageAdjustments {
     if (strongLB) {
       adjustments.push({
         defenderId: strongLB.id,
-        newPosition: { x: formation.strength === 'left' ? 18 : 35, y: 4.5 },
+        newPosition: { x: formation.strength === 'left' ? 18 : 35, y: los + 4.5 },
         technique: 'seam-hook'
       });
     }
@@ -294,18 +296,18 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private adjustCover3(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+  private adjustCover3(defenders: Player[], offensive: Player[], formation: FormationAnalysis, los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
     const rotation: CoverageRotation = this.determineCover3Rotation(formation);
 
     // Apply rotation-specific adjustments
     switch (rotation) {
       case 'sky':
-        return this.applySkyRotation(defenders, formation);
+        return this.applySkyRotation(defenders, formation, los);
       case 'buzz':
-        return this.applyBuzzRotation(undefined, defenders);
+        return this.applyBuzzRotation(undefined, defenders, los);
       case 'cloud':
-        return this.applyCloudRotation(defenders, formation);
+        return this.applyCloudRotation(defenders, formation, los);
       default:
         // Base Cover 3 alignment
         break;
@@ -316,7 +318,7 @@ export class CoverageAdjustments {
     if (fs) {
       adjustments.push({
         defenderId: fs.id,
-        newPosition: { x: this.FIELD_CENTER, y: 13.5 },
+        newPosition: { x: this.FIELD_CENTER, y: los + 13.5 },
         technique: 'deep-middle'
       });
     }
@@ -327,7 +329,7 @@ export class CoverageAdjustments {
       const isLeft = corner.position.x < this.FIELD_CENTER;
       adjustments.push({
         defenderId: corner.id,
-        newPosition: { x: isLeft ? 9 : 44, y: 6.5 },
+        newPosition: { x: isLeft ? 9 : 44, y: los + 6.5 },
         leverage: 'outside',
         technique: 'bail'
       });
@@ -342,7 +344,7 @@ export class CoverageAdjustments {
         const xPos = tripsSide === 'left' ? 15 : 38;
         adjustments.push({
           defenderId: ss.id,
-          newPosition: { x: xPos, y: 10 },
+          newPosition: { x: xPos, y: los + 10 },
           technique: 'curl-flat'
         });
       }
@@ -351,7 +353,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private adjustCover4(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+  private adjustCover4(defenders: Player[], offensive: Player[], formation: FormationAnalysis, los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
 
     // Safeties read #2 to #1 with pattern match
@@ -360,7 +362,7 @@ export class CoverageAdjustments {
       const isStrong = formation.strength === 'left' ? safety.position.x < this.FIELD_CENTER : safety.position.x > this.FIELD_CENTER;
       adjustments.push({
         defenderId: safety.id,
-        newPosition: { x: isStrong ? (formation.strength === 'left' ? 20 : 34) : (formation.strength === 'left' ? 34 : 20), y: 12 },
+        newPosition: { x: isStrong ? (formation.strength === 'left' ? 20 : 34) : (formation.strength === 'left' ? 34 : 20), y: los + 12 },
         leverage: 'inside',
         technique: '2-read'
       });
@@ -371,7 +373,7 @@ export class CoverageAdjustments {
     for (const corner of corners) {
       adjustments.push({
         defenderId: corner.id,
-        newPosition: { x: corner.position.x, y: 8 },
+        newPosition: { x: corner.position.x, y: los + 8 },
         leverage: 'outside',
         technique: 'MOD'
       });
@@ -387,7 +389,7 @@ export class CoverageAdjustments {
       if (backSideSafety) {
         adjustments.push({
           defenderId: backSideSafety.id,
-          newPosition: { x: this.FIELD_CENTER, y: 14 },
+          newPosition: { x: this.FIELD_CENTER, y: los + 14 },
           technique: 'solo'
         });
       }
@@ -418,7 +420,7 @@ export class CoverageAdjustments {
       for (let i = 0; i < bunchDefenders.length; i++) {
         adjustments.push({
           defenderId: bunchDefenders[i].id,
-          newPosition: { x: baseX + (i * 3), y: 6 + (i % 2) * 2 },
+          newPosition: { x: baseX + (i * 3), y: los + 6 + (i % 2) * 2 },
           technique: 'box-4'
         });
       }
@@ -427,7 +429,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private adjustCover6(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+  private adjustCover6(defenders: Player[], offensive: Player[], formation: FormationAnalysis, los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
 
     // Determine field/boundary split
@@ -443,7 +445,7 @@ export class CoverageAdjustments {
     if (fieldCorner) {
       adjustments.push({
         defenderId: fieldCorner.id,
-        newPosition: { x: fieldSide === 'left' ? 10 : 43, y: 7.5 },
+        newPosition: { x: fieldSide === 'left' ? 10 : 43, y: los + 7.5 },
         leverage: 'inside',
         technique: 'press-bail'
       });
@@ -452,7 +454,7 @@ export class CoverageAdjustments {
     if (fieldSafety) {
       adjustments.push({
         defenderId: fieldSafety.id,
-        newPosition: { x: fieldSide === 'left' ? 20 : 34, y: 13 },
+        newPosition: { x: fieldSide === 'left' ? 20 : 34, y: los + 13 },
         technique: 'pattern-match-quarter'
       });
     }
@@ -466,7 +468,7 @@ export class CoverageAdjustments {
     if (boundaryCorner) {
       adjustments.push({
         defenderId: boundaryCorner.id,
-        newPosition: { x: boundarySide === 'left' ? 10 : 43, y: 6 },
+        newPosition: { x: boundarySide === 'left' ? 10 : 43, y: los + 6 },
         leverage: 'outside',
         technique: 'press-funnel'
       });
@@ -475,7 +477,7 @@ export class CoverageAdjustments {
     if (boundarySafety) {
       adjustments.push({
         defenderId: boundarySafety.id,
-        newPosition: { x: boundarySide === 'left' ? 17 : 36, y: 13.5 },
+        newPosition: { x: boundarySide === 'left' ? 17 : 36, y: los + 13.5 },
         technique: 'deep-half'
       });
     }
@@ -485,7 +487,7 @@ export class CoverageAdjustments {
     if (mlb) {
       adjustments.push({
         defenderId: mlb.id,
-        newPosition: { x: this.FIELD_CENTER, y: 4.5 },
+        newPosition: { x: this.FIELD_CENTER, y: los + 4.5 },
         technique: 'middle-hook-wall'
       });
     }
@@ -493,7 +495,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private adjustTampa2(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+  private adjustTampa2(defenders: Player[], offensive: Player[], formation: FormationAnalysis, los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
 
     // Mike LB deep progression
@@ -501,7 +503,7 @@ export class CoverageAdjustments {
     if (mlb) {
       adjustments.push({
         defenderId: mlb.id,
-        newPosition: { x: this.FIELD_CENTER, y: 4.5 }, // Start position, will progress to 15-18
+        newPosition: { x: this.FIELD_CENTER, y: los + 4.5 }, // Start position, will progress to 15-18
         technique: 'tampa-2-mike'
       });
     }
@@ -511,13 +513,13 @@ export class CoverageAdjustments {
     if (safeties.length >= 2) {
       adjustments.push({
         defenderId: safeties[0].id,
-        newPosition: { x: 17, y: 13 },
+        newPosition: { x: 17, y: los + 13 },
         technique: 'deep-outside-half'
       });
 
       adjustments.push({
         defenderId: safeties[1].id,
-        newPosition: { x: 36, y: 13 },
+        newPosition: { x: 36, y: los + 13 },
         technique: 'deep-outside-half'
       });
     }
@@ -539,7 +541,7 @@ export class CoverageAdjustments {
       const isWeak = formation.strength === 'left' ? olb.position.x > this.FIELD_CENTER : olb.position.x < this.FIELD_CENTER;
       adjustments.push({
         defenderId: olb.id,
-        newPosition: { x: isWeak ? (formation.strength === 'left' ? 35 : 18) : (formation.strength === 'left' ? 18 : 35), y: 3.5 },
+        newPosition: { x: isWeak ? (formation.strength === 'left' ? 35 : 18) : (formation.strength === 'left' ? 18 : 35), y: los + 3.5 },
         technique: 'wall'
       });
     }
@@ -570,7 +572,7 @@ export class CoverageAdjustments {
     return responseMatrix[coverage]?.[motionType] || 'minimal';
   }
 
-  private applyLockTechnique(motion: Motion, defenders: Player[], offensive: Player[]): CoverageAdjustment[] {
+  private applyLockTechnique(motion: Motion, defenders: Player[], offensive: Player[], los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
     const motionPlayer = offensive.find(p => p.id === motion.playerId);
 
@@ -611,7 +613,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private applyDefenseTravel(motion: Motion, defenders: Player[]): CoverageAdjustment[] {
+  private applyDefenseTravel(motion: Motion, defenders: Player[], los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
     const travelDirection = motion.endPosition.x > motion.startPosition.x ? 1 : -1;
     const travelDistance = 2; // yards
@@ -630,7 +632,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private applyBuzzRotation(motion: Motion | undefined, defenders: Player[]): CoverageAdjustment[] {
+  private applyBuzzRotation(motion: Motion | undefined, defenders: Player[], los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
 
     // Strong safety buzzes down
@@ -638,7 +640,7 @@ export class CoverageAdjustments {
     if (ss) {
       adjustments.push({
         defenderId: ss.id,
-        newPosition: { x: ss.position.x, y: 8 },
+        newPosition: { x: ss.position.x, y: los + 8 }, // 8 yards behind LOS
         technique: 'buzz-down'
       });
     }
@@ -646,7 +648,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private applySpinRotation(motion: Motion, defenders: Player[]): CoverageAdjustment[] {
+  private applySpinRotation(motion: Motion, defenders: Player[], los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
     const spinDirection = motion.endPosition.x > motion.startPosition.x ? -1 : 1; // Opposite of motion
 
@@ -666,7 +668,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private applyCheckCall(motion: Motion, defenders: Player[], offensive: Player[]): CoverageAdjustment[] {
+  private applyCheckCall(motion: Motion, defenders: Player[], offensive: Player[], los: number = 30): CoverageAdjustment[] {
     // Check call allows coverage flip based on new formation strength
     const newFormation = this.formationAnalyzer.analyzeFormation(offensive);
 
@@ -678,7 +680,7 @@ export class CoverageAdjustments {
     return [];
   }
 
-  private applyPatternMatchAdjustment(motion: Motion, defenders: Player[], offensive: Player[]): CoverageAdjustment[] {
+  private applyPatternMatchAdjustment(motion: Motion, defenders: Player[], offensive: Player[], los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
 
     // Trigger new pattern match rules based on motion
@@ -694,7 +696,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private applyMEGTrigger(motion: Motion, defenders: Player[], offensive: Player[]): CoverageAdjustment[] {
+  private applyMEGTrigger(motion: Motion, defenders: Player[], offensive: Player[], los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
 
     // Convert to "Man Everywhere he Goes" for motion player
@@ -715,7 +717,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private applyMinimalAdjustment(motion: Motion, defenders: Player[]): CoverageAdjustment[] {
+  private applyMinimalAdjustment(motion: Motion, defenders: Player[], los: number = 30): CoverageAdjustment[] {
     // Zone coverage with minimal adjustment - some defenders may make slight positioning tweaks
     // but not major rotations like man coverage
     const adjustments: CoverageAdjustment[] = [];
@@ -746,7 +748,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private applyBumpAdjustment(motion: Motion, defenders: Player[], offensivePlayers: Player[]): CoverageAdjustment[] {
+  private applyBumpAdjustment(motion: Motion, defenders: Player[], offensivePlayers: Player[], los: number = 30): CoverageAdjustment[] {
     // Cover 2 "bump" technique: linebacker zones shift to accommodate motion
     const adjustments: CoverageAdjustment[] = [];
     const motionDirection = motion.endPosition.x > motion.startPosition.x ? 'right' : 'left';
@@ -801,7 +803,7 @@ export class CoverageAdjustments {
     return 'none';
   }
 
-  private applySkyRotation(defenders: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+  private applySkyRotation(defenders: Player[], formation: FormationAnalysis, los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
     const rotationSide = formation.strength;
 
@@ -811,7 +813,7 @@ export class CoverageAdjustments {
       const xPos = rotationSide === 'left' ? 9 : 44;
       adjustments.push({
         defenderId: ss.id,
-        newPosition: { x: xPos, y: 13.5 },
+        newPosition: { x: xPos, y: los + 13.5 },
         technique: 'sky-deep-third'
       });
     }
@@ -819,7 +821,7 @@ export class CoverageAdjustments {
     return adjustments;
   }
 
-  private applyCloudRotation(defenders: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+  private applyCloudRotation(defenders: Player[], formation: FormationAnalysis, los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
 
     // Corners press then bail
@@ -827,7 +829,7 @@ export class CoverageAdjustments {
     for (const corner of corners) {
       adjustments.push({
         defenderId: corner.id,
-        newPosition: { x: corner.position.x, y: 1 }, // Press first
+        newPosition: { x: corner.position.x, y: los + 1 }, // Press first
         technique: 'cloud-press-bail'
       });
     }

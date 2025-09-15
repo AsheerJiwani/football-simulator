@@ -508,15 +508,20 @@ export const useGameStore = create<GameStore>()(
 
           // Initialize engine with current selections
           if (concept) {
+            console.log('Setting initial play concept:', concept.name);
             newEngine.setPlayConcept(concept);
           }
           if (coverage) {
+            console.log('Setting initial coverage:', coverage.name);
             newEngine.setCoverage(coverage);
           }
           newEngine.setSackTime(sackTime);
 
           // Validate that both offense and defense are properly set up
           newEngine.validateSetup();
+
+          const initialState = newEngine.getGameState();
+          console.log('Initial engine state - players:', initialState.players.length);
 
           set((currentState) => {
             // Double-check that engine is still null before setting

@@ -49,11 +49,7 @@ export class OptionRoutesSystem {
   /**
    * Option route triggers based on coverage
    */
-  private optionTriggers: Record<CoverageType, {
-    slotReads: string[];
-    outsideReads: string[];
-    timing: number;
-  }> = {
+  private optionTriggers = {
     'cover-1': {
       slotReads: ['find_soft_spot_vs_zone', 'use_leverage_vs_man'],
       outsideReads: ['attack_safety_help', 'use_speed_advantage'],
@@ -93,8 +89,38 @@ export class OptionRoutesSystem {
       slotReads: ['avoid_mike_drop', 'attack_hole'],
       outsideReads: ['corner_vs_cb_sink', 'comeback_timing'],
       timing: 2.2
+    },
+    'cover-1-bracket': {
+      slotReads: ['find_soft_spot_vs_zone', 'use_leverage_vs_man'],
+      outsideReads: ['attack_safety_help', 'use_speed_advantage'],
+      timing: 2.0
+    },
+    'cover-1-robber': {
+      slotReads: ['find_soft_spot_vs_zone', 'use_leverage_vs_man'],
+      outsideReads: ['attack_safety_help', 'use_speed_advantage'],
+      timing: 2.0
+    },
+    'cover-1-lurk': {
+      slotReads: ['find_soft_spot_vs_zone', 'use_leverage_vs_man'],
+      outsideReads: ['attack_safety_help', 'use_speed_advantage'],
+      timing: 2.0
+    },
+    'cover-2-roll-to-1': {
+      slotReads: ['attack_seam_vs_safeties', 'sit_in_hole'],
+      outsideReads: ['corner_route_vs_cb_jump', 'comeback_vs_safety'],
+      timing: 2.2
+    },
+    'quarters-poach': {
+      slotReads: ['seam_adjustment', 'underneath_option'],
+      outsideReads: ['pattern_match_awareness', 'leverage_decision'],
+      timing: 2.0
+    },
+    'cover-2-invert': {
+      slotReads: ['attack_seam_vs_safeties', 'sit_in_hole'],
+      outsideReads: ['corner_route_vs_cb_jump', 'comeback_vs_safety'],
+      timing: 2.2
     }
-  };
+  } as const;
 
   /**
    * Evaluate option route decision for a receiver
@@ -169,7 +195,7 @@ export class OptionRoutesSystem {
     coverage: CoverageType
   ): boolean {
 
-    const trigger = this.optionTriggers[coverage];
+    const trigger = this.optionTriggers[coverage as keyof typeof this.optionTriggers];
     if (!trigger) return false;
 
     // Check if we're at the decision point timing

@@ -192,7 +192,9 @@ export function getZoneDropTechnique(
   coverage: CoverageType,
   receiverDepth: number
 ): { technique: DefensiveTechnique; speedMultiplier: number; shouldTransition: boolean } {
-  const config = DEFENSIVE_MOVEMENT_CONFIG.zoneDrops[coverage];
+  // Type guard to check if coverage exists in config
+  const zoneDrops = DEFENSIVE_MOVEMENT_CONFIG.zoneDrops as Record<string, any>;
+  const config = zoneDrops[coverage];
   const positionConfig = config?.[defender.playerType as keyof typeof config];
 
   if (!positionConfig) {

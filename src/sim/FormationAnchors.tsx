@@ -46,6 +46,7 @@ export function DroppableAnchor({
         opacity={opacity}
         strokeWidth={strokeWidth}
         stroke={strokeColor}
+        data-player-type="anchor"
       />
       {isHighlighted && !anchor.isOccupied && (
         <circle
@@ -57,6 +58,7 @@ export function DroppableAnchor({
           strokeWidth="1"
           opacity="0.4"
           strokeDasharray="2,2"
+          data-player-type="anchor-highlight"
         />
       )}
     </g>
