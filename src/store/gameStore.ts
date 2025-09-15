@@ -6,7 +6,7 @@ import { DataLoader, GameData } from '@/lib/dataLoader';
 
 interface GameStore {
   // Engine instance
-  engine: FootballEngine;
+  engine: FootballEngine | null;
 
   // UI State
   selectedConcept: string;
@@ -46,45 +46,54 @@ interface GameStore {
   reset: () => void;
   advanceToNextPlay: () => void;
   updateGameState: () => void;
+  initializeEngine: () => void;
 }
 
 // Create a separate function to initialize the engine to avoid re-creation
 // Only initialize client-side to avoid SSR issues
 const createInitialEngine = () => {
+  // Always return defaults first
+  const defaults = {
+    concept: 'slant-flat',
+    coverage: 'cover-1',
+    personnel: '11',
+    sackTime: 5.0,
+    gameMode: 'free-play' as const
+  };
+
   if (typeof window === 'undefined') {
     // Return minimal server-side state
     return {
-      engine: null as unknown as FootballEngine,
-      defaults: {
-        concept: 'slant-flat',
-        coverage: 'cover-1',
-        personnel: '11',
-        sackTime: 5.0,
-        gameMode: 'free-play' as const
-      }
+      engine: null,
+      defaults
     };
   }
 
-  const engine = new FootballEngine();
+  try {
+    const engine = new FootballEngine();
 
-  // Load default data
-  const defaults = GameData.getDefaults();
-  const defaultConcept = DataLoader.getConcept(defaults.concept);
-  const defaultCoverage = DataLoader.getCoverage(defaults.coverage);
+    // Load default data
+    const gameDefaults = GameData.getDefaults();
+    const defaultConcept = DataLoader.getConcept(gameDefaults.concept);
+    const defaultCoverage = DataLoader.getCoverage(gameDefaults.coverage);
 
-  // Initialize engine with defaults
-  if (defaultConcept) {
-    engine.setPlayConcept(defaultConcept);
+    // Initialize engine with defaults
+    if (defaultConcept) {
+      engine.setPlayConcept(defaultConcept);
+    }
+    if (defaultCoverage) {
+      engine.setCoverage(defaultCoverage);
+    }
+    engine.setSackTime(gameDefaults.sackTime);
+
+    // Validate that both offense and defense are properly set up
+    engine.validateSetup();
+
+    return { engine, defaults: gameDefaults };
+  } catch (error) {
+    console.error('Failed to initialize engine:', error);
+    return { engine: null, defaults };
   }
-  if (defaultCoverage) {
-    engine.setCoverage(defaultCoverage);
-  }
-  engine.setSackTime(defaults.sackTime);
-
-  // Validate that both offense and defense are properly set up
-  engine.validateSetup();
-
-  return { engine, defaults };
 };
 
 export const useGameStore = create<GameStore>()(
@@ -102,11 +111,31 @@ export const useGameStore = create<GameStore>()(
         isPlaying: false,
         gameState: engine?.getGameState() || {
           phase: 'pre-snap' as const,
+          timeElapsed: 0,
+          sackTime: 5.0,
           players: [],
-          ball: { position: { x: 0, y: 0 }, state: 'held' as const },
-          playConcept: null,
-          coverage: null,
-          outcome: null
+          ball: { position: { x: 0, y: 0 }, velocity: { x: 0, y: 0 }, state: 'held' as const, timeInAir: 0, speed: 16 },
+          playConcept: undefined,
+          coverage: undefined,
+          currentCoverage: undefined,
+          outcome: undefined,
+          isShowingDefense: false,
+          isShowingRoutes: false,
+          audiblesUsed: 0,
+          maxAudibles: 2,
+          gameMode: 'free-play' as const,
+          motionPlayer: undefined,
+          isMotionActive: false,
+          motion: undefined,
+          personnel: '11',
+          passProtection: { rbBlocking: false, teBlocking: false, fbBlocking: false },
+          lineOfScrimmage: 30,
+          currentDown: 1,
+          yardsToGo: 10,
+          driveStartPosition: 30,
+          ballOn: 30,
+          isFirstDown: true,
+          hashPosition: 'middle' as const
         },
         customPositions: new Map(),
         stateVersion: 0,
@@ -121,7 +150,7 @@ export const useGameStore = create<GameStore>()(
 
         const { engine } = get();
         if (!engine) {
-          console.warn('Engine not initialized');
+          console.warn('Engine not initialized, skipping action');
           return;
         }
 
@@ -147,7 +176,7 @@ export const useGameStore = create<GameStore>()(
 
         const { engine } = get();
         if (!engine) {
-          console.warn('Engine not initialized');
+          console.warn('Engine not initialized, skipping action');
           return;
         }
 
@@ -435,6 +464,50 @@ export const useGameStore = create<GameStore>()(
         if (!engine) return;
         set((state) => ({ ...state, gameState: engine.getGameState() }));
       },
+
+      initializeEngine: () => {
+        const { engine } = get();
+        if (engine) {
+          // Engine already initialized
+          return;
+        }
+
+        if (typeof window === 'undefined') {
+          // Don't initialize on server
+          return;
+        }
+
+        try {
+          const newEngine = new FootballEngine();
+          const { selectedConcept, selectedCoverage, sackTime } = get();
+
+          // Load default data
+          const concept = DataLoader.getConcept(selectedConcept);
+          const coverage = DataLoader.getCoverage(selectedCoverage);
+
+          // Initialize engine with current selections
+          if (concept) {
+            newEngine.setPlayConcept(concept);
+          }
+          if (coverage) {
+            newEngine.setCoverage(coverage);
+          }
+          newEngine.setSackTime(sackTime);
+
+          // Validate that both offense and defense are properly set up
+          newEngine.validateSetup();
+
+          set((state) => ({
+            ...state,
+            engine: newEngine,
+            gameState: newEngine.getGameState(),
+            lastRouteUpdate: Date.now(),
+            lastDefenseUpdate: Date.now()
+          }));
+        } catch (error) {
+          console.error('Failed to initialize engine on client:', error);
+        }
+      },
     };
   })
 );
@@ -507,6 +580,7 @@ export const useSetAudible = () => useGameStore(state => state.setAudible);
 export const useSnap = () => useGameStore(state => state.snap);
 export const useThrowTo = () => useGameStore(state => state.throwTo);
 export const useReset = () => useGameStore(state => state.reset);
+export const useInitializeEngine = () => useGameStore(state => state.initializeEngine);
 
 // UI state hooks - individual selectors to avoid re-creating objects
 export const useSelectedConcept = () => useGameStore(state => state.selectedConcept);
