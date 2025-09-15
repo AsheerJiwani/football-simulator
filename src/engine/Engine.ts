@@ -657,7 +657,7 @@ export class FootballEngine {
     // Special handling for 4 vertical routes - ensure deep zone integrity
     const isFourVerts = offensePlayers.filter(p =>
       p.isEligible &&
-      p.route?.type === 'vert-option' || p.route?.type === 'seam-bender'
+      (p.route?.type === 'go' || p.route?.type === 'fade' || p.route?.type === 'post')
     ).length >= 4;
 
     if (isFourVerts || isSpreadFormation) {
