@@ -75,6 +75,7 @@ Build a production-grade NFL quarterback training simulator with realistic defen
 - [ ] Replace all `any` types with proper TypeScript types
 - [ ] Fix ESLint warnings in Engine.ts
 - [ ] Ensure zero console errors in production
+- [ ] Clean up all warnings
 
 #### 1.3 Performance Validation
 - [ ] Profile engine performance under stress (14+ players)

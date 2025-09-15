@@ -11,7 +11,6 @@ import type {
   RouteType,
   Route,
   PersonnelPackage,
-  Motion,
   MotionType,
   HashPosition,
 } from './types';
@@ -75,15 +74,15 @@ export class FootballEngine {
         motionBoostDuration: 0.35,
       },
       playerSpeeds: {
-        QB: { min: 6.5, max: 8.5, average: 8.71 }, // NFL research: average 8.71 yd/s
-        RB: { min: 8.3, max: 9.3, average: 8.87 }, // NFL research: average 8.87 yd/s
-        WR: { min: 8.5, max: 9.5, average: 8.93 }, // NFL research: average 8.93 yd/s
-        TE: { min: 7.5, max: 8.8, average: 8.46 }, // NFL research: average 8.46 yd/s
-        FB: { min: 7.2, max: 8.5, average: 8.33 }, // NFL research: average 8.33 yd/s
-        CB: { min: 8.7, max: 9.4, average: 8.99 }, // NFL research: average 8.99 yd/s
-        S: { min: 8.2, max: 9.1, average: 8.79 }, // NFL research: average 8.79 yd/s
-        LB: { min: 7.8, max: 8.9, average: 8.70 }, // NFL research: average 8.70 yd/s
-        NB: { min: 8.4, max: 9.2, average: 8.89 }, // NFL research: average 8.89 yd/s
+        QB: { min: 6.5, max: 8.5 }, // NFL research: average 8.71 yd/s
+        RB: { min: 8.3, max: 9.3 }, // NFL research: average 8.87 yd/s
+        WR: { min: 8.5, max: 9.5 }, // NFL research: average 8.93 yd/s
+        TE: { min: 7.5, max: 8.8 }, // NFL research: average 8.46 yd/s
+        FB: { min: 7.2, max: 8.5 }, // NFL research: average 8.33 yd/s
+        CB: { min: 8.7, max: 9.4 }, // NFL research: average 8.99 yd/s
+        S: { min: 8.2, max: 9.1 }, // NFL research: average 8.79 yd/s
+        LB: { min: 7.8, max: 8.9 }, // NFL research: average 8.70 yd/s
+        NB: { min: 8.4, max: 9.2 }, // NFL research: average 8.89 yd/s
       },
       acceleration: {
         WR: { min: 2.2, max: 3.2, average: 2.7 },
@@ -2770,7 +2769,7 @@ export class FootballEngine {
 
   private getDeepQuarterZone(defender: Player): Vector2D {
     // NFL-accurate deep quarter zone position
-    const landmarks = this.config.zoneLandmarks.deepQuarter;
+    const landmarks = { depth: 12, width: 15 };
     const isLeft = defender.position.x < 26.665;
 
     return {
@@ -2781,7 +2780,7 @@ export class FootballEngine {
 
   private getFlatZone(defender: Player): Vector2D {
     // NFL-accurate flat zone position (numbers to sideline)
-    const landmarks = this.config.zoneLandmarks.flat;
+    const landmarks = { depth: 5, width: 12 };
     const isLeft = defender.position.x < 26.665;
 
     return {
@@ -2792,7 +2791,7 @@ export class FootballEngine {
 
   private getCurlZone(defender: Player): Vector2D {
     // NFL-accurate curl zone (top of numbers)
-    const landmarks = this.config.zoneLandmarks.curl;
+    const landmarks = { depth: 8, width: 10 };
     const isLeft = defender.position.x < 26.665;
 
     return {
@@ -2803,7 +2802,7 @@ export class FootballEngine {
 
   private getHookZone(defender: Player): Vector2D {
     // NFL-accurate hook zone (outside hash)
-    const landmarks = this.config.zoneLandmarks.hook;
+    const landmarks = { depth: 6, width: 8 };
     const isLeft = defender.position.x < 26.665;
 
     return {
@@ -2855,7 +2854,19 @@ export class FootballEngine {
     // Apply backpedal speed reduction
     let targetSpeed = speed;
     if (player.isBackpedaling) {
-      const backpedalRatio = this.config.backpedalSpeed?.[player.playerType]?.ratio || 0.55;
+      // NFL-accurate backpedal speed ratios by position
+      const backpedalRatios: Record<PlayerType, number> = {
+        CB: 0.65, // Better at backpedaling
+        S: 0.60,
+        NB: 0.62,
+        LB: 0.55,
+        WR: 0.50,
+        TE: 0.45,
+        RB: 0.50,
+        FB: 0.45,
+        QB: 0.40
+      };
+      const backpedalRatio = backpedalRatios[player.playerType] || 0.55;
       targetSpeed = speed * backpedalRatio;
     }
 
@@ -3150,6 +3161,9 @@ export class FootballEngine {
           hasMotionBoost: false,
           motionBoostTimeLeft: 0,
           isBlocking: false,
+          acceleration: this.getPlayerAcceleration(playerType),
+          isAccelerating: false,
+          isDecelerating: false,
         };
 
         return defender;
@@ -3199,6 +3213,9 @@ export class FootballEngine {
           hasMotionBoost: false,
           motionBoostTimeLeft: 0,
           isBlocking: false,
+          acceleration: this.getPlayerAcceleration('S'),
+          isAccelerating: false,
+          isDecelerating: false,
         };
 
         newDefensivePlayers.push(safetyCoverage);
@@ -3458,22 +3475,14 @@ export class FootballEngine {
 
   private getPlayerSpeed(playerType: PlayerType): number {
     const speedRange = this.config.playerSpeeds[playerType];
-    // Use average speed with ±10% variation for realistic gameplay
-    if (speedRange.average) {
-      const variation = speedRange.average * 0.1; // 10% variation
-      return speedRange.average + (Math.random() - 0.5) * 2 * variation;
-    }
-    // Fallback to range if average not specified
-    return Random.range(speedRange.min, speedRange.max);
+    // Use midpoint of range with slight variation for realistic gameplay
+    const midpoint = (speedRange.min + speedRange.max) / 2;
+    const variation = midpoint * 0.1; // 10% variation
+    return midpoint + (Math.random() - 0.5) * 2 * variation;
   }
 
   private getPlayerAcceleration(playerType: PlayerType): number {
-    const accelData = this.config.acceleration?.[playerType];
-    if (accelData?.average) {
-      const variation = accelData.average * 0.15; // 15% variation for acceleration
-      return accelData.average + (Math.random() - 0.5) * 2 * variation;
-    }
-    // Default acceleration values if not specified
+    // Default acceleration values based on position
     const defaults: Record<PlayerType, number> = {
       WR: 2.7, CB: 2.8, RB: 2.5, S: 2.5, NB: 2.6,
       LB: 2.2, TE: 2.0, QB: 1.8, FB: 1.9
