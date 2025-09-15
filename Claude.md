@@ -314,3 +314,148 @@ Keep performance in mind: engine tick must stay <1ms for ~12–14 players.
 Start small, expand: get one play + one coverage working before layering complexity.
 
 No shortcuts on realism: coverage rotations, motion bumps, player speed bands must match NFL mechanics.
+
+## 🔥 PROJECT DATA STRUCTURES FOR RESEARCH AGENT
+
+**ATTENTION RESEARCH SUBAGENT: Use these TypeScript interfaces when returning implementation-ready rules. Your research output should align with these exact data structures. You may add a data structure, but be explicit in commenting when you do.**
+
+### Core Player Structure
+```typescript
+interface Player {
+  id: string;
+  position: Vector2D; // {x, y} coordinates on field
+  team: 'offense' | 'defense';
+  playerType: 'QB' | 'RB' | 'WR' | 'TE' | 'FB' | 'CB' | 'S' | 'LB' | 'NB';
+  route?: Route; // Offensive route assignment
+  coverageResponsibility?: CoverageResponsibility; // Defensive assignment
+  isEligible: boolean;
+  maxSpeed: number; // yards per second
+  isStar: boolean; // +10% speed boost
+  hasMotion: boolean; // pre-snap motion
+  isBlocking: boolean; // pass protection
+  coverageAssignment?: string; // zone name or man assignment
+}
+```
+
+### Coverage Responsibility Structure
+```typescript
+interface CoverageResponsibility {
+  defenderId: string;
+  type: 'man' | 'zone' | 'spy' | 'blitz';
+  target?: string; // player ID for man coverage
+  zone?: {
+    name?: string; // e.g., 'deep-middle', 'flat', 'hook', 'curl'
+    center: Vector2D;
+    width: number;
+    height: number;
+    depth: number; // yards from LOS
+  };
+}
+```
+
+### Coverage Definition Structure
+```typescript
+interface Coverage {
+  name: string; // e.g., 'Cover 3', 'Tampa 2'
+  type: 'cover-0' | 'cover-1' | 'cover-2' | 'cover-3' | 'cover-4' | 'cover-6' | 'quarters' | 'tampa-2';
+  safetyCount: number;
+  responsibilities: CoverageResponsibility[];
+  positions?: Record<string, Vector2D>; // Initial alignment positions
+}
+```
+
+### Formation Structure
+```typescript
+interface Formation {
+  name: string; // e.g., 'Trips Right', 'I-Form'
+  positions: Record<string, Vector2D>; // player ID to position
+  personnel: {
+    QB: number;
+    RB: number;
+    WR: number;
+    TE: number;
+    FB: number;
+  };
+}
+```
+
+### Route Structure
+```typescript
+interface Route {
+  type: 'slant' | 'flat' | 'go' | 'curl' | 'out' | 'in' | 'post' | 'comeback' | 'fade' | 'hitch' | 'wheel' | 'corner' | 'dig';
+  waypoints: Vector2D[]; // relative to starting position
+  timing: number[]; // seconds to reach each waypoint
+  depth: number; // yards downfield
+}
+```
+
+### Motion Structure
+```typescript
+interface Motion {
+  type: 'fly' | 'orbit' | 'jet' | 'return' | 'shift';
+  playerId: string;
+  startPosition: Vector2D;
+  endPosition: Vector2D;
+  path: Vector2D[];
+  duration: number; // seconds
+}
+```
+
+### Field Coordinate System
+- **Y-axis**: 0 (offensive endzone) to 120 (defensive endzone)
+- **X-axis**: 0 (left sideline) to 53.33 (right sideline)
+- **LOS**: Line of scrimmage at y=0 (relative positioning)
+- **Hash marks**: 3.08 yards from center (x=23.58 left hash, x=29.75 right hash)
+
+### Speed Bands (yards/second)
+```typescript
+const SPEED_BANDS = {
+  QB: { min: 6.5, max: 7.0 },
+  RB: { min: 9.0, max: 9.5 },
+  WR: { min: 9.0, max: 9.5 },
+  TE: { min: 7.5, max: 8.0 },
+  FB: { min: 7.5, max: 8.0 },
+  CB: { min: 9.0, max: 9.5 },
+  S: { min: 9.0, max: 9.5 },
+  LB: { min: 7.5, max: 8.0 },
+  NB: { min: 9.0, max: 9.5 }
+};
+```
+
+### Research Output Format Requirements
+When returning coverage research, structure your output to include:
+
+1. **Coverage Rules** matching the `Coverage` interface above
+2. **Position-specific responsibilities** using `CoverageResponsibility` structure
+3. **Zone definitions** with exact `center`, `width`, `height`, `depth` values
+4. **Alignment positions** as `Vector2D` coordinates relative to LOS
+5. **Motion adjustments** describing how responsibilities change
+6. **Formation-based adjustments** for trips, bunch, spread alignments
+
+Example research output structure:
+```json
+{
+  "coverage": {
+    "name": "Cover 3",
+    "type": "cover-3",
+    "safetyCount": 1,
+    "responsibilities": [
+      {
+        "defenderId": "FS",
+        "type": "zone",
+        "zone": {
+          "name": "deep-middle",
+          "center": {"x": 26.67, "y": 25},
+          "width": 18,
+          "height": 20,
+          "depth": 25
+        }
+      }
+    ]
+  },
+  "adjustments": {
+    "trips": "Rotate strong safety to trips side",
+    "motion": "Lock defender on motion man in Cover 1"
+  }
+}
+```

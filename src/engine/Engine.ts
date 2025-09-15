@@ -84,53 +84,13 @@ export class FootballEngine {
         LB: { min: 7.8, max: 8.9 }, // NFL research: average 8.70 yd/s
         NB: { min: 8.4, max: 9.2 }, // NFL research: average 8.89 yd/s
       },
-      acceleration: {
-        WR: { min: 2.2, max: 3.2, average: 2.7 },
-        CB: { min: 2.4, max: 3.1, average: 2.8 },
-        RB: { min: 2.0, max: 3.0, average: 2.5 },
-        S: { min: 2.1, max: 2.9, average: 2.5 },
-        NB: { min: 2.2, max: 3.0, average: 2.6 },
-        LB: { min: 1.8, max: 2.6, average: 2.2 },
-        TE: { min: 1.6, max: 2.4, average: 2.0 },
-        QB: { min: 1.4, max: 2.2, average: 1.8 },
-        FB: { min: 1.5, max: 2.3, average: 1.9 },
-      },
-      backpedalSpeed: {
-        CB: { ratio: 0.55, min: 4.5, max: 5.5 },
-        S: { ratio: 0.53, min: 4.2, max: 5.2 },
-        NB: { ratio: 0.54, min: 4.3, max: 5.3 },
-      },
-      changeOfDirection: {
-        cut45: { speedRetention: 0.875, recoveryTime: 0.15 },
-        cut90: { speedRetention: 0.75, recoveryTime: 0.3 },
-        cut180: { speedRetention: 0.575, recoveryTime: 0.6 },
-        backpedalTransition: { speedRetention: 0.675, recoveryTime: 0.35 },
-      },
       gameplay: {
         minSackTime: 2.0,
         maxSackTime: 10.0,
         defaultSackTime: 5.0,
         challengeModeSackTime: 2.7,
         maxAudibles: 2,
-      },
-      // NFL-accurate zone landmarks for realistic coverage
-      zoneLandmarks: {
-        // Deep zones (all depths are negative from LOS toward defensive endzone)
-        deepThird: { depth: -15, width: 17.5 },    // Hash to sideline
-        deepHalf: { depth: -13, width: 13.5 },     // Hash to hash
-        deepMiddle: { depth: -18, width: 8 },      // Between hashes
-        deepQuarter: { depth: -15, width: 13.33 }, // Field split into 4
-
-        // Underneath zones
-        curl: { depth: -12, width: 13.5 },         // Top of numbers
-        flat: { depth: -10, width: 8 },            // Numbers to sideline
-        hook: { depth: -10, width: 11.25 },        // Outside hash
-        lowHole: { depth: -10, width: 9.25 },      // Between hashes (Tampa 2)
-
-        // Shallow zones
-        buzzFlat: { depth: -5, width: 10 },        // Quick flat route area
-        shallowCross: { depth: -6, width: 15 },    // Crossing route area
-      },
+      }
     };
   }
 

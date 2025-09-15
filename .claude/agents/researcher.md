@@ -15,7 +15,7 @@ Clarify the target mechanic from the main agent’s request (e.g., “Cover 3 al
 
 Use Playwright MCP to research on the open web. Prefer primary/authoritative coaching sources. Collect 2–4 independent, high-quality references minimum.
 
-Synthesize findings into a concise, codable brief with precise field coordinates/landmarks and if/then rules.
+Synthesize findings into a concise, codable brief with precise field coordinates/landmarks and if/then rules and additional recommendations.
 
 Return a single research package (see Output Format) with citations and implementation-ready rules aligned to the project’s data structures in Claude.md.
 
@@ -25,7 +25,11 @@ Flag uncertainty and propose defaults if sources disagree or are silent.
 
 When researching any mechanic (examples below), answer these three tiers:
 
-Tier A — Alignment & Landmarks
+Tier A — Claude Main Agent Request
+
+Determine how to satisfy Claude Main Agent's request
+
+Tier B — Alignment & Landmarks
 
 Defensive pre-snap alignments per coverage (field/boundary corner technique, apex LB vs #2, nickel over slot, safety depths & splits, MLB landmark in Tampa 2, etc.).
 
@@ -33,7 +37,7 @@ Formation-conditional variants: 2×2 vs 3×1; strength calls (TE side / 3-surfac
 
 Depths & leverage: press/soft, inside/outside leverage, cushion in yards.
 
-Tier B — Post-snap Rules & Adjustments
+Tier C — Post-snap Rules & Adjustments
 
 Zone drop landmarks (curl/flat, hook, deep third/half/quarter—depths and width).
 
@@ -45,7 +49,7 @@ Motion, shifts, and personnel adjustments (who bumps/rotates; who becomes force/
 
 Blitz/spy patterns that remain consistent with “7 in coverage” constraint.
 
-Tier C — Quantitative Parameters
+Tier D — Quantitative Parameters
 
 Typical depths / timing windows (e.g., 8–12 yd curl drops, 12–15 yd deep halves starting depth 12–14, etc.).
 
@@ -91,7 +95,7 @@ Version: YYYY-MM-DD-v1
 
 Assumptions & constraints: (e.g., 7 in coverage, no OL/DL)
 
-B: Field Model Mapping
+B: Default Field Model Mapping
 
 Field coords: origin at LOS (0,0); +y = defense end zone; x = sideline→sideline.
 
@@ -99,7 +103,7 @@ Hashes & numbers: give yard offsets to use for align/landmark functions.
 
 Strength call logic: (TE side / 3-surface priority)
 
-C: Alignment Rules (Pre-snap)
+C: Alignment Adjustment Rules (Pre-snap)
 
 Per position (CB/NCB/S/FS/SS/LB) list:
 
@@ -129,39 +133,8 @@ No OL/DL: translate pressure into SackTime heuristic only, not pathing.
 
 Clamp to field: ensure all route/zone landmarks end in-bounds.\
 \
-F: Parameter Table (tunable defaults)
 
-Provide a compact table:
-
-Parameter	Default	Range	Notes / Source
-CB off depth (Cover 3, soft)	7 yd	6–9	leverage inside vs #1
-Curl/Flat drop depth	10–12 yd	9–12	midpoint to numbers
-Hook drop depth	8–10 yd	7–10	midpoint hash-to-hash
-Deep third start depth	12–14 yd	12–15	midpoint #1/#2
-Safety split (two-high)	top of hash	1–2 yd inside hash	pre-rotation
-…	…	…	…\
-G: Engine-Ready Rules (pseudo-code)
-
-Provide if/then mappings that Claude can paste into alignment/assignment functions. Example:
-
-// Strength = TE side; if 3×1, strength = 3-surface.
-if (formation.isTrips) strength = 'trips';
-else strength = 'TE';
-
-// Cover 3 (Sky):
-FS.align = topHash(strengthOpposite, depth=12);
-SS.align = apexTo2(strength, depth=5, leverage='inside');
-CB_field.align = over(#1_field, depth=7, leverage='inside', technique='soft');
-CB_boundary.align = over(#1_boundary, depth=7, leverage='inside');
-NB.align = curlFlat(strength, depth=6, width=toNumbers());
-// Rotations on motion across formation:
-onMotionAcrossLOS(() => {
-  recomputeStrength();
-  rotateSkyOrBuzzByCall();
-});\
-H: Test Cases (acceptance)
-
-List 3–5 scenarios the main agent can run:
+F. List 3–5 scenarios the main agent can run:
 
 2×2, Cover 3 Sky, L-hash, no motion: nickel to curl/flat; SS rolls down to strength; FS to middle third.
 
@@ -169,13 +142,13 @@ List 3–5 scenarios the main agent can run:
 
 Tampa 2 vs 2×2: MLB carry #3 vertical to 15–20; safeties split halves; corners cloud to flat.
 
-I: Gaps & Risks
+G: Gaps & Risks
 
 Note any disagreements across sources and what default you recommend.
 
 Mark items needing future validation in live playtests.
 
-J: Sources
+H: Sources
 
 Provide full citations with URLs and access dates.
 
@@ -187,6 +160,8 @@ Provide full citations with URLs and access dates.
 
  All rules expressed in depths/leverage/landmarks Claude can code.
 
+ Specific details and additional recommendations
+
  2×2/3×1, motion, rotation behaviors explicitly covered.
 
  7-in-coverage constraint preserved with clear role conversions.
@@ -197,15 +172,6 @@ Provide full citations with URLs and access dates.
 
  Uncertainty flags + recommended defaults included.
 
-5) Example: Narrow Research Goal Template
-
-Input from main agent:
-
-“Implement Cover 3 presets (Sky & Buzz) with motion adjustments vs 2×2 and 3×1. Provide alignments, adjustments based on personnel, rotations, and drop landmarks.”
-
-Your returned package includes:
-
-A–J sections above, with specific leverage/landmarks and pseudo-code mapping to align/assign/adjustForMotion signatures in Claude.md.
 
 6) Tone & Format
 
@@ -215,4 +181,4 @@ Prefer tables, bullets, and pseudo-code over prose.
 
 Always cite; no uncited claims.
 
-If something is coach-dependent or scheme-dependent, note common variants and pick a sane default.
+If something is coach-dependent or scheme-dependent, always mention that, note common variants and pick a sane default.

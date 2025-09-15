@@ -1,0 +1,741 @@
+import { Player, CoverageType, Vector2D, CoverageResponsibility, Zone, Motion } from './types';
+import { FormationAnalyzer, FormationAnalysis, FormationStrength } from './formationAnalyzer';
+import { DefensivePersonnel } from './personnelMatcher';
+
+export type MotionResponse = 'lock' | 'travel' | 'buzz' | 'spin' | 'check' | 'pattern-adjust' | 'meg-trigger' | 'minimal';
+export type CoverageRotation = 'sky' | 'buzz' | 'cloud' | 'weak' | 'strong' | 'none';
+
+interface CoverageAdjustment {
+  defenderId: string;
+  newPosition: Vector2D;
+  newResponsibility?: CoverageResponsibility;
+  leverage?: 'inside' | 'outside' | 'head-up';
+  technique?: string;
+}
+
+export class CoverageAdjustments {
+  private readonly formationAnalyzer: FormationAnalyzer;
+  private readonly FIELD_CENTER = 26.67;
+  private readonly HASH_LEFT = 23.58;
+  private readonly HASH_RIGHT = 29.75;
+  private readonly NUMBERS_LEFT = 9;
+  private readonly NUMBERS_RIGHT = 44.33;
+
+  constructor() {
+    this.formationAnalyzer = new FormationAnalyzer();
+  }
+
+  /**
+   * Apply coverage-specific adjustments based on formation
+   */
+  applyCoverageSpecificAdjustments(
+    coverage: CoverageType,
+    defenders: Player[],
+    offensivePlayers: Player[],
+    formation: FormationAnalysis
+  ): CoverageAdjustment[] {
+    switch (coverage) {
+      case 'cover-0':
+        return this.adjustCover0(defenders, offensivePlayers, formation);
+      case 'cover-1':
+        return this.adjustCover1(defenders, offensivePlayers, formation);
+      case 'cover-2':
+        return this.adjustCover2(defenders, offensivePlayers, formation);
+      case 'cover-3':
+        return this.adjustCover3(defenders, offensivePlayers, formation);
+      case 'cover-4':
+      case 'quarters':
+        return this.adjustCover4(defenders, offensivePlayers, formation);
+      case 'cover-6':
+        return this.adjustCover6(defenders, offensivePlayers, formation);
+      case 'tampa-2':
+        return this.adjustTampa2(defenders, offensivePlayers, formation);
+      default:
+        return [];
+    }
+  }
+
+  /**
+   * Handle motion adjustments for all coverages
+   */
+  handleMotionAdjustments(
+    coverage: CoverageType,
+    motion: Motion,
+    defenders: Player[],
+    offensivePlayers: Player[]
+  ): CoverageAdjustment[] {
+    const motionResponse = this.getMotionResponse(coverage, motion.type);
+    const adjustments: CoverageAdjustment[] = [];
+
+    switch (motionResponse) {
+      case 'lock':
+        return this.applyLockTechnique(motion, defenders, offensivePlayers);
+      case 'travel':
+        return this.applyDefenseTravel(motion, defenders);
+      case 'buzz':
+        return this.applyBuzzRotation(motion, defenders);
+      case 'spin':
+        return this.applySpinRotation(motion, defenders);
+      case 'check':
+        return this.applyCheckCall(motion, defenders, offensivePlayers);
+      case 'pattern-adjust':
+        return this.applyPatternMatchAdjustment(motion, defenders, offensivePlayers);
+      case 'meg-trigger':
+        return this.applyMEGTrigger(motion, defenders, offensivePlayers);
+      case 'minimal':
+      default:
+        return this.applyMinimalAdjustment(motion, defenders);
+    }
+  }
+
+  // Coverage-specific adjustment methods
+
+  private adjustCover0(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+
+    // vs Trips: Bump NCB to trips #3
+    if (formation.receiverSets.includes('trips')) {
+      const tripsSide = formation.strength;
+      const ncb = defenders.find(d => d.playerType === 'NB');
+      if (ncb) {
+        const xPos = tripsSide === 'left' ? 15 : 38;
+        adjustments.push({
+          defenderId: ncb.id,
+          newPosition: { x: xPos, y: 4 },
+          leverage: 'head-up',
+          technique: 'press'
+        });
+      }
+    }
+
+    // vs Bunch: Box technique
+    if (formation.receiverSets.includes('bunch')) {
+      const bunchSide = formation.strength;
+      const baseX = bunchSide === 'left' ? 12 : 41;
+
+      let index = 0;
+      for (const defender of defenders) {
+        if (defender.playerType === 'CB' || defender.playerType === 'NB') {
+          adjustments.push({
+            defenderId: defender.id,
+            newPosition: { x: baseX + (index * 2), y: 3 + index },
+            leverage: 'inside',
+            technique: 'box'
+          });
+          index++;
+        }
+      }
+    }
+
+    // Green dog rules for LBs
+    const rbs = offensive.filter(p => p.playerType === 'RB');
+    const lbs = defenders.filter(d => d.playerType === 'LB');
+
+    for (let i = 0; i < lbs.length && i < rbs.length; i++) {
+      adjustments.push({
+        defenderId: lbs[i].id,
+        newPosition: { x: rbs[i].position.x, y: 5 },
+        newResponsibility: {
+          defenderId: lbs[i].id,
+          type: 'man',
+          target: rbs[i].id
+        },
+        technique: 'green-dog'
+      });
+    }
+
+    return adjustments;
+  }
+
+  private adjustCover1(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+
+    // Position FS in deep middle with shade to strength
+    const fs = defenders.find(d => d.id === 'FS' || (d.playerType === 'S' && d.id.includes('1')));
+    if (fs) {
+      const shadeX = formation.strength === 'left' ? -2 : formation.strength === 'right' ? 2 : 0;
+      adjustments.push({
+        defenderId: fs.id,
+        newPosition: { x: this.FIELD_CENTER + shadeX, y: 13.5 },
+        technique: 'center-field'
+      });
+    }
+
+    // Position SS as robber/hole player
+    const ss = defenders.find(d => d.id === 'SS' || (d.playerType === 'S' && d.id.includes('2')));
+    if (ss) {
+      const robberX = formation.strength === 'left' ? 20 : formation.strength === 'right' ? 33 : this.FIELD_CENTER;
+      adjustments.push({
+        defenderId: ss.id,
+        newPosition: { x: robberX, y: 10 },
+        leverage: 'inside',
+        technique: 'robber'
+      });
+    }
+
+    // vs Bunch: Jump call (FS comes down, CB rotates deep)
+    if (formation.receiverSets.includes('bunch')) {
+      const bunchSide = formation.strength;
+      const cb = defenders.find(d => d.playerType === 'CB' &&
+        (bunchSide === 'left' ? d.position.x < this.FIELD_CENTER : d.position.x > this.FIELD_CENTER));
+
+      if (fs && cb) {
+        // FS comes down for man coverage
+        adjustments.push({
+          defenderId: fs.id,
+          newPosition: { x: cb.position.x + 5, y: 8 },
+          newResponsibility: {
+            defenderId: fs.id,
+            type: 'man',
+            target: undefined // Will be assigned to specific receiver
+          },
+          technique: 'jump'
+        });
+
+        // CB rotates to deep
+        adjustments.push({
+          defenderId: cb.id,
+          newPosition: { x: this.FIELD_CENTER, y: 15 },
+          technique: 'rotate-deep'
+        });
+      }
+    }
+
+    // Outside leverage for corners with safety help
+    const corners = defenders.filter(d => d.playerType === 'CB');
+    for (const corner of corners) {
+      adjustments.push({
+        defenderId: corner.id,
+        newPosition: corner.position,
+        leverage: 'outside',
+        technique: 'off-man'
+      });
+    }
+
+    return adjustments;
+  }
+
+  private adjustCover2(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+
+    // Position safeties in deep halves
+    const safeties = defenders.filter(d => d.playerType === 'S');
+    if (safeties.length >= 2) {
+      // FS takes weak side half
+      adjustments.push({
+        defenderId: safeties[0].id,
+        newPosition: { x: formation.strength === 'left' ? 36 : 17, y: 15 },
+        technique: 'deep-half'
+      });
+
+      // SS takes strong side half
+      adjustments.push({
+        defenderId: safeties[1].id,
+        newPosition: { x: formation.strength === 'left' ? 17 : 36, y: 15 },
+        technique: 'deep-half'
+      });
+    }
+
+    // vs Trips: Palms technique for 2×2
+    if (formation.receiverDistribution.left === 2 && formation.receiverDistribution.right === 2) {
+      const corners = defenders.filter(d => d.playerType === 'CB');
+      for (const corner of corners) {
+        adjustments.push({
+          defenderId: corner.id,
+          newPosition: corner.position,
+          technique: 'palms-read'
+        });
+      }
+    }
+
+    // Hard corner technique
+    const corners = defenders.filter(d => d.playerType === 'CB');
+    for (const corner of corners) {
+      adjustments.push({
+        defenderId: corner.id,
+        newPosition: { x: corner.position.x, y: 6 },
+        leverage: 'outside',
+        technique: 'hard-press'
+      });
+    }
+
+    // LB hook/seam-hook adjustments
+    const lbs = defenders.filter(d => d.playerType === 'LB');
+    const mlb = lbs.find(lb => Math.abs(lb.position.x - this.FIELD_CENTER) < 3);
+    const weakLB = lbs.find(lb => formation.strength === 'left' ? lb.position.x > this.FIELD_CENTER : lb.position.x < this.FIELD_CENTER);
+    const strongLB = lbs.find(lb => formation.strength === 'left' ? lb.position.x < this.FIELD_CENTER : lb.position.x > this.FIELD_CENTER);
+
+    if (mlb) {
+      adjustments.push({
+        defenderId: mlb.id,
+        newPosition: { x: this.FIELD_CENTER, y: 4.5 },
+        technique: 'hook'
+      });
+    }
+
+    if (weakLB) {
+      adjustments.push({
+        defenderId: weakLB.id,
+        newPosition: { x: formation.strength === 'left' ? 35 : 18, y: 4.5 },
+        technique: 'seam-hook'
+      });
+    }
+
+    if (strongLB) {
+      adjustments.push({
+        defenderId: strongLB.id,
+        newPosition: { x: formation.strength === 'left' ? 18 : 35, y: 4.5 },
+        technique: 'seam-hook'
+      });
+    }
+
+    return adjustments;
+  }
+
+  private adjustCover3(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+    const rotation: CoverageRotation = this.determineCover3Rotation(formation);
+
+    // Apply rotation-specific adjustments
+    switch (rotation) {
+      case 'sky':
+        return this.applySkyRotation(defenders, formation);
+      case 'buzz':
+        return this.applyBuzzRotation(undefined, defenders);
+      case 'cloud':
+        return this.applyCloudRotation(defenders, formation);
+      default:
+        // Base Cover 3 alignment
+        break;
+    }
+
+    // Position FS in deep middle
+    const fs = defenders.find(d => d.id === 'FS' || (d.playerType === 'S' && d.id.includes('1')));
+    if (fs) {
+      adjustments.push({
+        defenderId: fs.id,
+        newPosition: { x: this.FIELD_CENTER, y: 13.5 },
+        technique: 'deep-middle'
+      });
+    }
+
+    // Position corners in deep thirds (bail technique)
+    const corners = defenders.filter(d => d.playerType === 'CB');
+    for (const corner of corners) {
+      const isLeft = corner.position.x < this.FIELD_CENTER;
+      adjustments.push({
+        defenderId: corner.id,
+        newPosition: { x: isLeft ? 9 : 44, y: 6.5 },
+        leverage: 'outside',
+        technique: 'bail'
+      });
+    }
+
+    // vs Trips: Skinny coverage to trips side
+    if (formation.receiverSets.includes('trips')) {
+      const tripsSide = formation.strength;
+      const ss = defenders.find(d => d.id === 'SS' || (d.playerType === 'S' && d.id.includes('2')));
+
+      if (ss) {
+        const xPos = tripsSide === 'left' ? 15 : 38;
+        adjustments.push({
+          defenderId: ss.id,
+          newPosition: { x: xPos, y: 10 },
+          technique: 'curl-flat'
+        });
+      }
+    }
+
+    return adjustments;
+  }
+
+  private adjustCover4(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+
+    // Safeties read #2 to #1 with pattern match
+    const safeties = defenders.filter(d => d.playerType === 'S');
+    for (const safety of safeties) {
+      const isStrong = formation.strength === 'left' ? safety.position.x < this.FIELD_CENTER : safety.position.x > this.FIELD_CENTER;
+      adjustments.push({
+        defenderId: safety.id,
+        newPosition: { x: isStrong ? (formation.strength === 'left' ? 20 : 34) : (formation.strength === 'left' ? 34 : 20), y: 12 },
+        leverage: 'inside',
+        technique: '2-read'
+      });
+    }
+
+    // Corners MOD technique
+    const corners = defenders.filter(d => d.playerType === 'CB');
+    for (const corner of corners) {
+      adjustments.push({
+        defenderId: corner.id,
+        newPosition: { x: corner.position.x, y: 8 },
+        leverage: 'outside',
+        technique: 'MOD'
+      });
+    }
+
+    // vs 3×1: Stubbie to trips, Solo backside
+    if (formation.receiverDistribution.left >= 3 || formation.receiverDistribution.right >= 3) {
+      const tripsSide = formation.receiverDistribution.left >= 3 ? 'left' : 'right';
+      const backSideSafety = safeties.find(s =>
+        tripsSide === 'left' ? s.position.x > this.FIELD_CENTER : s.position.x < this.FIELD_CENTER
+      );
+
+      if (backSideSafety) {
+        adjustments.push({
+          defenderId: backSideSafety.id,
+          newPosition: { x: this.FIELD_CENTER, y: 14 },
+          technique: 'solo'
+        });
+      }
+
+      // Stubbie adjustment for trips side
+      const tripsCorner = corners.find(c =>
+        tripsSide === 'left' ? c.position.x < this.FIELD_CENTER : c.position.x > this.FIELD_CENTER
+      );
+
+      if (tripsCorner) {
+        adjustments.push({
+          defenderId: tripsCorner.id,
+          newPosition: tripsCorner.position,
+          technique: 'stubbie'
+        });
+      }
+    }
+
+    // vs Bunch: Box technique (4-over-3)
+    if (formation.receiverSets.includes('bunch')) {
+      const bunchSide = formation.strength;
+      const bunchDefenders = defenders.filter(d =>
+        (d.playerType === 'CB' || d.playerType === 'S' || d.playerType === 'NB') &&
+        (bunchSide === 'left' ? d.position.x < this.FIELD_CENTER : d.position.x > this.FIELD_CENTER)
+      ).slice(0, 4);
+
+      const baseX = bunchSide === 'left' ? 12 : 41;
+      for (let i = 0; i < bunchDefenders.length; i++) {
+        adjustments.push({
+          defenderId: bunchDefenders[i].id,
+          newPosition: { x: baseX + (i * 3), y: 6 + (i % 2) * 2 },
+          technique: 'box-4'
+        });
+      }
+    }
+
+    return adjustments;
+  }
+
+  private adjustCover6(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+
+    // Determine field/boundary split
+    const fieldSide = formation.strength;
+    const boundarySide = fieldSide === 'left' ? 'right' : 'left';
+
+    // Cover 4 side (field/strong)
+    const fieldCorner = defenders.find(d => d.playerType === 'CB' &&
+      (fieldSide === 'left' ? d.position.x < this.FIELD_CENTER : d.position.x > this.FIELD_CENTER));
+    const fieldSafety = defenders.find(d => d.playerType === 'S' &&
+      (fieldSide === 'left' ? d.position.x < this.FIELD_CENTER : d.position.x > this.FIELD_CENTER));
+
+    if (fieldCorner) {
+      adjustments.push({
+        defenderId: fieldCorner.id,
+        newPosition: { x: fieldSide === 'left' ? 10 : 43, y: 7.5 },
+        leverage: 'inside',
+        technique: 'press-bail'
+      });
+    }
+
+    if (fieldSafety) {
+      adjustments.push({
+        defenderId: fieldSafety.id,
+        newPosition: { x: fieldSide === 'left' ? 20 : 34, y: 13 },
+        technique: 'pattern-match-quarter'
+      });
+    }
+
+    // Cover 2 side (boundary/weak)
+    const boundaryCorner = defenders.find(d => d.playerType === 'CB' &&
+      (boundarySide === 'left' ? d.position.x < this.FIELD_CENTER : d.position.x > this.FIELD_CENTER));
+    const boundarySafety = defenders.find(d => d.playerType === 'S' &&
+      (boundarySide === 'left' ? d.position.x < this.FIELD_CENTER : d.position.x > this.FIELD_CENTER));
+
+    if (boundaryCorner) {
+      adjustments.push({
+        defenderId: boundaryCorner.id,
+        newPosition: { x: boundarySide === 'left' ? 10 : 43, y: 6 },
+        leverage: 'outside',
+        technique: 'press-funnel'
+      });
+    }
+
+    if (boundarySafety) {
+      adjustments.push({
+        defenderId: boundarySafety.id,
+        newPosition: { x: boundarySide === 'left' ? 17 : 36, y: 13.5 },
+        technique: 'deep-half'
+      });
+    }
+
+    // MLB walls crossing routes
+    const mlb = defenders.find(d => d.playerType === 'LB' && Math.abs(d.position.x - this.FIELD_CENTER) < 3);
+    if (mlb) {
+      adjustments.push({
+        defenderId: mlb.id,
+        newPosition: { x: this.FIELD_CENTER, y: 4.5 },
+        technique: 'middle-hook-wall'
+      });
+    }
+
+    return adjustments;
+  }
+
+  private adjustTampa2(defenders: Player[], offensive: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+
+    // Mike LB deep progression
+    const mlb = defenders.find(d => d.playerType === 'LB' && Math.abs(d.position.x - this.FIELD_CENTER) < 3);
+    if (mlb) {
+      adjustments.push({
+        defenderId: mlb.id,
+        newPosition: { x: this.FIELD_CENTER, y: 4.5 }, // Start position, will progress to 15-18
+        technique: 'tampa-2-mike'
+      });
+    }
+
+    // Safeties take deep outside halves
+    const safeties = defenders.filter(d => d.playerType === 'S');
+    if (safeties.length >= 2) {
+      adjustments.push({
+        defenderId: safeties[0].id,
+        newPosition: { x: 17, y: 13 },
+        technique: 'deep-outside-half'
+      });
+
+      adjustments.push({
+        defenderId: safeties[1].id,
+        newPosition: { x: 36, y: 13 },
+        technique: 'deep-outside-half'
+      });
+    }
+
+    // Corners hard jam to flats
+    const corners = defenders.filter(d => d.playerType === 'CB');
+    for (const corner of corners) {
+      adjustments.push({
+        defenderId: corner.id,
+        newPosition: { x: corner.position.x, y: 4.5 },
+        leverage: 'outside',
+        technique: 'hard-jam'
+      });
+    }
+
+    // OLBs wall technique
+    const olbs = defenders.filter(d => d.playerType === 'LB' && Math.abs(d.position.x - this.FIELD_CENTER) > 3);
+    for (const olb of olbs) {
+      const isWeak = formation.strength === 'left' ? olb.position.x > this.FIELD_CENTER : olb.position.x < this.FIELD_CENTER;
+      adjustments.push({
+        defenderId: olb.id,
+        newPosition: { x: isWeak ? (formation.strength === 'left' ? 35 : 18) : (formation.strength === 'left' ? 18 : 35), y: 3.5 },
+        technique: 'wall'
+      });
+    }
+
+    return adjustments;
+  }
+
+  // Motion response methods
+
+  private getMotionResponse(coverage: CoverageType, motionType: Motion['type']): MotionResponse {
+    const responseMatrix: Record<CoverageType, Record<Motion['type'], MotionResponse>> = {
+      'cover-0': { 'fly': 'lock', 'orbit': 'lock', 'jet': 'lock', 'return': 'lock', 'shift': 'lock' },
+      'cover-1': { 'fly': 'lock', 'orbit': 'travel', 'jet': 'lock', 'return': 'lock', 'shift': 'travel' },
+      'cover-2': { 'fly': 'minimal', 'orbit': 'minimal', 'jet': 'minimal', 'return': 'minimal', 'shift': 'minimal' },
+      'cover-3': { 'fly': 'buzz', 'orbit': 'spin', 'jet': 'buzz', 'return': 'minimal', 'shift': 'buzz' },
+      'cover-4': { 'fly': 'pattern-adjust', 'orbit': 'lock', 'jet': 'meg-trigger', 'return': 'minimal', 'shift': 'pattern-adjust' },
+      'quarters': { 'fly': 'pattern-adjust', 'orbit': 'lock', 'jet': 'meg-trigger', 'return': 'minimal', 'shift': 'pattern-adjust' },
+      'cover-6': { 'fly': 'check', 'orbit': 'minimal', 'jet': 'pattern-adjust', 'return': 'minimal', 'shift': 'check' },
+      'tampa-2': { 'fly': 'minimal', 'orbit': 'minimal', 'jet': 'minimal', 'return': 'minimal', 'shift': 'minimal' }
+    };
+
+    return responseMatrix[coverage]?.[motionType] || 'minimal';
+  }
+
+  private applyLockTechnique(motion: Motion, defenders: Player[], offensive: Player[]): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+    const motionPlayer = offensive.find(p => p.id === motion.playerId);
+
+    if (!motionPlayer) return adjustments;
+
+    // Find defender assigned to motion player
+    const assignedDefender = defenders.find(d => d.coverageAssignment === motion.playerId);
+
+    if (assignedDefender) {
+      adjustments.push({
+        defenderId: assignedDefender.id,
+        newPosition: {
+          x: motion.endPosition.x,
+          y: assignedDefender.position.y
+        },
+        technique: 'lock-follow'
+      });
+    }
+
+    return adjustments;
+  }
+
+  private applyDefenseTravel(motion: Motion, defenders: Player[]): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+    const travelDirection = motion.endPosition.x > motion.startPosition.x ? 1 : -1;
+    const travelDistance = 2; // yards
+
+    for (const defender of defenders) {
+      adjustments.push({
+        defenderId: defender.id,
+        newPosition: {
+          x: defender.position.x + (travelDirection * travelDistance),
+          y: defender.position.y
+        },
+        technique: 'travel'
+      });
+    }
+
+    return adjustments;
+  }
+
+  private applyBuzzRotation(motion: Motion | undefined, defenders: Player[]): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+
+    // Strong safety buzzes down
+    const ss = defenders.find(d => d.id === 'SS' || (d.playerType === 'S' && d.id.includes('2')));
+    if (ss) {
+      adjustments.push({
+        defenderId: ss.id,
+        newPosition: { x: ss.position.x, y: 8 },
+        technique: 'buzz-down'
+      });
+    }
+
+    return adjustments;
+  }
+
+  private applySpinRotation(motion: Motion, defenders: Player[]): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+    const spinDirection = motion.endPosition.x > motion.startPosition.x ? -1 : 1; // Opposite of motion
+
+    // Rotate safeties
+    const safeties = defenders.filter(d => d.playerType === 'S');
+    for (const safety of safeties) {
+      adjustments.push({
+        defenderId: safety.id,
+        newPosition: {
+          x: safety.position.x + (spinDirection * 5),
+          y: safety.position.y
+        },
+        technique: 'spin-rotation'
+      });
+    }
+
+    return adjustments;
+  }
+
+  private applyCheckCall(motion: Motion, defenders: Player[], offensive: Player[]): CoverageAdjustment[] {
+    // Check call allows coverage flip based on new formation strength
+    const newFormation = this.formationAnalyzer.analyzeFormation(offensive);
+
+    if (newFormation.strength !== 'balanced') {
+      // Flip coverage sides
+      return this.adjustCover6(defenders, offensive, newFormation);
+    }
+
+    return [];
+  }
+
+  private applyPatternMatchAdjustment(motion: Motion, defenders: Player[], offensive: Player[]): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+
+    // Trigger new pattern match rules based on motion
+    const safeties = defenders.filter(d => d.playerType === 'S');
+    for (const safety of safeties) {
+      adjustments.push({
+        defenderId: safety.id,
+        newPosition: safety.position,
+        technique: 'pattern-match-reset'
+      });
+    }
+
+    return adjustments;
+  }
+
+  private applyMEGTrigger(motion: Motion, defenders: Player[], offensive: Player[]): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+
+    // Convert to "Man Everywhere he Goes" for motion player
+    const motionDefender = defenders.find(d => d.coverageAssignment === motion.playerId);
+    if (motionDefender) {
+      adjustments.push({
+        defenderId: motionDefender.id,
+        newPosition: motionDefender.position,
+        newResponsibility: {
+          defenderId: motionDefender.id,
+          type: 'man',
+          target: motion.playerId
+        },
+        technique: 'MEG'
+      });
+    }
+
+    return adjustments;
+  }
+
+  private applyMinimalAdjustment(motion: Motion, defenders: Player[]): CoverageAdjustment[] {
+    // Zone coverage with minimal adjustment
+    return [];
+  }
+
+  // Helper methods
+
+  private determineCover3Rotation(formation: FormationAnalysis): CoverageRotation {
+    if (formation.receiverSets.includes('trips')) {
+      return 'sky'; // Sky rotation to trips
+    } else if (formation.type === 'heavy') {
+      return 'cloud'; // Cloud rotation vs heavy
+    }
+    return 'none';
+  }
+
+  private applySkyRotation(defenders: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+    const rotationSide = formation.strength;
+
+    // SS rolls to deep third
+    const ss = defenders.find(d => d.id === 'SS' || (d.playerType === 'S' && d.id.includes('2')));
+    if (ss) {
+      const xPos = rotationSide === 'left' ? 9 : 44;
+      adjustments.push({
+        defenderId: ss.id,
+        newPosition: { x: xPos, y: 13.5 },
+        technique: 'sky-deep-third'
+      });
+    }
+
+    return adjustments;
+  }
+
+  private applyCloudRotation(defenders: Player[], formation: FormationAnalysis): CoverageAdjustment[] {
+    const adjustments: CoverageAdjustment[] = [];
+
+    // Corners press then bail
+    const corners = defenders.filter(d => d.playerType === 'CB');
+    for (const corner of corners) {
+      adjustments.push({
+        defenderId: corner.id,
+        newPosition: { x: corner.position.x, y: 1 }, // Press first
+        technique: 'cloud-press-bail'
+      });
+    }
+
+    return adjustments;
+  }
+}
