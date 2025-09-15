@@ -191,7 +191,7 @@ Star boost: +10% speed + openness bonus.
 
 Tackle radius: ~1.5–2.0 yds.
 
-🖥️ Tech Stack
+🖥️ Tech Stack & Architecture
 
 Frontend: Next.js 15, TypeScript, TailwindCSS, Framer Motion.
 
@@ -206,6 +206,51 @@ Deployment: Vercel.
 Auth & Subscription: Clerk/NextAuth + Stripe Checkout.
 
 Analytics: PostHog (events, feature flags, experiments, replays).
+
+## 🏗️ Current Engine Architecture (Phase 2 Complete)
+
+### Core Systems
+```typescript
+// Formation Analysis Pipeline
+FormationAnalyzer → analyzes offensive formation (trips, bunch, spread)
+    ↓
+PersonnelMatcher → determines optimal defensive personnel (Dime, Nickel, Base)
+    ↓
+CoverageAdjustments → applies coverage-specific alignments
+    ↓
+PostSnapRules → handles dynamic in-play adjustments (pattern matching, zone handoffs)
+    ↓
+Engine Integration → coordinates all systems via realignDefense() and tick()
+```
+
+### Key Modules
+- **`formationAnalyzer.ts`**: Detects formation strength, receiver sets, gaps
+- **`personnelMatcher.ts`**: Coverage-personnel compatibility, situation-based adjustments
+- **`coverageAdjustments.ts`**: Coverage-specific alignments, motion responses
+- **`postSnapRules.ts`**: Pattern match triggers, route distribution analysis, pursuit angles
+- **`Engine.ts`**: Main game loop integrating all systems
+
+### Defensive Intelligence Features
+- **Formation Recognition**: Automatic detection of trips, bunch, stack, spread formations
+- **Personnel Auto-Adjustment**: 10→Dime, 11→Nickel, 12→Base, 21→Goal Line
+- **Motion Response Matrix**: Each coverage has specific motion responses (lock, buzz, spin)
+- **Pattern Matching**: Zone defenders convert to man based on route triggers
+- **Zone Coordination**: Handoff points, overlap management, pursuit angles
+
+### Integration Points
+```typescript
+// In Engine.ts
+realignDefense() {
+  formationAnalysis = formationAnalyzer.analyzeFormation(offensivePlayers);
+  adjustments = coverageAdjustments.applyCoverageSpecificAdjustments(...);
+  // Apply adjustments to defenders
+}
+
+tick() {
+  postSnapRules.applyPostSnapRules(defenders, offense, coverage, phase);
+  // Dynamic in-play adjustments
+}
+```
 
 🛠️ Development Order
 Phase 1 — Setup

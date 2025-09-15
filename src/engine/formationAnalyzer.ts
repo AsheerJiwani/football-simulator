@@ -226,20 +226,27 @@ export class FormationAnalyzer {
   }
 
   private determineStrength(players: Player[], distribution: { left: number; right: number; backfield: number }): FormationStrength {
-    // Priority 1: TE side
+    // Priority 1: 3+ receiver surface (trips)
+    if (distribution.left >= 3) {
+      return 'left';
+    } else if (distribution.right >= 3) {
+      return 'right';
+    }
+
+    // Priority 2: TE side
     const te = players.find(p => p.playerType === 'TE');
     if (te) {
       return te.position.x < this.FIELD_CENTER ? 'left' : 'right';
     }
 
-    // Priority 2: 3-receiver surface
+    // Priority 3: More receivers to one side
     if (distribution.left > distribution.right) {
       return 'left';
     } else if (distribution.right > distribution.left) {
       return 'right';
     }
 
-    // Priority 3: RB alignment
+    // Priority 4: RB alignment
     const rb = players.find(p => p.playerType === 'RB');
     if (rb && Math.abs(rb.position.x - this.FIELD_CENTER) > 2) {
       return rb.position.x < this.FIELD_CENTER ? 'left' : 'right';
@@ -254,17 +261,7 @@ export class FormationAnalyzer {
     distribution: { left: number; right: number; backfield: number },
     receiverSets: ReceiverSet[]
   ): FormationType {
-    // Empty formation (no backs)
-    if (distribution.backfield === 0) {
-      return 'empty';
-    }
-
-    // Spread formation (4+ WRs)
-    if (receiverSets.includes('spread')) {
-      return 'spread';
-    }
-
-    // Bunch formation
+    // Bunch formation (priority over empty if bunch set is detected)
     if (receiverSets.includes('bunch')) {
       return 'bunch';
     }
@@ -272,6 +269,17 @@ export class FormationAnalyzer {
     // Trips formation
     if (receiverSets.includes('trips')) {
       return 'trips';
+    }
+
+    // Empty formation (no RBs or FBs - only check personnel, not distribution)
+    const hasRBorFB = players.some(p => p.playerType === 'RB' || p.playerType === 'FB');
+    if (!hasRBorFB) {
+      return 'empty';
+    }
+
+    // Spread formation (4+ WRs)
+    if (receiverSets.includes('spread')) {
+      return 'spread';
     }
 
     // Heavy formation (2+ TEs or 2+ RBs)

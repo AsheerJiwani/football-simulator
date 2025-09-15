@@ -187,6 +187,9 @@ describe('Formation Analysis and Defensive Adjustments', () => {
       const defenders = createDefenders();
       const offensivePlayers = createOffensivePlayers();
 
+      // Assign a defender to cover WR3 for Cover 0 test
+      defenders[0].coverageAssignment = 'WR3'; // CB1 covers WR3
+
       const motion = {
         type: 'fly' as const,
         playerId: 'WR3',

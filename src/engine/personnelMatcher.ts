@@ -182,11 +182,6 @@ export class PersonnelMatcher {
       }
     }
 
-    // Long yardage situations
-    if (distance >= 15) {
-      return 'Dime'; // Prevent defense
-    }
-
     // 3rd down adjustments
     if (down === 3) {
       if (distance >= 7) {
@@ -200,9 +195,14 @@ export class PersonnelMatcher {
     if (down === 4) {
       if (distance <= 1) {
         return 'Goal Line'; // Short yardage
-      } else {
-        return 'Dime'; // Hail Mary defense
+      } else if (distance >= 15) {
+        return 'Dime'; // Prevent defense for very long yardage
       }
+    }
+
+    // Long yardage situations (non-3rd down)
+    if (distance >= 20) {
+      return 'Dime'; // Prevent defense
     }
 
     // Default to offensive personnel match
