@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { DndContext, DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { usePlayers, useBall, useGamePhase, useIsShowingDefense, useIsShowingRoutes, useGameState, useGameStore, usePlayersWithUpdate, useInitializeEngine } from '@/store/gameStore';
 import type { Player, Ball } from '@/engine/types';
@@ -14,7 +14,7 @@ interface EnhancedFieldCanvasProps {
   className?: string;
 }
 
-export default function EnhancedFieldCanvas({
+function EnhancedFieldCanvas({
   width = 600,
   height = 900,
   className = ''
@@ -63,22 +63,25 @@ export default function EnhancedFieldCanvas({
     y: (120 - fieldY) * scaleY,
   });
 
-  // Get formation anchors
-  const anchors = generateFormationAnchors(
+  // Memoize formation anchors to prevent recreation on every render
+  const anchors = useMemo(() => generateFormationAnchors(
     gameState.hashPosition || 'middle',
     gameState.lineOfScrimmage
-  );
+  ), [gameState.hashPosition, gameState.lineOfScrimmage]);
 
-  // Mark occupied anchors
-  const occupiedAnchors = new Set<string>();
-  players.forEach(player => {
-    if (player.team === 'offense') {
-      const nearestAnchor = findNearestAnchor(player.position, anchors);
-      if (nearestAnchor) {
-        occupiedAnchors.add(nearestAnchor.id);
+  // Memoize occupied anchors calculation
+  const occupiedAnchors = useMemo(() => {
+    const occupied = new Set<string>();
+    players.forEach(player => {
+      if (player.team === 'offense') {
+        const nearestAnchor = findNearestAnchor(player.position, anchors);
+        if (nearestAnchor) {
+          occupied.add(nearestAnchor.id);
+        }
       }
-    }
-  });
+    });
+    return occupied;
+  }, [players, anchors]);
 
   function findNearestAnchor(position: { x: number; y: number }, anchors: FormationAnchor[]): FormationAnchor | null {
     let nearest: FormationAnchor | null = null;
@@ -630,3 +633,5 @@ export default function EnhancedFieldCanvas({
     </DndContext>
   );
 }
+
+export default memo(EnhancedFieldCanvas);

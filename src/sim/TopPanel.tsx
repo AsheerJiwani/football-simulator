@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { DataLoader } from '@/lib/dataLoader';
 import personnelData from '@/data/personnel.json';
@@ -26,11 +27,12 @@ export default function TopPanel() {
   const conceptOptions = DataLoader.getConceptOptions();
   const coverageOptions = DataLoader.getCoverageOptions();
 
-  const personnelOptions = Object.entries(personnelData).map(([key, data]) => ({
-    value: key,
-    label: data.name,
-    description: data.description
-  }));
+  const personnelOptions = useMemo(() =>
+    Object.entries(personnelData).map(([key, data]) => ({
+      value: key,
+      label: data.name,
+      description: data.description
+    })), []);
 
   return (
     <div className="bg-gray-900 border-b-2 border-gray-700 p-4">

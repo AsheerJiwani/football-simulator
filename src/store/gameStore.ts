@@ -381,9 +381,13 @@ export const useGameStore = create<GameStore>()(
             const currentState = engine.getGameState();
 
             set((state) => {
-              // Only update if state has actually changed
-              if (state.gameState.phase !== currentState.phase ||
-                  state.gameState !== currentState) {
+              // Only update if specific state properties have actually changed
+              const hasPhaseChanged = state.gameState.phase !== currentState.phase;
+              const hasTimeChanged = state.gameState.timeElapsed !== currentState.timeElapsed;
+              const hasBallStateChanged = state.gameState.ball.state !== currentState.ball.state;
+              const hasPlayersChanged = state.gameState.players.length !== currentState.players.length;
+
+              if (hasPhaseChanged || hasTimeChanged || hasBallStateChanged || hasPlayersChanged) {
                 return {
                   ...state,
                   gameState: currentState,
