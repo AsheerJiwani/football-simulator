@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { DndContext, DragEndEvent, DragStartEvent } from '@dnd-kit/core';
-import { usePlayers, useBall, useGamePhase, useIsShowingDefense, useIsShowingRoutes, useGameState, useGameStore, usePlayersWithUpdate, useInitializeEngine } from '@/store/gameStore';
+import { usePlayers, useBall, useGamePhase, useIsShowingDefense, useIsShowingRoutes, useGameState, useGameStore, useInitializeEngine } from '@/store/gameStore';
 import type { Player, Ball } from '@/engine/types';
 import ZoneBubbles from './ZoneBubbles';
 import DraggablePlayer from './DraggablePlayer';
@@ -29,35 +29,45 @@ function EnhancedFieldCanvas({
   const clearCustomPositions = useGameStore(state => state.clearCustomPositions);
   const initializeEngine = useInitializeEngine();
 
-  // Enhanced selector to force re-renders when state changes
-  const { players: playersWithUpdate, lastUpdate } = usePlayersWithUpdate();
+  // We're using the regular players selector since we don't need forced re-renders
+  // The component will re-render naturally when players change
 
   // Initialize engine on client mount (only once)
   const hasInitialized = useRef(false);
   const isInitializing = useRef(false);
+  const initTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
-    if (!hasInitialized.current && !isInitializing.current && typeof window !== 'undefined') {
-      isInitializing.current = true;
+    // Only initialize once on mount, and only on client side
+    if (hasInitialized.current || isInitializing.current || typeof window === 'undefined') {
+      return;
+    }
 
-      // Add a small delay to ensure all components are mounted
-      const timer = setTimeout(() => {
-        try {
+    isInitializing.current = true;
+
+    // Add a small delay to ensure all components are mounted
+    initTimeoutRef.current = setTimeout(() => {
+      try {
+        // Check again to prevent double initialization
+        if (!hasInitialized.current) {
           initializeEngine();
           hasInitialized.current = true;
-        } catch (error) {
-          console.error('Engine initialization failed:', error);
-        } finally {
-          isInitializing.current = false;
         }
-      }, 100);
-
-      return () => {
-        clearTimeout(timer);
+      } catch (error) {
+        console.error('Engine initialization failed:', error);
+      } finally {
         isInitializing.current = false;
-      };
-    }
-  }, []); // Empty dependencies - only run once on mount since initializeEngine is stable
+      }
+    }, 100);
+
+    return () => {
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
+      }
+      // Don't reset isInitializing in cleanup to prevent re-initialization
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Intentionally empty - we only want this to run once on mount
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedPlayer, setDraggedPlayer] = useState<Player | null>(null);

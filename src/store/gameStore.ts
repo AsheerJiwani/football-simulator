@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { useMemo } from 'react';
 import type { GameState, PlayConcept, Coverage } from '@/engine/types';
 import { FootballEngine } from '@/engine/Engine';
 import { DataLoader, GameData } from '@/lib/dataLoader';
@@ -49,10 +50,8 @@ interface GameStore {
   initializeEngine: () => void;
 }
 
-// Create a separate function to initialize the engine to avoid re-creation
-// Only initialize client-side to avoid SSR issues
-const createInitialEngine = () => {
-  // Always return defaults first
+// Create a separate function to get initial defaults
+const getInitialDefaults = () => {
   const defaults = {
     concept: 'slant-flat',
     coverage: 'cover-1',
@@ -61,55 +60,33 @@ const createInitialEngine = () => {
     gameMode: 'free-play' as const
   };
 
-  if (typeof window === 'undefined') {
-    // Return minimal server-side state
-    return {
-      engine: null,
-      defaults
-    };
-  }
-
+  // Try to get defaults from GameData if available
   try {
-    const engine = new FootballEngine();
-
-    // Load default data
-    const gameDefaults = GameData.getDefaults();
-    const defaultConcept = DataLoader.getConcept(gameDefaults.concept);
-    const defaultCoverage = DataLoader.getCoverage(gameDefaults.coverage);
-
-    // Initialize engine with defaults
-    if (defaultConcept) {
-      engine.setPlayConcept(defaultConcept);
+    if (typeof window !== 'undefined') {
+      const gameDefaults = GameData.getDefaults();
+      return gameDefaults;
     }
-    if (defaultCoverage) {
-      engine.setCoverage(defaultCoverage);
-    }
-    engine.setSackTime(gameDefaults.sackTime);
-
-    // Validate that both offense and defense are properly set up
-    engine.validateSetup();
-
-    return { engine, defaults: gameDefaults };
   } catch (error) {
-    console.error('Failed to initialize engine:', error);
-    return { engine: null, defaults };
+    // Fallback to hardcoded defaults
   }
+
+  return defaults;
 };
 
 export const useGameStore = create<GameStore>()(
   subscribeWithSelector((set, get) => {
-    const { engine, defaults } = createInitialEngine();
+    const defaults = getInitialDefaults();
 
     return {
-        // Initial state
-        engine,
+        // Initial state - engine starts as null and is initialized client-side
+        engine: null,
         selectedConcept: defaults.concept,
         selectedCoverage: defaults.coverage,
         selectedPersonnel: (defaults as any).personnel || '11',
         sackTime: defaults.sackTime,
         gameMode: defaults.gameMode,
         isPlaying: false,
-        gameState: engine?.getGameState() || {
+        gameState: {
           phase: 'pre-snap' as const,
           timeElapsed: 0,
           sackTime: 5.0,
@@ -496,24 +473,23 @@ export const useGameStore = create<GameStore>()(
 
         // Multiple safeguards to prevent double initialization
         if (state.engine) {
-          console.log('Engine already initialized, skipping');
-          return;
+          return; // Already initialized, no need to log
         }
 
         if (typeof window === 'undefined') {
-          console.log('Server-side detected, skipping engine initialization');
-          return;
+          return; // Server-side, skip silently
         }
 
-        // Check if we're already in the process of initializing
-        if ((globalThis as any).__footballEngineInitializing) {
-          console.log('Engine initialization already in progress, skipping');
-          return;
+        // Use a more robust locking mechanism
+        const globalKey = '__footballEngineInit';
+        const globalState = (globalThis as any)[globalKey] || {};
+
+        if (globalState.initialized || globalState.initializing) {
+          return; // Already initialized or in progress
         }
 
         try {
-          (globalThis as any).__footballEngineInitializing = true;
-          console.log('Starting engine initialization...');
+          (globalThis as any)[globalKey] = { ...globalState, initializing: true };
 
           const newEngine = new FootballEngine();
           const { selectedConcept, selectedCoverage, sackTime } = state;
@@ -537,7 +513,6 @@ export const useGameStore = create<GameStore>()(
           set((currentState) => {
             // Double-check that engine is still null before setting
             if (currentState.engine) {
-              console.log('Engine was initialized by another call, skipping set');
               return currentState;
             }
 
@@ -546,15 +521,15 @@ export const useGameStore = create<GameStore>()(
               engine: newEngine,
               gameState: newEngine.getGameState(),
               lastRouteUpdate: Date.now(),
-              lastDefenseUpdate: Date.now()
+              lastDefenseUpdate: Date.now(),
+              stateVersion: currentState.stateVersion + 1
             };
           });
 
-          console.log('Engine initialization completed successfully');
+          (globalThis as any)[globalKey] = { initialized: true, initializing: false };
         } catch (error) {
           console.error('Failed to initialize engine on client:', error);
-        } finally {
-          (globalThis as any).__footballEngineInitializing = false;
+          (globalThis as any)[globalKey] = { initialized: false, initializing: false };
         }
       },
     };
@@ -570,10 +545,12 @@ export const useIsShowingDefense = () => useGameStore(state => state.gameState.i
 export const useIsShowingRoutes = () => useGameStore(state => state.gameState.isShowingRoutes);
 
 // Enhanced selector that includes stateVersion for forcing re-renders
-export const usePlayersWithUpdate = () => useGameStore(state => ({
-  players: state.gameState.players,
-  lastUpdate: state.stateVersion
-}));
+// Use shallow equality check to prevent unnecessary re-renders
+export const usePlayersWithUpdate = () => {
+  const players = useGameStore(state => state.gameState.players);
+  const stateVersion = useGameStore(state => state.stateVersion);
+  return useMemo(() => ({ players, lastUpdate: stateVersion }), [players, stateVersion]);
+};
 
 // Computed selectors
 export const usePlayOutcome = () => useGameStore(state => state.gameState.outcome);
