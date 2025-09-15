@@ -36,6 +36,10 @@ import {
   adjustZoneWidthsForReceiverDistribution
 } from './zoneCoordination';
 import { DefensiveMovement } from './movement';
+import { FormationAnalyzer } from './formationAnalyzer';
+import { PersonnelMatcher } from './personnelMatcher';
+import { CoverageAdjustments } from './coverageAdjustments';
+import { PostSnapRules } from './postSnapRules';
 
 export class FootballEngine {
   private gameState: GameState;
@@ -44,6 +48,10 @@ export class FootballEngine {
   private lastTickTime: number = 0;
   private isRunning: boolean = false;
   private defensiveMovement: DefensiveMovement;
+  private formationAnalyzer: FormationAnalyzer;
+  private personnelMatcher: PersonnelMatcher;
+  private coverageAdjustments: CoverageAdjustments;
+  private postSnapRules: PostSnapRules;
 
   constructor(config?: Partial<GameConfig>) {
     this.config = this.getDefaultConfig();
@@ -53,6 +61,10 @@ export class FootballEngine {
 
     this.gameState = this.initializeGameState();
     this.defensiveMovement = new DefensiveMovement();
+    this.formationAnalyzer = new FormationAnalyzer();
+    this.personnelMatcher = new PersonnelMatcher();
+    this.coverageAdjustments = new CoverageAdjustments();
+    this.postSnapRules = new PostSnapRules();
   }
 
   private getDefaultConfig(): GameConfig {
@@ -522,11 +534,14 @@ export class FootballEngine {
     // If no defenders exist yet, return (defense not set up)
     if (defensePlayers.length === 0) return;
 
-    // Enhanced formation analysis using NFL-accurate rules
+    // Use new FormationAnalyzer for comprehensive analysis
+    const formationAnalysis = this.formationAnalyzer.analyzeFormation(offensePlayers);
+
+    // Enhanced formation analysis using NFL-accurate rules (legacy compatibility)
     const formation = this.analyzeFormationComprehensive(offensePlayers);
 
     // Apply NFL-accurate strength determination
-    const formationStrength = this.determineFormationStrength(formation, offensePlayers);
+    const formationStrength = formationAnalysis.strength;
 
     // First, reassign coverage responsibilities based on new formation
     this.reassignCoverageResponsibilities(offensePlayers, defensePlayers, formation);
@@ -537,8 +552,29 @@ export class FootballEngine {
     // Store old positions to ensure changes are detectable
     const oldPositions = new Map(defensePlayers.map(d => [d.id, { ...d.position }]));
 
-    // Apply NFL-accurate coverage-specific realignment
-    this.applyCoverageSpecificRealignment(coverage, defensePlayers, formation, formationStrength);
+    // Apply new coverage adjustment system
+    const adjustments = this.coverageAdjustments.applyCoverageSpecificAdjustments(
+      coverage.type,
+      defensePlayers,
+      offensePlayers,
+      formationAnalysis
+    );
+
+    // Apply adjustments to defenders
+    for (const adjustment of adjustments) {
+      const defender = defensePlayers.find(d => d.id === adjustment.defenderId);
+      if (defender) {
+        defender.position = adjustment.newPosition;
+        if (adjustment.newResponsibility) {
+          defender.coverageResponsibility = adjustment.newResponsibility;
+        }
+      }
+    }
+
+    // Apply NFL-accurate coverage-specific realignment (legacy fallback)
+    // Convert 'balanced' to 'right' as default for legacy method
+    const legacyStrength = formationStrength === 'balanced' ? 'right' : formationStrength;
+    this.applyCoverageSpecificRealignment(coverage, defensePlayers, formation, legacyStrength);
 
     // Ensure at least some positional changes occur to trigger UI updates
     // Add more significant adjustments if positions haven't changed much
@@ -1064,12 +1100,31 @@ export class FootballEngine {
   private handleMotionAdjustments(offensePlayers: Player[], defensePlayers: Player[]): void {
     // Check if there's an active motion player
     const motionPlayer = offensePlayers.find(p => p.hasMotion);
-    if (!motionPlayer || !this.gameState.coverage) return;
+    if (!motionPlayer || !this.gameState.coverage || !this.gameState.motion) return;
 
     const coverage = this.gameState.coverage;
     const centerX = 26.665;
     const originalSide = motionPlayer.position.x < centerX ? 'left' : 'right';
     const motionCrossesFormation = this.doesMotionCrossFormation(motionPlayer, offensePlayers);
+
+    // Use new motion response system
+    const motionAdjustments = this.coverageAdjustments.handleMotionAdjustments(
+      coverage.type,
+      this.gameState.motion,
+      defensePlayers,
+      offensePlayers
+    );
+
+    // Apply motion adjustments
+    for (const adjustment of motionAdjustments) {
+      const defender = defensePlayers.find(d => d.id === adjustment.defenderId);
+      if (defender) {
+        defender.position = adjustment.newPosition;
+        if (adjustment.newResponsibility) {
+          defender.coverageResponsibility = adjustment.newResponsibility;
+        }
+      }
+    }
 
     // Enhanced NFL motion rules from research
     switch (coverage.type) {
@@ -2288,6 +2343,19 @@ export class FootballEngine {
 
     // Update player positions first
     this.updatePlayerPositions(deltaTime);
+
+    // Apply post-snap execution rules
+    if (this.gameState.coverage) {
+      const offensePlayers = this.gameState.players.filter(p => p.team === 'offense');
+      const defensePlayers = this.gameState.players.filter(p => p.team === 'defense');
+
+      this.postSnapRules.applyPostSnapRules(
+        defensePlayers,
+        offensePlayers,
+        this.gameState.coverage.type,
+        this.gameState.phase
+      );
+    }
 
     // Update sack time based on blocked blitzers (dynamic)
     this.updateSackTimeForBlockedBlitzers();
