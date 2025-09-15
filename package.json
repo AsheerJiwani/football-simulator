@@ -17,6 +17,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "framer-motion": "^12.23.12",
     "next": "15.5.3",
+    "puppeteer": "^24.21.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "zustand": "^5.0.8"

@@ -4088,6 +4088,19 @@ export class FootballEngine {
     // Create offensive players based on formation
     Object.entries(concept.formation.positions).forEach(([playerId, position]) => {
       const playerType = this.getPlayerTypeFromId(playerId);
+
+      // Debug: Log the calculation for the first player
+      if (playerId === 'QB1') {
+        console.log('🔍 QB1 Position Calculation:', JSON.stringify({
+          playerId,
+          basePosition: position,
+          hashOffset,
+          lineOfScrimmage: this.gameState.lineOfScrimmage,
+          calculatedX: position.x + hashOffset,
+          calculatedY: position.y + this.gameState.lineOfScrimmage
+        }, null, 2));
+      }
+
       // Adjust position relative to current LOS and hash
       const adjustedPosition = {
         x: position.x + hashOffset, // Apply hash offset to x position

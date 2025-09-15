@@ -549,6 +549,11 @@ export const useGameStore = create<GameStore>()(
   })
 );
 
+// Debug helper - expose store globally for debugging
+if (typeof window !== 'undefined') {
+  (window as any).__gameStore = useGameStore;
+}
+
 // Selector hooks for optimized re-renders
 export const useGameState = () => useGameStore(state => state.gameState);
 export const useGamePhase = () => useGameStore(state => state.gameState.phase);

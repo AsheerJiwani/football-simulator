@@ -507,6 +507,16 @@ function EnhancedFieldCanvas({
   const renderEnhancedPlayer = (player: Player) => {
     const position = fieldToSvg(player.position.x, player.position.y);
     const isOffense = player.team === 'offense';
+
+    // Debug: Log player rendering for first few players
+    if (typeof window !== 'undefined' && (player.id === 'QB1' || player.id === 'WR1')) {
+      console.log(`🎨 Rendering ${player.id}:`, JSON.stringify({
+        fieldPosition: player.position,
+        svgPosition: position,
+        scaleX,
+        scaleY
+      }, null, 2));
+    }
     const isDraggable = isOffense && gamePhase === 'pre-snap';
 
     const playerElement = (
