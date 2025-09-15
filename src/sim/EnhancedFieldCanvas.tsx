@@ -38,34 +38,28 @@ function EnhancedFieldCanvas({
   const initTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
+    console.log('🏈 EnhancedFieldCanvas: Effect starting', {
+      hasInitialized: hasInitialized.current,
+      isClient: typeof window !== 'undefined'
+    });
+
     // Only initialize once on mount, and only on client side
-    if (hasInitialized.current || isInitializing.current || typeof window === 'undefined') {
+    if (hasInitialized.current || typeof window === 'undefined') {
+      console.log('⏭️ EnhancedFieldCanvas: Skipping initialization (already done or server-side)');
       return;
     }
 
-    isInitializing.current = true;
+    console.log('🔄 EnhancedFieldCanvas: Initializing engine directly (no timeout)');
 
-    // Add a small delay to ensure all components are mounted
-    initTimeoutRef.current = setTimeout(() => {
-      try {
-        // Check again to prevent double initialization
-        if (!hasInitialized.current) {
-          initializeEngine();
-          hasInitialized.current = true;
-        }
-      } catch (error) {
-        console.error('Engine initialization failed:', error);
-      } finally {
-        isInitializing.current = false;
-      }
-    }, 100);
-
-    return () => {
-      if (initTimeoutRef.current) {
-        clearTimeout(initTimeoutRef.current);
-      }
-      // Don't reset isInitializing in cleanup to prevent re-initialization
-    };
+    try {
+      console.log('🚀 EnhancedFieldCanvas: About to call initializeEngine()');
+      initializeEngine();
+      hasInitialized.current = true;
+      console.log('✅ EnhancedFieldCanvas: initializeEngine() completed successfully');
+    } catch (error) {
+      console.error('❌ EnhancedFieldCanvas: Engine initialization failed:', error);
+      console.error('Stack trace:', error);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Intentionally empty - we only want this to run once on mount
 

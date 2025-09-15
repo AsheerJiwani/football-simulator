@@ -52,7 +52,9 @@ interface GameStore {
 }
 
 // Create a separate function to get initial defaults
+// IMPORTANT: This must return the same values on server and client to avoid hydration mismatch
 const getInitialDefaults = () => {
+  // Always use hardcoded defaults for initial state to ensure server/client consistency
   const defaults = {
     concept: 'slant-flat',
     coverage: 'cover-1',
@@ -61,16 +63,7 @@ const getInitialDefaults = () => {
     gameMode: 'free-play' as const
   };
 
-  // Try to get defaults from GameData if available
-  try {
-    if (typeof window !== 'undefined') {
-      const gameDefaults = GameData.getDefaults();
-      return gameDefaults;
-    }
-  } catch (error) {
-    // Fallback to hardcoded defaults
-  }
-
+  // We'll load GameData defaults after hydration in the initializeEngine method
   return defaults;
 };
 
