@@ -4025,10 +4025,16 @@ export class FootballEngine {
     if (!this.gameState.playConcept) return;
 
     const concept = this.gameState.playConcept;
-    console.log('🏈 setupPlayers: Setting up players for concept:', concept.name);
-    console.log('🏈 setupPlayers: Formation:', concept.formation.name);
-    console.log('🏈 setupPlayers: Formation positions:', concept.formation.positions);
-    console.log('🏈 setupPlayers: Current LOS:', this.gameState.lineOfScrimmage);
+
+    // Debug: Validate concept structure
+    if (!concept.formation || !concept.formation.positions) {
+      console.error('🚨 CONCEPT BUG: Invalid concept structure!', {
+        hasFormation: !!concept.formation,
+        hasPositions: !!concept.formation?.positions,
+        concept: concept
+      });
+      return;
+    }
     // Create a new array with only defensive players to ensure immutability
     const defensivePlayers = this.gameState.players.filter(p => p.team === 'defense');
 
@@ -4081,14 +4087,12 @@ export class FootballEngine {
 
     // Create offensive players based on formation
     Object.entries(concept.formation.positions).forEach(([playerId, position]) => {
-      console.log(`🏈 setupPlayers: Creating player ${playerId}, base position:`, position);
       const playerType = this.getPlayerTypeFromId(playerId);
       // Adjust position relative to current LOS and hash
       const adjustedPosition = {
         x: position.x + hashOffset, // Apply hash offset to x position
         y: position.y + this.gameState.lineOfScrimmage // Position is now relative to LOS (y=0)
       };
-      console.log(`🏈 setupPlayers: Adjusted position for ${playerId}:`, adjustedPosition);
       // Adjust route waypoints relative to current LOS
       let adjustedRoute = undefined;
       if (concept.routes[playerId]) {
@@ -4135,12 +4139,20 @@ export class FootballEngine {
 
     // Create a completely new players array
     this.gameState.players = [...newOffensivePlayers, ...defensivePlayers];
-    console.log('🏈 setupPlayers: Final players array:', this.gameState.players.map(p => ({
-      id: p.id,
-      team: p.team,
-      position: p.position,
-      playerType: p.playerType
-    })));
+
+    // Debug: Check if any players have (0,0) positions
+    const zeroPositionPlayers = this.gameState.players.filter(p => p.position.x === 0 && p.position.y === 0);
+    if (zeroPositionPlayers.length > 0) {
+      console.error('🚨 POSITION BUG: Players with (0,0) positions detected!', zeroPositionPlayers.map(p => ({
+        id: p.id,
+        team: p.team,
+        position: p.position,
+        playerType: p.playerType
+      })));
+      console.error('🚨 Concept formation positions:', concept.formation.positions);
+      console.error('🚨 Line of scrimmage:', this.gameState.lineOfScrimmage);
+      console.error('🚨 Hash offset:', hashOffset);
+    }
   }
 
   private setupDefense(previousCoverage?: Coverage): void {
