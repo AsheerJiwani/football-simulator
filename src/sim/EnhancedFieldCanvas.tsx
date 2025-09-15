@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DndContext, DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { usePlayers, useBall, useGamePhase, useIsShowingDefense, useIsShowingRoutes, useGameState, useGameStore, usePlayersWithUpdate, useInitializeEngine } from '@/store/gameStore';
 import type { Player, Ball } from '@/engine/types';
@@ -31,10 +31,14 @@ export default function EnhancedFieldCanvas({
   // Enhanced selector to force re-renders when state changes
   const { players: playersWithUpdate, lastUpdate } = usePlayersWithUpdate();
 
-  // Initialize engine on client mount
+  // Initialize engine on client mount (only once)
+  const hasInitialized = useRef(false);
   useEffect(() => {
-    initializeEngine();
-  }, [initializeEngine]);
+    if (!hasInitialized.current) {
+      initializeEngine();
+      hasInitialized.current = true;
+    }
+  }, []); // Empty dependency array to run only once
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draggedPlayer, setDraggedPlayer] = useState<Player | null>(null);
