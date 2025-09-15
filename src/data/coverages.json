@@ -55,9 +55,15 @@
         }
       },
       {
-        "defenderId": "LB3",
-        "type": "spy",
-        "target": "QB1"
+        "defenderId": "LB2",
+        "type": "zone",
+        "zone": {
+          "name": "hole",
+          "center": { "x": 26.665, "y": 10 },
+          "width": 13.33,
+          "height": 8,
+          "depth": "intermediate"
+        }
       }
     ]
   },

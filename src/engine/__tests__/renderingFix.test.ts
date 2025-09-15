@@ -80,12 +80,15 @@ describe('Coverage/Play Selection Rendering Fix', () => {
     const offenseAfter = playersAfter.filter(p => p.team === 'offense');
 
     // At least some offensive players should have different positions
-    const positionsChanged = offenseAfter.some((player, i) => {
-      const beforePos = offenseBefore[i]?.position;
-      return beforePos && (
-        player.position.x !== beforePos.x ||
-        player.position.y !== beforePos.y
-      );
+    // Since formations are different (trips-right vs singleback), positions will differ
+    const positionsChanged = offenseAfter.some((playerAfter) => {
+      // Find corresponding player by type in the before state
+      const playerBefore = offenseBefore.find(p => p.playerType === playerAfter.playerType);
+      if (!playerBefore) return true; // New player type means positions changed
+
+      // Check if this player's position changed
+      return playerAfter.position.x !== playerBefore.position.x ||
+             playerAfter.position.y !== playerBefore.position.y;
     });
 
     expect(positionsChanged).toBe(true);

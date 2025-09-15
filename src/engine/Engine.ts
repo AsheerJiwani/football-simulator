@@ -35,11 +35,16 @@ import {
   calculateZoneOverlaps,
   adjustZoneWidthsForReceiverDistribution
 } from './zoneCoordination';
-import { DefensiveMovement } from './movement';
+import { ReceiverMovement } from './receiverMovement';
 import { FormationAnalyzer } from './formationAnalyzer';
 import { PersonnelMatcher } from './personnelMatcher';
 import { CoverageAdjustments } from './coverageAdjustments';
 import { PostSnapRules } from './postSnapRules';
+import { updateDefensiveMovement, calculateDefensiveMovement } from './defensiveMovement';
+import { QuarterbackMovement, type QBMovementConfig } from './quarterbackMovement';
+import { HotRoutesSystem } from './hotRoutes';
+import { OptionRoutesSystem } from './optionRoutes';
+import { RubRoutesSystem } from './rubRoutes';
 
 export class FootballEngine {
   private gameState: GameState;
@@ -47,11 +52,14 @@ export class FootballEngine {
   private animationFrameId?: number;
   private lastTickTime: number = 0;
   private isRunning: boolean = false;
-  private defensiveMovement: DefensiveMovement;
+  private receiverMovement: ReceiverMovement;
   private formationAnalyzer: FormationAnalyzer;
   private personnelMatcher: PersonnelMatcher;
   private coverageAdjustments: CoverageAdjustments;
   private postSnapRules: PostSnapRules;
+  private hotRoutesSystem: HotRoutesSystem;
+  private optionRoutesSystem: OptionRoutesSystem;
+  private rubRoutesSystem: RubRoutesSystem;
   private preSnapState?: {
     currentDown: number;
     yardsToGo: number;
@@ -68,11 +76,14 @@ export class FootballEngine {
     }
 
     this.gameState = this.initializeGameState();
-    this.defensiveMovement = new DefensiveMovement();
+    this.receiverMovement = new ReceiverMovement();
     this.formationAnalyzer = new FormationAnalyzer();
     this.personnelMatcher = new PersonnelMatcher();
     this.coverageAdjustments = new CoverageAdjustments();
     this.postSnapRules = new PostSnapRules();
+    this.hotRoutesSystem = new HotRoutesSystem();
+    this.optionRoutesSystem = new OptionRoutesSystem();
+    this.rubRoutesSystem = new RubRoutesSystem();
   }
 
   private getDefaultConfig(): GameConfig {
@@ -306,11 +317,25 @@ export class FootballEngine {
   }
 
   public setLineOfScrimmage(yardLine: number): void {
-    // Clamp between goal lines (0-100)
-    this.gameState.lineOfScrimmage = Math.max(1, Math.min(99, yardLine));
-    this.gameState.ballOn = this.gameState.lineOfScrimmage;
-    // Update ball position
-    this.gameState.ball.position.y = this.gameState.lineOfScrimmage;
+    // Check for safety (ball at or behind offensive 1-yard line)
+    if (yardLine <= 1) {
+      console.warn('Safety! Ball would be at or behind offensive 1-yard line. Resetting to offensive 30-yard line.');
+      // Safety results in turnover and reset to 30-yard line
+      this.gameState.lineOfScrimmage = 30;
+      this.gameState.ballOn = 30;
+      this.gameState.currentDown = 1;
+      this.gameState.yardsToGo = 10;
+      this.gameState.driveStartPosition = 30;
+      // Update ball position
+      this.gameState.ball.position.y = 30;
+    } else {
+      // Normal LOS update - clamp between 2 and 99 to avoid safety zone
+      this.gameState.lineOfScrimmage = Math.max(2, Math.min(99, yardLine));
+      this.gameState.ballOn = this.gameState.lineOfScrimmage;
+      // Update ball position
+      this.gameState.ball.position.y = this.gameState.lineOfScrimmage;
+    }
+
     // Re-setup players at new LOS
     if (this.gameState.playConcept) {
       this.setupPlayers();
@@ -376,8 +401,11 @@ export class FootballEngine {
       this.gameState.currentDown = 1;
       this.gameState.yardsToGo = 10;
       this.gameState.driveStartPosition = 30;
+    } else if (newLOS <= 1) {
+      // Safety check - setLineOfScrimmage will handle the safety logic
+      this.setLineOfScrimmage(newLOS);
     } else {
-      // Continue drive
+      // Continue drive normally
       this.setLineOfScrimmage(newLOS);
     }
 
@@ -989,6 +1017,9 @@ export class FootballEngine {
         }
       });
 
+      // Also update zone responsibilities from coverage definition for mixed coverage (Cover 1)
+      this.updateZoneResponsibilitiesFromDefinition(defensePlayers, coverage);
+
     } else {
       // For zone coverage, update zone assignments based on formation strength
       const formation = analyzeFormation(offensePlayers);
@@ -1031,6 +1062,31 @@ export class FootballEngine {
         });
       }
     }
+  }
+
+  private updateZoneResponsibilitiesFromDefinition(defensePlayers: Player[], coverage: Coverage): void {
+    // Update zone responsibilities from the coverage definition
+    // This ensures existing defenders get updated zone assignments when the coverage definition changes
+    coverage.responsibilities.forEach(responsibilityDef => {
+      const defender = defensePlayers.find(d => d.id === responsibilityDef.defenderId);
+      if (defender && responsibilityDef.type === 'zone' && responsibilityDef.zone) {
+        // Update the zone responsibility
+        defender.coverageResponsibility = {
+          defenderId: responsibilityDef.defenderId,
+          type: 'zone',
+          zone: { ...responsibilityDef.zone }
+        };
+
+        // Recalculate position for specific zone types that need LOS-relative positioning
+        if (responsibilityDef.zone.name === 'hole' && defender.playerType === 'LB') {
+          // Hole defender should be positioned 10 yards on defensive side of LOS
+          defender.position = {
+            x: 26.665, // Center field
+            y: this.gameState.lineOfScrimmage + 10 // 10 yards on defensive side
+          };
+        }
+      }
+    });
   }
 
   private adjustZoneCoverageResponsibilities(defensePlayers: Player[], formation: any, coverageType: string): void {
@@ -1984,6 +2040,315 @@ export class FootballEngine {
     return true;
   }
 
+  /**
+   * Apply hot route based on defensive pressure or coverage
+   */
+  public applyHotRoute(playerId: string, trigger: 'blitz' | 'coverage' | 'pressure'): boolean {
+    // Can only apply hot routes pre-snap
+    if (this.gameState.phase !== 'pre-snap') return false;
+
+    // Check audible limit
+    if (this.gameState.audiblesUsed >= this.gameState.maxAudibles) {
+      return false;
+    }
+
+    const player = this.gameState.players.find(p =>
+      p.id === playerId &&
+      p.team === 'offense' &&
+      p.isEligible &&
+      p.playerType !== 'QB'
+    );
+
+    if (!player || !player.route) return false;
+
+    // Get hot route recommendation
+    const hotRoute = this.hotRoutesSystem.getHotRoute(player.route.type, trigger);
+    if (!hotRoute) return false;
+
+    // Generate new route
+    const newRoute = this.generateRouteFromType(hotRoute.toRoute, player.position);
+    if (!newRoute) return false;
+
+    // Update player's route
+    player.route = newRoute;
+    this.gameState.audiblesUsed++;
+
+    // Trigger defensive adjustments
+    this.realignDefense();
+
+    return true;
+  }
+
+  /**
+   * Apply sight adjustment based on coverage and receiver position
+   */
+  public applySightAdjustment(playerId: string, receiverPosition: 'outside' | 'slot' | 'tight'): boolean {
+    // Can only apply sight adjustments pre-snap
+    if (this.gameState.phase !== 'pre-snap') return false;
+
+    const player = this.gameState.players.find(p =>
+      p.id === playerId &&
+      p.team === 'offense' &&
+      p.isEligible &&
+      p.playerType !== 'QB'
+    );
+
+    if (!player || !this.gameState.coverage) return false;
+
+    // Apply sight adjustment
+    const adjustedRoute = this.hotRoutesSystem.applySightAdjustment(
+      player,
+      this.gameState.coverage.type,
+      receiverPosition
+    );
+
+    if (!adjustedRoute) return false;
+
+    player.route = adjustedRoute;
+
+    // Trigger defensive adjustments
+    this.realignDefense();
+
+    return true;
+  }
+
+  /**
+   * Apply automatic sight adjustments for all receivers
+   */
+  public applyAutomaticSightAdjustments(): boolean {
+    if (this.gameState.phase !== 'pre-snap' || !this.gameState.coverage) return false;
+
+    // Analyze formation strength
+    const offensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
+    const formationAnalysis = this.formationAnalyzer.analyzeFormation(offensivePlayers);
+    const formationStrength = formationAnalysis.strength;
+
+    // Apply sight adjustments
+    const updatedPlayers = this.hotRoutesSystem.applyAutomaticSightAdjustments(
+      this.gameState.players,
+      this.gameState.coverage.type,
+      formationStrength
+    );
+
+    // Update game state with adjusted routes
+    this.gameState.players = updatedPlayers;
+
+    // Trigger defensive adjustments
+    this.realignDefense();
+
+    return true;
+  }
+
+  /**
+   * Get quarterback read progression for current coverage
+   */
+  public getQBReadProgression(): {
+    primaryRead: 'slot' | 'outside' | 'tight';
+    secondaryRead: 'slot' | 'outside' | 'tight';
+    checkDown: 'slot' | 'outside' | 'tight' | 'RB';
+    timing: number[];
+  } | null {
+    if (!this.gameState.coverage) return null;
+
+    const offensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
+    const formationAnalysis = this.formationAnalyzer.analyzeFormation(offensivePlayers);
+    const formationStrength = formationAnalysis.strength;
+
+    return this.hotRoutesSystem.getQBReadProgression(
+      this.gameState.coverage.type,
+      formationStrength
+    );
+  }
+
+  /**
+   * Analyze pick play potential and setup coordination
+   */
+  public analyzePickPlays(): {
+    hasPickPotential: boolean;
+    pickType: 'mesh' | 'smash' | 'stack' | 'bunch' | null;
+    pickReceivers: Player[];
+    legalPickZones: Vector2D[];
+  } {
+    const offensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
+    return this.rubRoutesSystem.analyzePickPotential(offensivePlayers);
+  }
+
+  /**
+   * Execute pick play coordination during play
+   */
+  public executePickPlay(conceptName: string, pickReceivers: Player[]): {
+    separationCreated: number;
+    opennessBonus: number;
+    pickExecuted: boolean;
+    throwWindow: { start: number; end: number };
+  } {
+    if (!this.gameState.coverage || this.gameState.phase !== 'post-snap') {
+      return {
+        separationCreated: 0,
+        opennessBonus: 0,
+        pickExecuted: false,
+        throwWindow: { start: 0, end: 0 }
+      };
+    }
+
+    return this.rubRoutesSystem.executePickPlay(
+      conceptName,
+      pickReceivers,
+      this.gameState.timeElapsed,
+      this.gameState.coverage.type
+    );
+  }
+
+  /**
+   * Apply rub routes coordination pre-snap
+   */
+  public applyRubRoutes(pickType: 'mesh' | 'smash' | 'stack' | 'bunch'): boolean {
+    if (this.gameState.phase !== 'pre-snap') return false;
+
+    const offensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
+    const eligibleReceivers = offensivePlayers.filter(p => p.isEligible && p.playerType !== 'QB');
+
+    // Update routes for pick coordination
+    const updatedReceivers = this.rubRoutesSystem.updateRoutesForPick(
+      eligibleReceivers,
+      pickType,
+      this.gameState.timeElapsed
+    );
+
+    // Apply updates to game state
+    updatedReceivers.forEach(updatedReceiver => {
+      const player = this.gameState.players.find(p => p.id === updatedReceiver.id);
+      if (player) {
+        player.route = updatedReceiver.route;
+      }
+    });
+
+    // Apply defensive response
+    if (this.gameState.coverage) {
+      const defenders = this.gameState.players.filter(p => p.team === 'defense');
+      const updatedDefenders = this.rubRoutesSystem.applyDefensivePickResponse(
+        defenders,
+        pickType,
+        this.gameState.coverage.type
+      );
+
+      // Apply defensive updates to game state
+      updatedDefenders.forEach(updatedDefender => {
+        const player = this.gameState.players.find(p => p.id === updatedDefender.id);
+        if (player) {
+          player.coverageResponsibility = updatedDefender.coverageResponsibility;
+        }
+      });
+    }
+
+    return true;
+  }
+
+  /**
+   * Process option route decisions for receivers
+   */
+  private processOptionRoutes(deltaTime: number): void {
+    if (!this.gameState.coverage) return;
+
+    const receivers = this.gameState.players.filter(p =>
+      p.team === 'offense' &&
+      p.route &&
+      p.playerType !== 'QB' &&
+      !p.isBlocking
+    );
+
+    const defenders = this.gameState.players.filter(p => p.team === 'defense');
+
+    receivers.forEach(receiver => {
+      // Check if receiver should make option decision
+      if (!this.optionRoutesSystem.shouldMakeOptionDecision(
+        receiver,
+        this.gameState.timeElapsed,
+        this.gameState.coverage!.type
+      )) {
+        return;
+      }
+
+      // Find nearest defender
+      const nearestDefender = this.findNearestDefender(receiver, defenders);
+      if (!nearestDefender) return;
+
+      // Evaluate option route decision
+      const newRouteType = this.optionRoutesSystem.evaluateOptionRoute(
+        receiver,
+        nearestDefender,
+        this.gameState.coverage!.type,
+        this.gameState.timeElapsed
+      );
+
+      if (newRouteType) {
+        // Update receiver's route based on decision
+        receiver.route = this.optionRoutesSystem.updateRouteForOption(
+          receiver,
+          newRouteType,
+          receiver.position
+        );
+      }
+    });
+  }
+
+  /**
+   * Find nearest defender to a receiver
+   */
+  private findNearestDefender(receiver: Player, defenders: Player[]): Player | null {
+    let nearestDefender: Player | null = null;
+    let minDistance = Number.MAX_VALUE;
+
+    defenders.forEach(defender => {
+      const distance = Math.sqrt(
+        Math.pow(receiver.position.x - defender.position.x, 2) +
+        Math.pow(receiver.position.y - defender.position.y, 2)
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestDefender = defender;
+      }
+    });
+
+    return nearestDefender;
+  }
+
+  /**
+   * Process pick plays and rub routes during play execution
+   */
+  private processPickPlays(deltaTime: number): void {
+    if (!this.gameState.coverage) return;
+
+    // Analyze current formation for pick potential
+    const pickAnalysis = this.analyzePickPlays();
+    if (!pickAnalysis.hasPickPotential || !pickAnalysis.pickType) return;
+
+    // Execute pick play if in timing window
+    const pickResult = this.executePickPlay('mesh_concept', pickAnalysis.pickReceivers);
+    if (pickResult.pickExecuted) {
+      // Apply separation and openness bonus to receivers involved in pick
+      pickAnalysis.pickReceivers.forEach(receiver => {
+        // Find nearest defender to apply separation
+        const defenders = this.gameState.players.filter(p => p.team === 'defense');
+        const nearestDefender = this.findNearestDefender(receiver, defenders);
+
+        if (nearestDefender) {
+          // Create temporary separation by adjusting defender position slightly
+          const separationVector = Vector.normalize({
+            x: receiver.position.x - nearestDefender.position.x,
+            y: receiver.position.y - nearestDefender.position.y
+          });
+
+          nearestDefender.position = {
+            x: nearestDefender.position.x - separationVector.x * (pickResult.separationCreated * 0.3),
+            y: nearestDefender.position.y - separationVector.y * (pickResult.separationCreated * 0.3)
+          };
+        }
+      });
+    }
+  }
+
   private generateRouteFromType(routeType: RouteType, startPos: Vector2D): Route | null {
     // Generate standard route patterns based on type
     const baseRoute: Route = {
@@ -2083,6 +2448,85 @@ export class FootballEngine {
         ];
         baseRoute.timing = [0, 1.5, 3.0];
         baseRoute.depth = 20;
+        break;
+
+      // Advanced route types
+      case 'mesh_cross':
+        baseRoute.waypoints = [
+          startPos,
+          { x: startPos.x + 8, y: startPos.y + 8 },
+          { x: startPos.x - 15, y: startPos.y + 12 }
+        ];
+        baseRoute.timing = [0, 1.8, 2.5];
+        baseRoute.depth = 8;
+        break;
+
+      case 'speed_out':
+        baseRoute.waypoints = [
+          startPos,
+          { x: startPos.x + 6, y: startPos.y + 6 }
+        ];
+        baseRoute.timing = [0, 1.5];
+        baseRoute.depth = 6;
+        break;
+
+      case 'seam':
+        baseRoute.waypoints = [
+          startPos,
+          { x: startPos.x + 2, y: startPos.y + 25 }
+        ];
+        baseRoute.timing = [0, 3.5];
+        baseRoute.depth = 25;
+        break;
+
+      case 'quick_hitch':
+        baseRoute.waypoints = [
+          startPos,
+          { x: startPos.x, y: startPos.y + 4 },
+          { x: startPos.x, y: startPos.y + 2 }
+        ];
+        baseRoute.timing = [0, 1.2, 1.5];
+        baseRoute.depth = 4;
+        break;
+
+      case 'option_in_out':
+        baseRoute.waypoints = [
+          startPos,
+          { x: startPos.x, y: startPos.y + 8 },
+          { x: startPos.x + 6, y: startPos.y + 8 }
+        ];
+        baseRoute.timing = [0, 1.5, 2.0];
+        baseRoute.depth = 8;
+        break;
+
+      case 'choice_break':
+        baseRoute.waypoints = [
+          startPos,
+          { x: startPos.x, y: startPos.y + 8 },
+          { x: startPos.x + 4, y: startPos.y + 8 }
+        ];
+        baseRoute.timing = [0, 1.5, 2.0];
+        baseRoute.depth = 8;
+        break;
+
+      case 'delayed_drag':
+        baseRoute.waypoints = [
+          startPos,
+          { x: startPos.x, y: startPos.y + 2 },
+          { x: startPos.x - 15, y: startPos.y + 8 }
+        ];
+        baseRoute.timing = [0, 1.2, 3.0];
+        baseRoute.depth = 8;
+        break;
+
+      case 'bootleg_comeback':
+        baseRoute.waypoints = [
+          startPos,
+          { x: startPos.x, y: startPos.y + 18 },
+          { x: startPos.x - 3, y: startPos.y + 15 }
+        ];
+        baseRoute.timing = [0, 2.8, 3.5];
+        baseRoute.depth = 18;
         break;
 
       default:
@@ -2257,8 +2701,25 @@ export class FootballEngine {
     this.gameState.phase = 'post-snap';
     this.gameState.timeElapsed = 0;
 
+    // Check for blitz and apply hot route conversions
+    if (this.hotRoutesSystem.detectBlitz(this.gameState)) {
+      this.gameState.players = this.hotRoutesSystem.autoConvertForBlitz(this.gameState.players);
+
+      // Adjust sack time for pressure
+      const timingAdjustment = this.hotRoutesSystem.getPressureTimingAdjustment(true);
+      this.gameState.sackTime = Math.max(1.0, this.gameState.sackTime - timingAdjustment);
+    }
+
     // Apply motion boosts to players who have them
     this.applyMotionBoosts();
+
+    // Initialize receivers in the movement system
+    this.gameState.players
+      .filter(p => p.team === 'offense' && p.route && p.playerType !== 'QB')
+      .forEach(receiver => this.receiverMovement.initializeReceiver(receiver));
+
+    // Initialize quarterback movement
+    this.initializeQBMovement();
 
     // Calculate adjusted sack time based on blitzers
     this.calculateAdjustedSackTime();
@@ -2280,6 +2741,17 @@ export class FootballEngine {
     const qb = this.gameState.players.find(p => p.playerType === 'QB');
     if (!qb) return false;
 
+    // Apply QB movement accuracy modifier
+    let ballSpeed = this.config.physics.ballSpeed;
+    if (this.gameState.qbMovement) {
+      const accuracyModifier = QuarterbackMovement.getAccuracyModifier(
+        qb,
+        this.gameState.qbMovement.config,
+        this.gameState.timeElapsed
+      );
+      ballSpeed *= accuracyModifier;
+    }
+
     // Calculate ball trajectory timing
     // Ball physics calculations happen in updateBallPhysics
 
@@ -2290,7 +2762,7 @@ export class FootballEngine {
       timeInAir: 0,
       velocity: Vector.multiply(
         Vector.direction(qb.position, receiver.position),
-        this.config.physics.ballSpeed
+        ballSpeed
       ),
     };
 
@@ -2298,10 +2770,134 @@ export class FootballEngine {
     return true;
   }
 
+  /**
+   * Set quarterback movement type (3-step, 5-step, 7-step dropback, or play action)
+   */
+  public setQBMovement(movementType: '3-step' | '5-step' | '7-step' | 'play-action' | 'rollout-left' | 'rollout-right'): boolean {
+    if (this.gameState.phase !== 'pre-snap') return false;
+
+    const qb = this.gameState.players.find(p => p.playerType === 'QB');
+    if (!qb) {
+      console.warn('No quarterback found for movement setup');
+      return false;
+    }
+
+    let config: QBMovementConfig;
+
+    switch (movementType) {
+      case '3-step':
+        config = QuarterbackMovement.getDropbackConfig(3, qb.position);
+        break;
+      case '5-step':
+        config = QuarterbackMovement.getDropbackConfig(5, qb.position);
+        break;
+      case '7-step':
+        config = QuarterbackMovement.getDropbackConfig(7, qb.position);
+        break;
+      case 'play-action':
+        const paConfig = QuarterbackMovement.getPlayActionBootConfig(qb.position);
+        config = paConfig.qbMovement;
+        break;
+      case 'rollout-left':
+        config = QuarterbackMovement.getRolloutConfig(qb.position, 'left');
+        break;
+      case 'rollout-right':
+        config = QuarterbackMovement.getRolloutConfig(qb.position, 'right');
+        break;
+      default:
+        return false;
+    }
+
+    // Store QB movement configuration for use at snap
+    this.gameState.qbMovement = {
+      config,
+      isActive: false,
+      startTime: 0,
+      isPlayAction: movementType === 'play-action',
+      hasTriggeredDefensiveResponse: false
+    };
+
+    return true;
+  }
+
+  /**
+   * Initialize quarterback movement at snap
+   */
+  private initializeQBMovement(): void {
+    if (!this.gameState.qbMovement) {
+      // Default to 5-step dropback if no movement set
+      const qb = this.gameState.players.find(p => p.playerType === 'QB');
+      if (qb) {
+        const config = QuarterbackMovement.getDropbackConfig(5, qb.position);
+        this.gameState.qbMovement = {
+          config,
+          isActive: true,
+          startTime: 0,
+          isPlayAction: false,
+          hasTriggeredDefensiveResponse: false
+        };
+      }
+    } else {
+      this.gameState.qbMovement.isActive = true;
+      this.gameState.qbMovement.startTime = 0;
+    }
+  }
+
+  /**
+   * Update quarterback movement during play
+   */
+  private updateQBMovement(deltaTime: number): void {
+    if (!this.gameState.qbMovement?.isActive) return;
+
+    const qb = this.gameState.players.find(p => p.playerType === 'QB');
+    if (!qb) return;
+
+    // Update QB position based on movement pattern
+    QuarterbackMovement.updateQuarterbackMovement(
+      qb,
+      this.gameState.qbMovement.config,
+      this.gameState.timeElapsed,
+      deltaTime
+    );
+
+    // Check for Play Action defensive response trigger
+    if (this.gameState.qbMovement.isPlayAction && !this.gameState.qbMovement.hasTriggeredDefensiveResponse) {
+      if (QuarterbackMovement.shouldTriggerPlayActionResponse(
+        this.gameState.qbMovement.config,
+        this.gameState.timeElapsed
+      )) {
+        this.triggerPlayActionDefensiveResponse();
+        this.gameState.qbMovement.hasTriggeredDefensiveResponse = true;
+      }
+    }
+
+    // Mark movement as complete if timing is finished
+    if (this.gameState.timeElapsed >= this.gameState.qbMovement.config.timing) {
+      this.gameState.qbMovement.isActive = false;
+    }
+  }
+
+  /**
+   * Trigger defensive Play Action response
+   */
+  private triggerPlayActionDefensiveResponse(): void {
+    // This will trigger the existing defensive Play Action response in updateDefensiveMovement
+    // The defensive system already has PA response logic with proper timing (LB: 600ms, CB: 400ms, S: 350ms)
+    const defensePlayers = this.gameState.players.filter(p => p.team === 'defense');
+
+    // The defensive movement system will automatically handle PA response when it detects
+    // QB movement type is 'playaction' during its regular update cycle
+    defensePlayers.forEach(defender => {
+      if (defender.coverageResponsibility?.type === 'zone' && defender.playerType === 'LB') {
+        // LBs are most affected by Play Action - they flow toward fake
+        // This will be handled by the existing defensive movement system
+      }
+    });
+  }
+
   public reset(): void {
     this.stopGameLoop();
     this.gameState = this.initializeGameState();
-    this.defensiveMovement.reset();
   }
 
   public resetPlay(): void {
@@ -2318,6 +2914,12 @@ export class FootballEngine {
     this.gameState.motionPlayer = undefined;
     this.gameState.audiblesUsed = 0;
 
+    // Reset quarterback movement state
+    if (this.gameState.qbMovement) {
+      this.gameState.qbMovement.isActive = false;
+      this.gameState.qbMovement.hasTriggeredDefensiveResponse = false;
+    }
+
     // Reset player states but keep their base positions
     this.gameState.players.forEach(player => {
       player.hasMotion = false;
@@ -2330,6 +2932,9 @@ export class FootballEngine {
       player.isDecelerating = false;
     });
 
+    // Reset movement systems
+    this.receiverMovement.reset();
+
     // Re-setup players at new LOS if needed
     if (this.gameState.playConcept) {
       this.setupPlayers();
@@ -2338,7 +2943,6 @@ export class FootballEngine {
       this.setupDefense();
     }
 
-    this.defensiveMovement.reset();
   }
 
   public resetToPlayStart(): void {
@@ -2391,7 +2995,6 @@ export class FootballEngine {
       player.isDecelerating = false;
     });
 
-    this.defensiveMovement.reset();
   }
 
   // Game Loop Methods
@@ -2451,6 +3054,15 @@ export class FootballEngine {
 
     // Update player positions first
     this.updatePlayerPositions(deltaTime);
+
+    // Process option route decisions
+    this.processOptionRoutes(deltaTime);
+
+    // Process pick plays and rub routes
+    this.processPickPlays(deltaTime);
+
+    // Update quarterback movement
+    this.updateQBMovement(deltaTime);
 
     // Apply post-snap execution rules
     if (this.gameState.coverage) {
@@ -2520,7 +3132,8 @@ export class FootballEngine {
         // Blocking players stay in position
         this.updateBlockingPlayerPosition(player, deltaTime);
       } else if (player.team === 'defense' && player.coverageResponsibility) {
-        this.updateDefensivePlayerPosition(player, deltaTime, speed);
+        // Use new NFL-researched defensive movement system
+        this.updateAdvancedDefensivePlayerPosition(player, deltaTime, speed);
       }
 
       // Clamp position to field bounds
@@ -2629,86 +3242,64 @@ export class FootballEngine {
   private updateOffensivePlayerPosition(player: Player, deltaTime: number, speed: number): void {
     if (!player.route) return;
 
-    const targetPosition = RouteUtil.getPositionAtTime(
-      player.route.waypoints,
-      player.route.timing,
-      this.gameState.timeElapsed
+    // Get nearby defenders for leverage adjustments
+    const nearbyDefenders = this.gameState.players.filter(p =>
+      p.team === 'defense' &&
+      Vector.distance(p.position, player.position) < 8
     );
 
-    const direction = Vector.direction(player.position, targetPosition);
-    const distance = Vector.distance(player.position, targetPosition);
+    // Use the new NFL-realistic receiver movement system
+    const newPosition = this.receiverMovement.updateReceiverMovement(
+      player,
+      deltaTime,
+      this.gameState.timeElapsed,
+      nearbyDefenders
+    );
 
-    // Check for direction change
-    const oldDirection = Vector.normalize(player.velocity);
-    const angleDiff = Math.acos(Math.max(-1, Math.min(1,
-      oldDirection.x * direction.x + oldDirection.y * direction.y
-    )));
+    // Calculate velocity based on position change
+    const movement = Vector.subtract(newPosition, player.position);
+    const actualSpeed = Vector.magnitude(movement) / deltaTime;
 
-    // Apply direction change penalty
-    if (angleDiff > Math.PI / 4) { // 45 degree change
-      if (angleDiff > Math.PI * 0.75) { // 135+ degree change (cut back)
-        player.directionChangeRecoveryTime = 0.6;
-        player.currentSpeed *= 0.575; // 180 degree penalty
-      } else if (angleDiff > Math.PI / 2) { // 90 degree change
-        player.directionChangeRecoveryTime = 0.3;
-        player.currentSpeed *= 0.75; // 90 degree penalty
-      } else {
-        player.directionChangeRecoveryTime = 0.15;
-        player.currentSpeed *= 0.875; // 45 degree penalty
-      }
-    }
-
-    // Apply acceleration to reach target speed
-    const targetSpeed = Math.min(speed, distance / deltaTime);
-    const actualSpeed = this.applyAcceleration(player, targetSpeed, deltaTime);
-
-    const movement = Vector.multiply(direction, actualSpeed * deltaTime);
     player.velocity = movement;
-    player.position = Vector.add(player.position, movement);
-    player.currentSpeed = actualSpeed;
+    player.position = newPosition;
+    player.currentSpeed = Math.min(actualSpeed, speed);
   }
 
-  private updateDefensivePlayerPosition(player: Player, deltaTime: number, speed: number): void {
-    if (!player.coverageResponsibility) return;
+  private updateAdvancedDefensivePlayerPosition(player: Player, deltaTime: number, speed: number): void {
+    if (!player.coverageResponsibility || !this.gameState.coverage) return;
 
-    // Get current coverage type from gameState
-    const currentCoverage = this.gameState.currentCoverage || this.gameState.coverage;
-    if (!currentCoverage) return;
+    // Get all offensive and defensive players
+    const offensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
+    const defensivePlayers = this.gameState.players.filter(p => p.team === 'defense');
 
-    // Initialize defender state if needed
-    if (player.coverageResponsibility.type === 'man' && player.coverageResponsibility.target) {
-      const target = this.gameState.players.find(p => p.id === player.coverageResponsibility!.target);
-      if (target) {
-        this.defensiveMovement.initializeDefender(player, currentCoverage, target);
+    // Check if this is a Play Action concept (future implementation)
+    const isPlayAction = false; // TODO: Implement Play Action detection
+
+    // Use new comprehensive defensive movement system
+    const updatedDefenders = updateDefensiveMovement(
+      [player], // Single player for individual updates
+      offensivePlayers,
+      this.gameState.coverage.type,
+      this.gameState.timeElapsed,
+      deltaTime,
+      isPlayAction
+    );
+
+    if (updatedDefenders.length > 0) {
+      const updatedPlayer = updatedDefenders[0];
+
+      // Calculate velocity for smooth animations
+      if (updatedPlayer.position.x !== player.position.x || updatedPlayer.position.y !== player.position.y) {
+        player.velocity = {
+          x: (updatedPlayer.position.x - player.position.x) / deltaTime,
+          y: (updatedPlayer.position.y - player.position.y) / deltaTime
+        };
+        player.currentSpeed = Vector.magnitude(player.velocity);
+        player.position = updatedPlayer.position;
       }
-    } else {
-      this.defensiveMovement.initializeDefender(player, currentCoverage);
-    }
-
-    // Get adjusted speed from movement system
-    const adjustedSpeed = this.defensiveMovement.getMovementSpeed(player, speed);
-
-    // Execute coverage-specific logic
-    switch (currentCoverage?.name) {
-      case 'Cover 4':
-      case 'Quarters':
-        this.executeCover4PatternMatch(player, deltaTime, adjustedSpeed);
-        break;
-      case 'Tampa 2':
-        this.executeTampa2Coverage(player, deltaTime, adjustedSpeed);
-        break;
-      case 'Cover 6':
-        this.executeCover6SplitField(player, deltaTime, adjustedSpeed);
-        break;
-      case 'Cover 0':
-        this.executeCover0Blitz(player, deltaTime, adjustedSpeed);
-        break;
-      default:
-        // Standard man/zone execution for other coverages
-        this.executeStandardCoverage(player, deltaTime, adjustedSpeed);
-        break;
     }
   }
+
 
   private executeStandardCoverage(player: Player, deltaTime: number, speed: number): void {
     if (!player.coverageResponsibility) return;
@@ -2720,7 +3311,15 @@ export class FootballEngine {
       // Use improved man coverage movement
       const target = this.gameState.players.find(p => p.id === player.coverageResponsibility!.target);
       if (target) {
-        const newPosition = this.defensiveMovement.updateManCoverage(player, target, deltaTime);
+        const movementState = {
+          technique: 'mirror' as const,
+          leverage: 'neutral' as const,
+          targetPosition: target.position,
+          reactionDelay: 0,
+          isTransitioning: false,
+          lastBreakRecognition: 0
+        };
+        const newPosition = calculateDefensiveMovement(player, movementState, deltaTime);
 
         // Update velocity for animation only if newPosition is valid
         if (newPosition) {
@@ -2736,7 +3335,15 @@ export class FootballEngine {
       // Use improved zone coverage movement
       const zoneLandmark = this.getZoneTargetPosition(player);
       const ballCarrier = this.gameState.players.find(p => p.hasBall);
-      const newPosition = this.defensiveMovement.updateZoneCoverage(player, zoneLandmark, deltaTime, ballCarrier);
+      const movementState = {
+        technique: 'backpedal' as const,
+        leverage: 'neutral' as const,
+        targetPosition: zoneLandmark,
+        reactionDelay: 0,
+        isTransitioning: false,
+        lastBreakRecognition: 0
+      };
+      const newPosition = calculateDefensiveMovement(player, movementState, deltaTime);
 
       // Update velocity for animation only if newPosition is valid
       if (newPosition) {
@@ -3234,8 +3841,17 @@ export class FootballEngine {
     // Check if we can preserve existing defenders (same coverage type)
     // Use passed previousCoverage if available, otherwise use current
     const oldCoverageType = previousCoverage?.type || this.gameState.currentCoverage?.type;
+    // Don't preserve defenders if LOS has changed significantly - force recreation for proper positioning
+    const losChanged = existingDefenders.some(d => Math.abs(d.position.y - this.gameState.lineOfScrimmage) > 10);
     const shouldPreserveDefenders = existingDefenders.length > 0 &&
-      oldCoverageType === coverage.type;
+      oldCoverageType === coverage.type && !losChanged;
+
+    if (existingDefenders.length > 0) {
+      console.warn(`setupDefense: existingDefenders=${existingDefenders.length}, oldCoverage=${oldCoverageType}, newCoverage=${coverage.type}, LOS=${this.gameState.lineOfScrimmage}, losChanged=${losChanged}, shouldPreserve=${shouldPreserveDefenders}`);
+      if (losChanged) {
+        console.warn(`LOS changed detected - defender positions:`, existingDefenders.map(d => `${d.id}:${d.position.y}`));
+      }
+    }
 
     if (shouldPreserveDefenders) {
       // Update existing defenders' responsibilities and realign
@@ -3315,7 +3931,9 @@ export class FootballEngine {
           defender.position = calculatedPosition;
         } else {
           // Fallback to static positioning if dynamic calculation fails
-          defender.position = this.getDefensivePosition(defender.id, coverage);
+          const fallbackPosition = this.getDefensivePosition(defender.id, coverage);
+          console.warn(`No calculated position for ${defender.id} (${defender.coverageResponsibility?.type}), using fallback: x=${fallbackPosition.x}, y=${fallbackPosition.y}, LOS=${this.gameState.lineOfScrimmage}`);
+          defender.position = fallbackPosition;
         }
       });
 
@@ -3487,7 +4105,9 @@ export class FootballEngine {
           defender.position = calculatedPosition;
         } else {
           // Fallback to static positioning if dynamic calculation fails
-          defender.position = this.getDefensivePosition(defender.id, coverage);
+          const fallbackPosition = this.getDefensivePosition(defender.id, coverage);
+          console.warn(`No calculated position for ${defender.id} (${defender.coverageResponsibility?.type}), using fallback: x=${fallbackPosition.x}, y=${fallbackPosition.y}, LOS=${this.gameState.lineOfScrimmage}`);
+          defender.position = fallbackPosition;
         }
       });
 

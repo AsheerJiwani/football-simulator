@@ -3,61 +3,219 @@
     "type": "slant",
     "relativeWaypoints": [
       { "x": 0, "y": 0 },
-      { "x": 2, "y": 0 },
-      { "x": 4, "y": 3 }
+      { "x": 3, "y": 0 },
+      { "x": 4, "y": 2 }
     ],
-    "timingSeconds": [0, 0.4, 0.8],
-    "depth": 4
+    "timingSeconds": [0, 0.6, 1.8],
+    "depth": 3,
+    "breakAngle": 45,
+    "speedPattern": "accelerate-plant-explode",
+    "leverage": "attack_inside_shoulder"
   },
   "flat": {
     "type": "flat",
     "relativeWaypoints": [
       { "x": 0, "y": 0 },
-      { "x": 1, "y": 0 },
-      { "x": 2, "y": -8 },
-      { "x": 4, "y": -8 }
+      { "x": 2, "y": 0 },
+      { "x": 6, "y": 0 }
     ],
-    "timingSeconds": [0, 0.2, 0.8, 1.2],
-    "depth": 2
+    "timingSeconds": [0, 0.4, 1.8],
+    "depth": 2,
+    "breakAngle": 90,
+    "speedPattern": "quick-cut-accelerate",
+    "leverage": "immediate_width"
   },
   "go": {
     "type": "go",
     "relativeWaypoints": [
       { "x": 0, "y": 0 },
-      { "x": 15, "y": 0 },
-      { "x": 25, "y": 0 }
+      { "x": 20, "y": 0 },
+      { "x": 30, "y": 0 }
     ],
-    "timingSeconds": [0, 1.8, 3.0],
-    "depth": 25
+    "timingSeconds": [0, 2.2, 3.5],
+    "depth": 25,
+    "breakAngle": 0,
+    "speedPattern": "accelerate-maintain",
+    "leverage": "stack_defender"
   },
   "out": {
     "type": "out",
     "relativeWaypoints": [
       { "x": 0, "y": 0 },
-      { "x": 8, "y": 0 },
-      { "x": 10, "y": 5 }
+      { "x": 12, "y": 0 },
+      { "x": 12, "y": 8 }
     ],
-    "timingSeconds": [0, 1.2, 1.6],
-    "depth": 10
+    "timingSeconds": [0, 2.0, 2.2],
+    "depth": 12,
+    "breakAngle": 90,
+    "speedPattern": "accelerate-decelerate-cut",
+    "leverage": "threaten_vertical_first"
+  },
+  "in": {
+    "type": "in",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 11, "y": 0 },
+      { "x": 11, "y": -8 }
+    ],
+    "timingSeconds": [0, 1.9, 2.2],
+    "depth": 11,
+    "breakAngle": 90,
+    "speedPattern": "accelerate-plant-drive",
+    "leverage": "threaten_seam"
   },
   "curl": {
     "type": "curl",
     "relativeWaypoints": [
       { "x": 0, "y": 0 },
-      { "x": 10, "y": 0 },
-      { "x": 8, "y": 0 }
+      { "x": 11, "y": 0 },
+      { "x": 9, "y": -2 }
     ],
-    "timingSeconds": [0, 1.5, 2.0],
-    "depth": 8
+    "timingSeconds": [0, 1.9, 2.2],
+    "depth": 11,
+    "breakAngle": 45,
+    "speedPattern": "accelerate-decelerate-comeback",
+    "leverage": "sit_in_hole"
   },
   "comeback": {
     "type": "comeback",
     "relativeWaypoints": [
       { "x": 0, "y": 0 },
-      { "x": 12, "y": 0 },
-      { "x": 8, "y": 0 }
+      { "x": 14, "y": 0 },
+      { "x": 12, "y": 2 }
     ],
-    "timingSeconds": [0, 1.8, 2.4],
-    "depth": 8
+    "timingSeconds": [0, 2.0, 2.2],
+    "depth": 14,
+    "breakAngle": 45,
+    "speedPattern": "accelerate-decelerate-return",
+    "leverage": "create_separation_at_top"
+  },
+  "post": {
+    "type": "post",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 12, "y": 0 },
+      { "x": 12, "y": -6 }
+    ],
+    "timingSeconds": [0, 1.9, 2.2],
+    "depth": 12,
+    "breakAngle": 45,
+    "speedPattern": "accelerate-plant-angle",
+    "leverage": "threaten_seam"
+  },
+  "fade": {
+    "type": "fade",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 18, "y": 2 },
+      { "x": 25, "y": 4 }
+    ],
+    "timingSeconds": [0, 2.3, 2.6],
+    "depth": 18,
+    "breakAngle": 15,
+    "speedPattern": "accelerate-maintain-adjust",
+    "leverage": "stack_outside_shoulder"
+  },
+  "mesh_cross": {
+    "type": "mesh_cross",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 8, "y": 8 },
+      { "x": -15, "y": 12 }
+    ],
+    "timingSeconds": [0, 1.8, 2.5],
+    "depth": 8,
+    "breakAngle": 45,
+    "speedPattern": "accelerate-cut-accelerate",
+    "leverage": "natural_pick"
+  },
+  "speed_out": {
+    "type": "speed_out",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 6, "y": 6 }
+    ],
+    "timingSeconds": [0, 1.5],
+    "depth": 6,
+    "breakAngle": 90,
+    "speedPattern": "quick-cut",
+    "leverage": "immediate_width"
+  },
+  "seam": {
+    "type": "seam",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 2, "y": 25 }
+    ],
+    "timingSeconds": [0, 3.5],
+    "depth": 25,
+    "breakAngle": 0,
+    "speedPattern": "accelerate-maintain",
+    "leverage": "split_seam"
+  },
+  "quick_hitch": {
+    "type": "quick_hitch",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 0, "y": 4 },
+      { "x": 0, "y": 2 }
+    ],
+    "timingSeconds": [0, 1.2, 1.5],
+    "depth": 4,
+    "breakAngle": 180,
+    "speedPattern": "accelerate-plant-return",
+    "leverage": "create_separation_quick"
+  },
+  "option_in_out": {
+    "type": "option_in_out",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 0, "y": 8 },
+      { "x": 6, "y": 8 }
+    ],
+    "timingSeconds": [0, 1.5, 2.0],
+    "depth": 8,
+    "breakAngle": 90,
+    "speedPattern": "accelerate-option-break",
+    "leverage": "read_leverage"
+  },
+  "choice_break": {
+    "type": "choice_break",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 0, "y": 8 },
+      { "x": 4, "y": 8 }
+    ],
+    "timingSeconds": [0, 1.5, 2.0],
+    "depth": 8,
+    "breakAngle": 45,
+    "speedPattern": "accelerate-choice-break",
+    "leverage": "choice_based"
+  },
+  "delayed_drag": {
+    "type": "delayed_drag",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 0, "y": 2 },
+      { "x": -15, "y": 8 }
+    ],
+    "timingSeconds": [0, 1.2, 3.0],
+    "depth": 8,
+    "breakAngle": 45,
+    "speedPattern": "delay-accelerate-drag",
+    "leverage": "delayed_release"
+  },
+  "bootleg_comeback": {
+    "type": "bootleg_comeback",
+    "relativeWaypoints": [
+      { "x": 0, "y": 0 },
+      { "x": 0, "y": 18 },
+      { "x": -3, "y": 15 }
+    ],
+    "timingSeconds": [0, 2.8, 3.5],
+    "depth": 18,
+    "breakAngle": 45,
+    "speedPattern": "accelerate-decelerate-comeback",
+    "leverage": "bootleg_timing"
   }
 }

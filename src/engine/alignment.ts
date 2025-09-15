@@ -613,15 +613,17 @@ function isReceiverInDefenderZone(
 /**
  * Calculate Cover 1 Linebacker position
  */
-export function getCover1Linebacker(targetReceiver: Player, los: number, role: 'coverage' | 'spy' = 'coverage'): Vector2D {
+export function getCover1Linebacker(targetReceiver: Player, los: number, role: 'coverage' | 'hole' = 'coverage'): Vector2D {
   const depth = COVER_1_CONSTANTS.LB_DEPTH;
 
-  if (role === 'spy') {
-    // Spy stays in middle of field to watch QB
-    return {
-      x: 26.665,
-      y: los + depth, // On defensive side of LOS
+  if (role === 'hole') {
+    // Hole/rat defender covers middle zone to help with crossing routes
+    // Position: Center field, 10 yards deep for hole zone coverage
+    const holePosition = {
+      x: 26.665, // Center field between hash marks
+      y: los + 10, // 10 yards on defensive side for hole coverage
     };
+    return holePosition;
   }
 
   // Coverage linebacker aligns over target at x position, 5 yards on defensive side
@@ -871,9 +873,9 @@ export function generateCover1Alignment(
         break;
 
       case 'LB':
-        if (responsibility.type === 'spy') {
-          // QB spy - stay in middle
-          positions[defender.id] = getCover1Linebacker(offensivePlayers[0], los, 'spy');
+        if (responsibility.type === 'zone' && responsibility.zone?.name === 'hole') {
+          // Hole/rat defender - covers middle zone for crossing routes
+          positions[defender.id] = getCover1Linebacker(offensivePlayers[0], los, 'hole');
         } else if (responsibility.target) {
           const assignedReceiver = offensivePlayers.find(p => p.id === responsibility.target);
           if (assignedReceiver) {

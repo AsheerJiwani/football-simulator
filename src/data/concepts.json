@@ -946,5 +946,213 @@
         "depth": 6
       }
     }
+  },
+  "pa-boot-flood": {
+    "name": "PA Boot Flood",
+    "description": "Play Action bootleg with flood concept - multiple routes to one side",
+    "difficulty": "intermediate",
+    "formation": "trips-right",
+    "playAction": "boot-right",
+    "routes": {
+      "WR1": {
+        "type": "corner",
+        "waypoints": [
+          { "x": 45, "y": 0 },
+          { "x": 48, "y": 12 },
+          { "x": 52, "y": 18 }
+        ],
+        "timing": [0, 2.0, 2.8],
+        "depth": 18,
+        "delayedRelease": 0.6
+      },
+      "WR2": {
+        "type": "comeback",
+        "waypoints": [
+          { "x": 40, "y": 0 },
+          { "x": 40, "y": 15 },
+          { "x": 37, "y": 12 }
+        ],
+        "timing": [0, 2.2, 2.8],
+        "depth": 15,
+        "delayedRelease": 0.4
+      },
+      "WR3": {
+        "type": "delayed_drag",
+        "waypoints": [
+          { "x": 35, "y": 0 },
+          { "x": 35, "y": 2 },
+          { "x": 20, "y": 8 }
+        ],
+        "timing": [0, 1.2, 3.0],
+        "depth": 8,
+        "delayedRelease": 1.2
+      },
+      "TE1": {
+        "type": "bootleg_comeback",
+        "waypoints": [
+          { "x": 30, "y": 0 },
+          { "x": 30, "y": 16 },
+          { "x": 27, "y": 13 }
+        ],
+        "timing": [0, 2.6, 3.2],
+        "depth": 16,
+        "delayedRelease": 0.8
+      }
+    }
+  },
+  "pa-pocket-seams": {
+    "name": "PA Pocket Seams",
+    "description": "Play Action pocket drop with vertical seam routes",
+    "difficulty": "intermediate",
+    "formation": "spread",
+    "playAction": "pocket-drop",
+    "routes": {
+      "WR1": {
+        "type": "seam",
+        "waypoints": [
+          { "x": 45, "y": 0 },
+          { "x": 47, "y": 25 }
+        ],
+        "timing": [0, 3.5],
+        "depth": 25,
+        "delayedRelease": 0.6
+      },
+      "WR2": {
+        "type": "seam",
+        "waypoints": [
+          { "x": 35, "y": 0 },
+          { "x": 37, "y": 25 }
+        ],
+        "timing": [0, 3.5],
+        "depth": 25,
+        "delayedRelease": 0.6
+      },
+      "WR3": {
+        "type": "seam",
+        "waypoints": [
+          { "x": 18, "y": 0 },
+          { "x": 16, "y": 25 }
+        ],
+        "timing": [0, 3.5],
+        "depth": 25,
+        "delayedRelease": 0.6
+      },
+      "TE1": {
+        "type": "choice_break",
+        "waypoints": [
+          { "x": 30, "y": 0 },
+          { "x": 30, "y": 8 },
+          { "x": 34, "y": 8 }
+        ],
+        "timing": [0, 1.5, 2.0],
+        "depth": 8,
+        "delayedRelease": 0.6
+      }
+    }
+  },
+  "pa-deep-cross": {
+    "name": "PA Deep Cross",
+    "description": "Play Action with crossing routes at multiple levels",
+    "difficulty": "advanced",
+    "formation": "i-form",
+    "playAction": "deep-cross",
+    "routes": {
+      "WR1": {
+        "type": "post",
+        "waypoints": [
+          { "x": 45, "y": 0 },
+          { "x": 45, "y": 12 },
+          { "x": 39, "y": 18 }
+        ],
+        "timing": [0, 2.0, 2.8],
+        "depth": 18,
+        "delayedRelease": 0.6
+      },
+      "WR2": {
+        "type": "dig",
+        "waypoints": [
+          { "x": 18, "y": 0 },
+          { "x": 18, "y": 11 },
+          { "x": 32, "y": 11 }
+        ],
+        "timing": [0, 1.9, 2.4],
+        "depth": 11,
+        "delayedRelease": 0.6
+      },
+      "TE1": {
+        "type": "delayed_drag",
+        "waypoints": [
+          { "x": 30, "y": 0 },
+          { "x": 30, "y": 2 },
+          { "x": 15, "y": 8 }
+        ],
+        "timing": [0, 1.2, 3.0],
+        "depth": 8,
+        "delayedRelease": 1.2
+      },
+      "FB1": {
+        "type": "flat",
+        "waypoints": [
+          { "x": 24, "y": -3 },
+          { "x": 24, "y": 0 },
+          { "x": 18, "y": 3 }
+        ],
+        "timing": [0, 0.4, 1.2],
+        "depth": 3,
+        "delayedRelease": 0.6
+      }
+    }
+  },
+  "pa-naked-boot": {
+    "name": "PA Naked Boot",
+    "description": "Play Action naked bootleg with quick developing routes",
+    "difficulty": "advanced",
+    "formation": "singleback",
+    "playAction": "naked-boot",
+    "routes": {
+      "WR1": {
+        "type": "speed_out",
+        "waypoints": [
+          { "x": 45, "y": 0 },
+          { "x": 51, "y": 6 }
+        ],
+        "timing": [0, 1.5],
+        "depth": 6,
+        "delayedRelease": 0.4
+      },
+      "WR2": {
+        "type": "corner",
+        "waypoints": [
+          { "x": 35, "y": 0 },
+          { "x": 38, "y": 8 },
+          { "x": 43, "y": 15 }
+        ],
+        "timing": [0, 1.6, 2.4],
+        "depth": 15,
+        "delayedRelease": 0.4
+      },
+      "WR3": {
+        "type": "hitch",
+        "waypoints": [
+          { "x": 18, "y": 0 },
+          { "x": 18, "y": 6 },
+          { "x": 18, "y": 4 }
+        ],
+        "timing": [0, 1.5, 1.8],
+        "depth": 6,
+        "delayedRelease": 0.4
+      },
+      "TE1": {
+        "type": "bootleg_comeback",
+        "waypoints": [
+          { "x": 30, "y": 0 },
+          { "x": 30, "y": 12 },
+          { "x": 27, "y": 9 }
+        ],
+        "timing": [0, 2.0, 2.4],
+        "depth": 12,
+        "delayedRelease": 0.4
+      }
+    }
   }
 }

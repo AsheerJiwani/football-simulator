@@ -1,6 +1,6 @@
 import { FootballEngine } from '../Engine';
 import { DataLoader } from '@/lib/dataLoader';
-import type { PlayConcept, GameState, PersonnelPackage } from '../types';
+import type { PlayConcept, GameState, PersonnelPackage, Vector2D } from '../types';
 
 describe('User Autonomy Integration Tests', () => {
   let engine: FootballEngine;
@@ -244,7 +244,7 @@ describe('User Autonomy Integration Tests', () => {
         const manDefender = state.players.find(p =>
           p.team === 'defense' &&
           p.coverageResponsibility?.type === 'man' &&
-          p.coverageResponsibility.targetId === motionPlayer.id
+          p.coverageResponsibility.target === motionPlayer.id
         );
 
         expect(manDefender).toBeDefined();
@@ -264,7 +264,7 @@ describe('User Autonomy Integration Tests', () => {
         const defenders = newState.players.filter(p => p.team === 'defense');
         const coveringDefender = defenders.find(d =>
           d.coverageResponsibility?.type === 'man' &&
-          d.coverageResponsibility.targetId === motionPlayer.id
+          d.coverageResponsibility.target === motionPlayer.id
         );
 
         expect(coveringDefender).toBeDefined();
@@ -535,6 +535,9 @@ describe('User Autonomy Integration Tests', () => {
 
         // Game should be in post-snap phase
         expect(snappedState.phase).toBe('post-snap');
+
+        // Clean up game loop to prevent Jest hanging
+        engine.resetPlay();
 
         // All players should have valid positions
         snappedState.players.forEach(player => {
@@ -1024,6 +1027,9 @@ describe('User Autonomy Integration Tests', () => {
 
               // Everything should be valid (phase is 'post-snap' after snap)
               expect(state3.phase).toBe('post-snap');
+
+              // Clean up game loop to prevent Jest hanging
+              engine.resetPlay();
               expect(state3.players.length).toBeGreaterThan(0);
 
               // No NaN positions

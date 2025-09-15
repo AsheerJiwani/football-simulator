@@ -106,6 +106,8 @@ This system creates a living, breathing defense that reacts intelligently to use
 
 Gameplay with drives (4 downs, first down line 10 yards ahead of default start position [30 yard line], if 4 downs are reached and user does not complete a first down, they should have to reset at the 30 yard line.) with ongoing plays starting from where the last one ended based on the hashmarks and last play result
 
+**Safety Logic**: If the line of scrimmage (LOS) is ever at or behind the offensive 1-yard line (y ≤ 1), a safety is triggered. The game warns the user about the safety and automatically resets the drive to the offensive 30-yard line with a fresh set of downs (1st and 10). This prevents the quarterback from starting a snap in their own endzone, which would be unrealistic. The minimum playable LOS is at the 2-yard line.
+
 Directive: Whenever implementing, modifying, or expanding any NFL mechanic (coverages, alignments, motions, player speeds, ball physics, openness/tackle logic, zone bubbles, or new concepts), Claude must first call the Research Subagent to gather factual, cited evidence before coding. For each coverage, the agent should return JSON Structured data describing each positions' role in the coverage system as well as the adjustments made when offensive personnel and formations changes occur. If Claude utilizes the research subagent, ensure that it is utilized after "plan mode" is finished and when actually working in the code.
 
 If Claude utilizes the research subagent, ensure that it is utilized after "plan mode" is finished and when actually working in the code.

@@ -59,7 +59,7 @@ describe('Engine Performance', () => {
         engine.sendInMotion(motionPlayer.id);
         // Reset motion
         engine['gameState'].isMotionActive = false;
-        engine['gameState'].motionPlayerId = undefined;
+        engine['gameState'].motionPlayer = null;
       }
 
       const end = performance.now();

@@ -45,6 +45,7 @@ export interface Ball {
   velocity: Vector2D;
   state: BallState;
   targetPlayer?: string; // player ID if thrown
+  carrier?: string; // player ID if carried
   timeInAir: number;
   speed: number; // constant ~16 yards/second
 }
@@ -65,7 +66,7 @@ export interface RoutePoint {
   timing: number;
 }
 
-export type RouteType = 'slant' | 'flat' | 'go' | 'curl' | 'out' | 'in' | 'post' | 'comeback' | 'fade';
+export type RouteType = 'slant' | 'flat' | 'go' | 'curl' | 'out' | 'in' | 'post' | 'comeback' | 'fade' | 'hitch' | 'wheel' | 'corner' | 'dig' | 'mesh_cross' | 'speed_out' | 'seam' | 'option_in_out' | 'choice_break' | 'delayed_drag' | 'bootleg_comeback' | 'quick_hitch' | 'drag';
 
 export interface Formation {
   name: string;
@@ -186,6 +187,8 @@ export interface GameState {
     teBlocking: boolean;
     fbBlocking: boolean;
   };
+  // Quarterback movement
+  qbMovement?: QBMovementState;
   // Drive and field position
   lineOfScrimmage: number; // Y-coordinate of LOS (default 30)
   currentDown: number; // 1-4
@@ -213,6 +216,27 @@ export interface Motion {
 
 export type PersonnelPackage = '11' | '12' | '21' | '10' | '20' | '22' | '00';
 
+export type QBMovementType = 'dropback' | 'playaction' | 'rollout';
+
+export interface QBMovementConfig {
+  type: QBMovementType;
+  steps: number;
+  timing: number; // seconds to complete movement
+  depth: number; // yards behind LOS
+  pattern: Vector2D[]; // movement waypoints
+  accuracyModifier: number; // 0.8-1.0 based on movement type
+  fakeHandoffDuration?: number; // for Play Action only
+  lateral?: number; // lateral movement for rollouts
+}
+
+export interface QBMovementState {
+  config: QBMovementConfig;
+  isActive: boolean;
+  startTime: number; // when movement began
+  isPlayAction: boolean;
+  hasTriggeredDefensiveResponse: boolean;
+}
+
 export interface PlayOutcome {
   type: 'catch' | 'incomplete' | 'interception' | 'sack' | 'timeout';
   receiver?: string; // player ID
@@ -233,4 +257,35 @@ export interface RouteDefinition {
   type: RouteType;
   relativeWaypoints: Vector2D[]; // relative to snap position
   timingSeconds: number[];
+}
+
+// Hot route system interfaces
+export interface HotRoute {
+  trigger: 'blitz' | 'coverage' | 'pressure';
+  fromRoute: RouteType;
+  toRoute: RouteType;
+  timing: number; // seconds to execute
+  depth: number; // yards from LOS
+}
+
+export interface SightAdjustment {
+  coverage: CoverageType;
+  receiverPosition: 'outside' | 'slot' | 'tight';
+  adjustment: {
+    routeType: RouteType;
+    depthChange: number;
+    breakDirection: 'in' | 'out' | 'up' | 'weak';
+  };
+}
+
+export interface HotRouteSystem {
+  blitzDetection: {
+    triggerCount: number;    // number of rushers that triggers hot route
+    autoConvert: RouteType[]; // routes that auto-convert
+    timingReduction: number; // reduce sack time
+  };
+  coverageAudibles: {
+    preSnapReads: CoverageType[];
+    routeConversions: Record<CoverageType, Partial<Record<RouteType, RouteType>>>;
+  };
 }
