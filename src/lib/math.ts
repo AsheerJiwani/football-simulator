@@ -78,6 +78,26 @@ export const Vector = {
   approximately: (a: Vector2D, b: Vector2D, epsilon = 0.001): boolean => {
     return Math.abs(a.x - b.x) < epsilon && Math.abs(a.y - b.y) < epsilon;
   },
+
+  // Move from one position toward another at specified distance
+  moveToward: (from: Vector2D, to: Vector2D, distance: number): Vector2D => {
+    const direction = Vector.direction(from, to);
+    const displacement = Vector.multiply(direction, distance);
+    const newPosition = Vector.add(from, displacement);
+
+    // Don't overshoot the target
+    const totalDistance = Vector.distance(from, to);
+    if (distance >= totalDistance) {
+      return to;
+    }
+
+    return newPosition;
+  },
+
+  // Scale vector by scalar (alias for multiply for clarity)
+  scale: (v: Vector2D, scalar: number): Vector2D => {
+    return Vector.multiply(v, scalar);
+  },
 };
 
 // Physics and game-specific math utilities

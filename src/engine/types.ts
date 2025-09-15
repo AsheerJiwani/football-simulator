@@ -91,7 +91,7 @@ export interface Coverage {
   positions?: Record<string, Vector2D>; // Defender positions relative to LOS
 }
 
-export type CoverageType = 'cover-0' | 'cover-1' | 'cover-2' | 'cover-3' | 'cover-4' | 'cover-6' | 'quarters' | 'tampa-2';
+export type CoverageType = 'cover-0' | 'cover-1' | 'cover-2' | 'cover-3' | 'cover-4' | 'cover-6' | 'quarters' | 'tampa-2' | 'cover-1-bracket' | 'cover-1-robber' | 'cover-1-lurk' | 'cover-2-roll-to-1' | 'quarters-poach' | 'cover-2-invert';
 
 export interface CoverageResponsibility {
   defenderId: string;
@@ -99,6 +99,45 @@ export interface CoverageResponsibility {
   target?: string; // player ID for man coverage (assignment)
   zone?: Zone; // zone area for zone coverage
   overlaps?: ZoneOverlap[]; // zone overlap information for coordination
+
+  // Advanced coverage properties
+  bracketType?: 'top-bottom' | 'inside-outside';
+  bracketPartner?: string; // defender ID of bracket partner
+  primaryTarget?: string; // receiver being bracketed
+  triggerRoutes?: string[]; // routes that activate bracket
+  maxDepth?: number; // handoff depth for bracket coverage
+  triggerDepth?: number; // depth at which bracket activates
+  leverage?: 'inside' | 'outside' | 'head-up';
+
+  // Robber/Lurk properties
+  patternReads?: string[]; // patterns this defender reads
+  qbKeyRules?: {
+    readEyes: boolean;
+    jumpThreshold: number; // seconds after snap to react
+    pursuitAngle: 'undercut' | 'overthrow' | 'collision';
+  };
+  strengthAdjustment?: boolean; // adjusts position based on formation strength
+
+  // Pattern matching enhancements
+  matchRules?: string;
+
+  // Disguise properties
+  preSnapAlignment?: Vector2D;
+  postSnapMovement?: {
+    destination: Vector2D;
+    timing: number; // seconds after snap
+    trigger: 'snap' | 'ball-movement' | 'route-recognition';
+  };
+  disguiseType?: 'safety-rotation' | 'coverage-roll' | 'late-break';
+
+  // Modern coverage properties
+  poachRules?: {
+    keyPlayer: string; // player to read (e.g., "TE")
+    helpStrong: boolean;
+    trigger: string; // condition that triggers poach
+  };
+  receivesHelp?: boolean; // gets help from poach defender
+  invertedRole?: boolean; // playing inverted coverage (safety low, corner high)
 }
 
 export interface Zone {

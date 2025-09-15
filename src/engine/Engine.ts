@@ -25,6 +25,11 @@ import {
   generateTampa2Alignment,
   generateCover6Alignment,
   generateCover0Alignment,
+  generateCover1BracketAlignment,
+  generateCover1RobberAlignment,
+  generateCover1LurkAlignment,
+  generateQuartersPoachAlignment,
+  generateCover2InvertAlignment,
   getOptimalDefensivePersonnel,
   generateDefensiveAssignments,
   analyzeFormation
@@ -59,6 +64,9 @@ import {
   PRESSURE_EFFECTS,
   HOT_ROUTE_TRIGGER_TIME
 } from './blitzMechanics';
+import { AdvancedDefensiveBehavior } from './advancedDefensiveBehavior';
+import { PatternMatchingSystem } from './patternMatching';
+import { CoverageDisguiseSystem } from './coverageDisguise';
 
 export class FootballEngine {
   private gameState: GameState;
@@ -431,8 +439,8 @@ export class FootballEngine {
     // Can only send player in motion pre-snap
     if (this.gameState.phase !== 'pre-snap') return false;
 
-    // Can only have one player in motion at a time
-    if (this.gameState.isMotionActive) return false;
+    // Can only have one player in motion per play (NFL rule)
+    if (this.gameState.motionPlayer) return false;
 
     const player = this.gameState.players.find(p =>
       p.id === playerId &&
@@ -550,8 +558,9 @@ export class FootballEngine {
     const player = this.gameState.players.find(p => p.id === playerId);
     if (!player) return false;
 
-    // Update the player's position
+    // Update the player's position and mark as manually positioned
     player.position = { ...position };
+    (player as any).isManuallyPositioned = true; // Flag for preserving user positioning
 
     // Only realign defense if an offensive player moved
     if (player.team === 'offense' && this.gameState.coverage) {
@@ -1175,6 +1184,31 @@ export class FootballEngine {
     });
   }
 
+  private validateDefensivePositions(defensePlayers: Player[]): void {
+    const losY = this.gameState.lineOfScrimmage;
+
+    defensePlayers.forEach(defender => {
+      // Ensure defender is behind the line of scrimmage (minimum 1 yard behind)
+      if (defender.position.y < losY + 1) {
+        console.warn(`Fixing ${defender.id} position: y=${defender.position.y} → y=${losY + 1} (1 yard behind LOS=${losY})`);
+        defender.position.y = losY + 1;
+      }
+
+      // Ensure defender is within field bounds
+      if (defender.position.x < 0) {
+        defender.position.x = 0;
+      } else if (defender.position.x > 53.33) {
+        defender.position.x = 53.33;
+      }
+
+      // Ensure reasonable depth (not more than 40 yards behind LOS)
+      if (defender.position.y > losY + 40) {
+        console.warn(`Fixing ${defender.id} excessive depth: y=${defender.position.y} → y=${losY + 25}`);
+        defender.position.y = losY + 25;
+      }
+    });
+  }
+
   private handleMotionAdjustments(offensePlayers: Player[], defensePlayers: Player[]): void {
     // Check if there's an active motion player
     const motionPlayer = offensePlayers.find(p => p.hasMotion);
@@ -1248,6 +1282,9 @@ export class FootballEngine {
 
     // Enhanced formation analysis after motion
     this.handlePostMotionFormationChanges(motionPlayer, offensePlayers, defensePlayers);
+
+    // Validate all defensive positions are legal
+    this.validateDefensivePositions(defensePlayers);
   }
 
   private checkForOverloadAfterMotion(motionPlayer: Player, allReceivers: Player[]): {isOverload: boolean, side: 'left' | 'right'} {
@@ -1297,7 +1334,7 @@ export class FootballEngine {
         const newTarget = offensePlayers.find(p => p.id === fs.coverageResponsibility?.target);
         if (newTarget) {
           fs.position.x = newTarget.position.x;
-          fs.position.y = this.gameState.lineOfScrimmage - 8;
+          fs.position.y = this.gameState.lineOfScrimmage + 8;
         }
       }
 
@@ -1305,7 +1342,7 @@ export class FootballEngine {
         const newTarget = offensePlayers.find(p => p.id === ss.coverageResponsibility?.target);
         if (newTarget) {
           ss.position.x = newTarget.position.x;
-          ss.position.y = this.gameState.lineOfScrimmage - 8;
+          ss.position.y = this.gameState.lineOfScrimmage + 8;
         }
       }
     }
@@ -1429,7 +1466,7 @@ export class FootballEngine {
       const ss = defensePlayers.find(d => d.playerType === 'S' && d.id !== 'FS');
       if (ss && ss.coverageResponsibility?.zone?.name?.includes('box')) {
         // SS drops to hook zone
-        ss.position.y = losY + 8;
+        ss.position.y = Math.max(losY + 8, losY + 1); // Ensure at least 1 yard behind LOS
         ss.position.x = motionPlayer.position.x > centerX ? centerX + 5 : centerX - 5;
       }
     }
@@ -3034,7 +3071,13 @@ export class FootballEngine {
       const deltaTime = (currentTime - this.lastTickTime) / 1000; // Convert to seconds
       this.lastTickTime = currentTime;
 
-      this.tick(deltaTime);
+      // Safety check for NaN deltaTime in test environments
+      if (!Number.isFinite(deltaTime) || deltaTime < 0) {
+        // Use standard 16ms frame time as fallback
+        this.tick(0.016);
+      } else {
+        this.tick(deltaTime);
+      }
 
       if (this.gameState.phase !== 'play-over') {
         // Use requestAnimationFrame if available, otherwise setTimeout
@@ -3073,7 +3116,10 @@ export class FootballEngine {
       return;
     }
 
-    this.gameState.timeElapsed += deltaTime;
+    // Safety check for deltaTime before accumulating
+    if (Number.isFinite(deltaTime) && deltaTime >= 0) {
+      this.gameState.timeElapsed += deltaTime;
+    }
 
     // Update player positions first
     this.updatePlayerPositions(deltaTime);
@@ -3100,6 +3146,36 @@ export class FootballEngine {
         offensePlayers,
         this.gameState.coverage.type,
         this.gameState.phase
+      );
+
+      // Update advanced defensive behaviors (robber, lurk, bracket, poach, invert)
+      this.updateAdvancedDefensiveBehaviors(offensePlayers, defensePlayers);
+
+      // Process pattern matching adjustments
+      if (!PatternMatchingSystem.shouldDisablePatternMatching(this.gameState.coverage.type)) {
+        PatternMatchingSystem.processPatternMatching(
+          defensePlayers,
+          offensePlayers,
+          this.gameState.coverage.type,
+          this.gameState.timeElapsed,
+          this.gameState
+        );
+      }
+
+      // Process coverage disguise and rotations
+      CoverageDisguiseSystem.processDisguiseRotations(
+        defensePlayers,
+        this.gameState.timeElapsed,
+        this.gameState,
+        this.gameState.coverage.type
+      );
+
+      // Process linebacker disguise movements
+      const linebackers = defensePlayers.filter(d => d.playerType === 'LB');
+      CoverageDisguiseSystem.processLinebackerDisguise(
+        linebackers,
+        this.gameState.timeElapsed,
+        this.gameState
       );
     }
 
@@ -3779,10 +3855,28 @@ export class FootballEngine {
     const concept = this.gameState.playConcept;
     // Create a new array with only defensive players to ensure immutability
     const defensivePlayers = this.gameState.players.filter(p => p.team === 'defense');
+
+    // Preserve motion state and custom positions from existing players
+    const existingOffensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
+    const playerState = new Map<string, {
+      hasMotion: boolean;
+      hasMotionBoost: boolean;
+      motionBoostTimeLeft: number;
+      customPosition?: Vector2D;
+    }>();
+    existingOffensivePlayers.forEach(player => {
+      playerState.set(player.id, {
+        hasMotion: player.hasMotion,
+        hasMotionBoost: player.hasMotionBoost,
+        motionBoostTimeLeft: player.motionBoostTimeLeft || 0,
+        customPosition: (player as any).isManuallyPositioned ? player.position : undefined // Only preserve manually positioned players
+      });
+    });
+
     const newOffensivePlayers: Player[] = [];
 
-    // Set personnel based on formation's personnel data
-    if (concept.formation.personnel) {
+    // Set personnel based on formation's personnel data ONLY if not already set by user
+    if (concept.formation.personnel && !this.gameState.personnel) {
       // Convert formation personnel to PersonnelPackage format
       const { RB, TE, WR } = concept.formation.personnel;
       let personnelCode = `${RB || 0}${TE || 0}`;
@@ -3829,9 +3923,12 @@ export class FootballEngine {
         };
       }
 
+      // Restore state if player previously existed
+      const existingState = playerState.get(playerId);
+
       const player: Player = {
         id: playerId,
-        position: adjustedPosition,
+        position: existingState?.customPosition || adjustedPosition, // Use custom position if preserved
         velocity: { x: 0, y: 0 },
         team: 'offense',
         playerType,
@@ -3840,15 +3937,20 @@ export class FootballEngine {
         maxSpeed: this.getPlayerSpeed(playerType),
         currentSpeed: 0,
         isStar: false,
-        hasMotion: false,
-        hasMotionBoost: false,
-        motionBoostTimeLeft: 0,
+        hasMotion: existingState?.hasMotion || false,
+        hasMotionBoost: existingState?.hasMotionBoost || false,
+        motionBoostTimeLeft: existingState?.motionBoostTimeLeft || 0,
         isBlocking: false,
         acceleration: this.getPlayerAcceleration(playerType),
         isAccelerating: false,
         isDecelerating: false,
         timeToTopSpeed: 0,
       };
+
+      // Restore manual positioning flag
+      if (existingState?.customPosition) {
+        (player as any).isManuallyPositioned = true;
+      }
 
       newOffensivePlayers.push(player);
     });
@@ -3877,9 +3979,9 @@ export class FootballEngine {
       oldCoverageType === coverage.type && !losChanged;
 
     if (existingDefenders.length > 0) {
-      console.warn(`setupDefense: existingDefenders=${existingDefenders.length}, oldCoverage=${oldCoverageType}, newCoverage=${coverage.type}, LOS=${this.gameState.lineOfScrimmage}, losChanged=${losChanged}, shouldPreserve=${shouldPreserveDefenders}`);
+      // Debug logging removed - defense setup working properly
       if (losChanged) {
-        console.warn(`LOS changed detected - defender positions:`, existingDefenders.map(d => `${d.id}:${d.position.y}`));
+        // LOS change detected - will proceed with full reset
       }
     }
 
@@ -3960,9 +4062,14 @@ export class FootballEngine {
         if (calculatedPosition) {
           defender.position = calculatedPosition;
         } else {
-          // Fallback to static positioning if dynamic calculation fails
-          const fallbackPosition = this.getDefensivePosition(defender.id, coverage);
-          console.warn(`No calculated position for ${defender.id} (${defender.coverageResponsibility?.type}), using fallback: x=${fallbackPosition.x}, y=${fallbackPosition.y}, LOS=${this.gameState.lineOfScrimmage}`);
+          // Enhanced fallback positioning for specific player types
+          let fallbackPosition = this.getDefensivePosition(defender.id, coverage);
+
+          // Special handling for NB (Nickel backs) based on coverage type
+          if (defender.playerType === 'NB') {
+            fallbackPosition = this.getNickelBackFallbackPosition(defender.id, coverage, this.gameState.lineOfScrimmage);
+          }
+
           defender.position = fallbackPosition;
         }
       });
@@ -4073,6 +4180,7 @@ export class FootballEngine {
           alignmentPositions = generateCover3Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
         case 'cover-4':
+        case 'quarters':
           alignmentPositions = generateCover4Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
         case 'tampa-2':
@@ -4083,6 +4191,21 @@ export class FootballEngine {
           break;
         case 'cover-0':
           alignmentPositions = generateCover0Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
+          break;
+        case 'cover-1-bracket':
+          alignmentPositions = generateCover1BracketAlignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage, formation);
+          break;
+        case 'cover-1-robber':
+          alignmentPositions = generateCover1RobberAlignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage, formation);
+          break;
+        case 'cover-1-lurk':
+          alignmentPositions = generateCover1LurkAlignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage, formation);
+          break;
+        case 'quarters-poach':
+          alignmentPositions = generateQuartersPoachAlignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage, formation);
+          break;
+        case 'cover-2-invert':
+          alignmentPositions = generateCover2InvertAlignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage, formation);
           break;
         default:
           // Fall back to old system for unknown coverages
@@ -4134,9 +4257,14 @@ export class FootballEngine {
         if (calculatedPosition) {
           defender.position = calculatedPosition;
         } else {
-          // Fallback to static positioning if dynamic calculation fails
-          const fallbackPosition = this.getDefensivePosition(defender.id, coverage);
-          console.warn(`No calculated position for ${defender.id} (${defender.coverageResponsibility?.type}), using fallback: x=${fallbackPosition.x}, y=${fallbackPosition.y}, LOS=${this.gameState.lineOfScrimmage}`);
+          // Enhanced fallback positioning for specific player types
+          let fallbackPosition = this.getDefensivePosition(defender.id, coverage);
+
+          // Special handling for NB (Nickel backs) based on coverage type
+          if (defender.playerType === 'NB') {
+            fallbackPosition = this.getNickelBackFallbackPosition(defender.id, coverage, this.gameState.lineOfScrimmage);
+          }
+
           defender.position = fallbackPosition;
         }
       });
@@ -4148,6 +4276,49 @@ export class FootballEngine {
     // Apply blitz package adjustments if applicable
     if (blitzPackage && this.gameState.players) {
       this.applyBlitzPackage(blitzPackage);
+    }
+  }
+
+  /**
+   * Enhanced fallback positioning for Nickel backs based on coverage type
+   */
+  private getNickelBackFallbackPosition(defenderId: string, coverage: Coverage, los: number): Vector2D {
+    const coverageType = coverage.type;
+
+    // Coverage-specific NB positioning
+    switch (coverageType) {
+      case 'cover-0':
+        // Cover 0 - man coverage, NB takes slot receiver
+        return { x: defenderId === 'NB1' ? 18 : 35, y: los + 4 };
+
+      case 'cover-1':
+        // Cover 1 - slot coverage, inside leverage
+        return { x: defenderId === 'NB1' ? 20 : 33, y: los + 6 };
+
+      case 'cover-2':
+        // Cover 2 - hook/curl zones
+        return { x: defenderId === 'NB1' ? 18 : 35, y: los + 8 };
+
+      case 'cover-3':
+        // Cover 3 - underneath zones
+        return { x: defenderId === 'NB1' ? 20 : 33, y: los + 6 };
+
+      case 'cover-4':
+      case 'quarters':
+        // Quarters coverage - pattern match responsibilities
+        return { x: defenderId === 'NB1' ? 18 : 35, y: los + 6 };
+
+      case 'cover-6':
+        // Cover 6 - robber/lurk position
+        return { x: 20, y: los + 6 };
+
+      case 'tampa-2':
+        // Tampa 2 - hook/curl coverage
+        return { x: defenderId === 'NB1' ? 18 : 35, y: los + 8 };
+
+      default:
+        // Generic slot position
+        return { x: 26.665, y: los + 6 };
     }
   }
 
@@ -4673,6 +4844,97 @@ export class FootballEngine {
       } else if (!targetBlitzer) {
         // No blitzers to block - move to default blocking position
         this.moveToDefaultBlockingPosition(blocker, deltaTime);
+      }
+    });
+  }
+
+  /**
+   * Update advanced defensive behaviors (robber, lurk, bracket, poach, invert)
+   * Based on NFL research from Phase 4.3
+   */
+  private updateAdvancedDefensiveBehaviors(offensePlayers: Player[], defensePlayers: Player[]): void {
+    if (!this.gameState.coverage) return;
+
+    const qb = offensePlayers.find(p => p.playerType === 'QB');
+    const receivers = offensePlayers.filter(p => p.isEligible && p.playerType !== 'QB');
+    const formation = this.analyzeFormationComprehensive(offensePlayers);
+
+    defensePlayers.forEach(defender => {
+      const responsibility = defender.coverageResponsibility;
+      if (!responsibility) return;
+
+      // Update robber behavior
+      if (responsibility.qbKeyRules && qb) {
+        AdvancedDefensiveBehavior.updateRobberBehavior(
+          defender,
+          qb,
+          receivers,
+          this.gameState.timeElapsed,
+          this.gameState
+        );
+      }
+
+      // Update lurk behavior
+      if (responsibility.strengthAdjustment) {
+        AdvancedDefensiveBehavior.updateLurkBehavior(
+          defender,
+          offensePlayers,
+          formation.strength,
+          this.gameState.timeElapsed,
+          this.gameState
+        );
+      }
+
+      // Update bracket behavior
+      if (responsibility.bracketType && responsibility.bracketPartner) {
+        const partner = defensePlayers.find(d => d.id === responsibility.bracketPartner);
+        const target = responsibility.primaryTarget ?
+          receivers.find(r => r.id === responsibility.primaryTarget) :
+          receivers.find(r => r.id === responsibility.target);
+
+        if (partner && target) {
+          AdvancedDefensiveBehavior.updateBracketBehavior(
+            defender,
+            partner,
+            target,
+            this.gameState.timeElapsed,
+            this.gameState
+          );
+        }
+      }
+
+      // Update poach behavior
+      if (responsibility.poachRules) {
+        const keyPlayer = offensePlayers.find(p =>
+          p.playerType === responsibility.poachRules?.keyPlayer
+        );
+        const strongSideDefender = defensePlayers.find(d =>
+          d.coverageResponsibility?.receivesHelp
+        );
+
+        if (keyPlayer && strongSideDefender) {
+          AdvancedDefensiveBehavior.updatePoachBehavior(
+            defender,
+            keyPlayer,
+            strongSideDefender,
+            this.gameState.timeElapsed,
+            this.gameState
+          );
+        }
+      }
+
+      // Update inverted coverage behavior
+      if (responsibility.invertedRole) {
+        const partner = defensePlayers.find(d =>
+          d.id !== defender.id && d.coverageResponsibility?.invertedRole
+        );
+
+        AdvancedDefensiveBehavior.updateInvertedBehavior(
+          defender,
+          partner || defender, // Use self if no partner found
+          this.gameState.timeElapsed,
+          this.gameState
+        );
       }
     });
   }

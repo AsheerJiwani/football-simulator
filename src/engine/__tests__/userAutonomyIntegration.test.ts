@@ -27,6 +27,13 @@ describe('User Autonomy Integration Tests', () => {
     });
   });
 
+  afterEach(() => {
+    // Clean up any running game loops
+    if (engine) {
+      engine.reset();
+    }
+  });
+
   describe('1. setPlayConcept() Integration Chain', () => {
     test('should trigger defensive realignment when play concept changes', () => {
       // Get Four Verts concept (spread 2x2 formation)

@@ -10,6 +10,13 @@ describe('Air Raid Concepts Tests', () => {
     if (coverage) engine.setCoverage(coverage);
   });
 
+  afterEach(() => {
+    // Clean up any running game loops
+    if (engine) {
+      engine.reset();
+    }
+  });
+
   describe('Y-Option Concept', () => {
     test('should load y-option concept with empty formation', () => {
       const yOption = DataLoader.getConcept('y-option');

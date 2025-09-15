@@ -314,6 +314,7 @@
         "defenderId": "LB2",
         "type": "zone",
         "zone": {
+          "name": "hole",
           "center": { "x": 26.665, "y": 8 },
           "width": 15,
           "height": 10,
@@ -499,6 +500,7 @@
         "defenderId": "LB2",
         "type": "zone",
         "zone": {
+          "name": "hole",
           "center": { "x": 26.665, "y": 8 },
           "width": 15,
           "height": 10,
@@ -576,5 +578,417 @@
       "coverage": 5,
       "pressureTiming": "immediate"
     }
+  },
+  "cover-1-bracket": {
+    "name": "Cover 1 Bracket",
+    "type": "cover-1-bracket",
+    "safetyCount": 1,
+    "description": "Cover 1 with top-bottom bracket on #1 receiver",
+    "positions": {
+      "CB1": { "x": 8, "y": 7, "type": "man", "leverage": "inside" },
+      "CB2": { "x": 45, "y": 7, "type": "man", "leverage": "outside" },
+      "CB3": { "x": 38, "y": 6, "type": "man", "leverage": "inside" },
+      "S1": { "x": 26.67, "y": 14, "type": "zone" },
+      "S2": { "x": 20, "y": 12, "type": "zone" },
+      "LB1": { "x": 30, "y": 5, "type": "man" },
+      "LB2": { "x": 23, "y": 5, "type": "zone" }
+    },
+    "responsibilities": [
+      {
+        "defenderId": "CB1",
+        "type": "man",
+        "target": "#1",
+        "bracketType": "top-bottom",
+        "bracketPartner": "S2",
+        "leverage": "inside",
+        "maxDepth": 12,
+        "triggerRoutes": ["go", "fade", "corner", "comeback"]
+      },
+      {
+        "defenderId": "S2",
+        "type": "zone",
+        "target": "#1",
+        "bracketType": "top-bottom",
+        "bracketPartner": "CB1",
+        "triggerDepth": 12,
+        "zone": {
+          "name": "bracket-over",
+          "center": { "x": 8, "y": 18 },
+          "width": 8,
+          "height": 15,
+          "depth": 18
+        },
+        "triggerRoutes": ["go", "fade", "corner", "comeback"]
+      },
+      {
+        "defenderId": "CB2",
+        "type": "man",
+        "target": "#2"
+      },
+      {
+        "defenderId": "CB3",
+        "type": "man",
+        "target": "#3"
+      },
+      {
+        "defenderId": "S1",
+        "type": "zone",
+        "zone": {
+          "name": "deep-middle-bracket",
+          "center": { "x": 26.67, "y": 22 },
+          "width": 20,
+          "height": 25,
+          "depth": 22
+        }
+      },
+      {
+        "defenderId": "LB1",
+        "type": "man",
+        "target": "RB1"
+      },
+      {
+        "defenderId": "LB2",
+        "type": "zone",
+        "zone": {
+          "name": "hole-bracket",
+          "center": { "x": 26.67, "y": 8 },
+          "width": 12,
+          "height": 8,
+          "depth": 8
+        }
+      }
+    ]
+  },
+  "cover-1-robber": {
+    "name": "Cover 1 Robber",
+    "type": "cover-1-robber",
+    "safetyCount": 1,
+    "description": "Cover 1 with robber defender reading QB eyes and patterns",
+    "positions": {
+      "CB1": { "x": 8, "y": 7, "type": "man", "leverage": "outside" },
+      "CB2": { "x": 45, "y": 7, "type": "man", "leverage": "outside" },
+      "CB3": { "x": 38, "y": 6, "type": "man", "leverage": "inside" },
+      "S1": { "x": 26.67, "y": 25, "type": "zone" },
+      "S2": { "x": 26.67, "y": 8, "type": "zone" },
+      "LB1": { "x": 30, "y": 5, "type": "man" },
+      "LB2": { "x": 23, "y": 5, "type": "man" }
+    },
+    "responsibilities": [
+      {
+        "defenderId": "S2",
+        "type": "zone",
+        "zone": {
+          "name": "robber-hole",
+          "center": { "x": 26.67, "y": 8 },
+          "width": 12,
+          "height": 8,
+          "depth": 8
+        },
+        "patternReads": ["mesh", "crossing", "shallow", "dig", "slant"],
+        "qbKeyRules": {
+          "readEyes": true,
+          "jumpThreshold": 0.6,
+          "pursuitAngle": "undercut"
+        }
+      },
+      {
+        "defenderId": "S1",
+        "type": "zone",
+        "zone": {
+          "name": "deep-middle-robber",
+          "center": { "x": 26.67, "y": 25 },
+          "width": 22,
+          "height": 20,
+          "depth": 25
+        }
+      },
+      {
+        "defenderId": "CB1",
+        "type": "man",
+        "target": "#1"
+      },
+      {
+        "defenderId": "CB2",
+        "type": "man",
+        "target": "#2"
+      },
+      {
+        "defenderId": "CB3",
+        "type": "man",
+        "target": "#3"
+      },
+      {
+        "defenderId": "LB1",
+        "type": "man",
+        "target": "RB1"
+      },
+      {
+        "defenderId": "LB2",
+        "type": "man",
+        "target": "TE1"
+      }
+    ]
+  },
+  "cover-1-lurk": {
+    "name": "Cover 1 Lurk",
+    "type": "cover-1-lurk",
+    "safetyCount": 1,
+    "description": "Cover 1 with lurk defender positioned toward formation strength",
+    "positions": {
+      "CB1": { "x": 8, "y": 7, "type": "man", "leverage": "outside" },
+      "CB2": { "x": 45, "y": 7, "type": "man", "leverage": "outside" },
+      "CB3": { "x": 38, "y": 6, "type": "man", "leverage": "inside" },
+      "S1": { "x": 26.67, "y": 25, "type": "zone" },
+      "S2": { "x": 20, "y": 9, "type": "zone" },
+      "LB1": { "x": 30, "y": 5, "type": "man" },
+      "LB2": { "x": 23, "y": 5, "type": "man" }
+    },
+    "responsibilities": [
+      {
+        "defenderId": "S2",
+        "type": "zone",
+        "zone": {
+          "name": "lurk-hole-strong",
+          "center": { "x": 20, "y": 9 },
+          "width": 10,
+          "height": 8,
+          "depth": 9
+        },
+        "strengthAdjustment": true,
+        "patternReads": ["smash-low", "flood-underneath", "stick", "hitch"]
+      },
+      {
+        "defenderId": "S1",
+        "type": "zone",
+        "zone": {
+          "name": "deep-middle-lurk",
+          "center": { "x": 26.67, "y": 25 },
+          "width": 24,
+          "height": 20,
+          "depth": 25
+        }
+      },
+      {
+        "defenderId": "CB1",
+        "type": "man",
+        "target": "#1"
+      },
+      {
+        "defenderId": "CB2",
+        "type": "man",
+        "target": "#2"
+      },
+      {
+        "defenderId": "CB3",
+        "type": "man",
+        "target": "#3"
+      },
+      {
+        "defenderId": "LB1",
+        "type": "man",
+        "target": "RB1"
+      },
+      {
+        "defenderId": "LB2",
+        "type": "man",
+        "target": "TE1"
+      }
+    ]
+  },
+  "quarters-poach": {
+    "name": "Quarters Poach",
+    "type": "quarters-poach",
+    "safetyCount": 2,
+    "description": "Quarters coverage with backside safety providing help",
+    "positions": {
+      "CB1": { "x": 8, "y": 7, "type": "zone", "leverage": "inside" },
+      "CB2": { "x": 45, "y": 7, "type": "zone", "leverage": "inside" },
+      "S1": { "x": 18, "y": 22, "type": "zone" },
+      "S2": { "x": 35, "y": 22, "type": "zone" },
+      "LB1": { "x": 20, "y": 6, "type": "zone" },
+      "LB2": { "x": 26.67, "y": 6, "type": "zone" },
+      "LB3": { "x": 33, "y": 6, "type": "zone" }
+    },
+    "responsibilities": [
+      {
+        "defenderId": "S1",
+        "type": "zone",
+        "zone": {
+          "name": "quarters-backside",
+          "center": { "x": 18, "y": 22 },
+          "width": 16,
+          "height": 20,
+          "depth": 22
+        },
+        "poachRules": {
+          "keyPlayer": "TE1",
+          "helpStrong": true,
+          "trigger": "te-block-or-flat"
+        }
+      },
+      {
+        "defenderId": "S2",
+        "type": "zone",
+        "zone": {
+          "name": "quarters-strong-poach",
+          "center": { "x": 35, "y": 22 },
+          "width": 16,
+          "height": 20,
+          "depth": 22
+        },
+        "receivesHelp": true
+      },
+      {
+        "defenderId": "CB1",
+        "type": "zone",
+        "zone": {
+          "name": "quarters-corner1",
+          "center": { "x": 8, "y": 20 },
+          "width": 13.33,
+          "height": 40,
+          "depth": 20
+        }
+      },
+      {
+        "defenderId": "CB2",
+        "type": "zone",
+        "zone": {
+          "name": "quarters-corner2",
+          "center": { "x": 45, "y": 20 },
+          "width": 13.33,
+          "height": 40,
+          "depth": 20
+        }
+      },
+      {
+        "defenderId": "LB1",
+        "type": "zone",
+        "zone": {
+          "name": "underneath-1",
+          "center": { "x": 13, "y": 6 },
+          "width": 10,
+          "height": 8,
+          "depth": 6
+        }
+      },
+      {
+        "defenderId": "LB2",
+        "type": "zone",
+        "zone": {
+          "name": "hook",
+          "center": { "x": 26.67, "y": 8 },
+          "width": 15,
+          "height": 10,
+          "depth": 8
+        }
+      },
+      {
+        "defenderId": "LB3",
+        "type": "zone",
+        "zone": {
+          "name": "underneath-3",
+          "center": { "x": 40, "y": 6 },
+          "width": 10,
+          "height": 8,
+          "depth": 6
+        }
+      }
+    ]
+  },
+  "cover-2-invert": {
+    "name": "Cover 2 Invert",
+    "type": "cover-2-invert",
+    "safetyCount": 2,
+    "description": "Inverted coverage with safety low and corner high",
+    "positions": {
+      "CB1": { "x": 8, "y": 12, "type": "zone", "leverage": "outside" },
+      "CB2": { "x": 45, "y": 5, "type": "zone", "leverage": "outside" },
+      "S1": { "x": 13, "y": 16, "type": "zone" },
+      "S2": { "x": 8, "y": 10, "type": "zone" },
+      "LB1": { "x": 20, "y": 5, "type": "zone" },
+      "LB2": { "x": 26.67, "y": 5, "type": "zone" },
+      "LB3": { "x": 33, "y": 5, "type": "zone" }
+    },
+    "responsibilities": [
+      {
+        "defenderId": "CB1",
+        "type": "zone",
+        "zone": {
+          "name": "deep-outside-invert",
+          "center": { "x": 8, "y": 22 },
+          "width": 12,
+          "height": 20,
+          "depth": 22
+        },
+        "invertedRole": true
+      },
+      {
+        "defenderId": "S2",
+        "type": "zone",
+        "zone": {
+          "name": "robber-invert",
+          "center": { "x": 8, "y": 10 },
+          "width": 8,
+          "height": 8,
+          "depth": 10
+        },
+        "invertedRole": true
+      },
+      {
+        "defenderId": "CB2",
+        "type": "zone",
+        "zone": {
+          "name": "flat-right",
+          "center": { "x": 45, "y": 8 },
+          "width": 8,
+          "height": 12,
+          "depth": 8
+        }
+      },
+      {
+        "defenderId": "S1",
+        "type": "zone",
+        "zone": {
+          "name": "deep-right",
+          "center": { "x": 37, "y": 20 },
+          "width": 26.67,
+          "height": 40,
+          "depth": 20
+        }
+      },
+      {
+        "defenderId": "LB1",
+        "type": "zone",
+        "zone": {
+          "name": "hook-left",
+          "center": { "x": 20, "y": 6 },
+          "width": 10,
+          "height": 8,
+          "depth": 6
+        }
+      },
+      {
+        "defenderId": "LB2",
+        "type": "zone",
+        "zone": {
+          "name": "middle-hook",
+          "center": { "x": 26.67, "y": 8 },
+          "width": 15,
+          "height": 10,
+          "depth": 8
+        }
+      },
+      {
+        "defenderId": "LB3",
+        "type": "zone",
+        "zone": {
+          "name": "hook-right",
+          "center": { "x": 33, "y": 6 },
+          "width": 10,
+          "height": 8,
+          "depth": 6
+        }
+      }
+    ]
   }
 }
