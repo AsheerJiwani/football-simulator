@@ -75,15 +75,37 @@ export class FootballEngine {
         motionBoostDuration: 0.35,
       },
       playerSpeeds: {
-        QB: { min: 7.0, max: 8.5 }, // Updated from research: average 8.71 yd/s
-        RB: { min: 8.5, max: 10.0 }, // Updated from research: average 8.87 yd/s
-        WR: { min: 8.5, max: 10.5 }, // Updated from research: average 8.91 yd/s
-        TE: { min: 7.5, max: 9.0 }, // Updated from research: average 8.46 yd/s
-        FB: { min: 7.5, max: 8.5 }, // Conservative estimate based on TE data
-        CB: { min: 8.8, max: 10.5 }, // Updated from research: average 8.99 yd/s
-        S: { min: 8.2, max: 9.8 }, // Updated from research: average 8.79 yd/s
-        LB: { min: 7.8, max: 9.2 }, // Updated from research: average 8.81 yd/s
-        NB: { min: 8.7, max: 10.2 }, // Updated from research: between CB/S
+        QB: { min: 6.5, max: 8.5, average: 8.71 }, // NFL research: average 8.71 yd/s
+        RB: { min: 8.3, max: 9.3, average: 8.87 }, // NFL research: average 8.87 yd/s
+        WR: { min: 8.5, max: 9.5, average: 8.93 }, // NFL research: average 8.93 yd/s
+        TE: { min: 7.5, max: 8.8, average: 8.46 }, // NFL research: average 8.46 yd/s
+        FB: { min: 7.2, max: 8.5, average: 8.33 }, // NFL research: average 8.33 yd/s
+        CB: { min: 8.7, max: 9.4, average: 8.99 }, // NFL research: average 8.99 yd/s
+        S: { min: 8.2, max: 9.1, average: 8.79 }, // NFL research: average 8.79 yd/s
+        LB: { min: 7.8, max: 8.9, average: 8.70 }, // NFL research: average 8.70 yd/s
+        NB: { min: 8.4, max: 9.2, average: 8.89 }, // NFL research: average 8.89 yd/s
+      },
+      acceleration: {
+        WR: { min: 2.2, max: 3.2, average: 2.7 },
+        CB: { min: 2.4, max: 3.1, average: 2.8 },
+        RB: { min: 2.0, max: 3.0, average: 2.5 },
+        S: { min: 2.1, max: 2.9, average: 2.5 },
+        NB: { min: 2.2, max: 3.0, average: 2.6 },
+        LB: { min: 1.8, max: 2.6, average: 2.2 },
+        TE: { min: 1.6, max: 2.4, average: 2.0 },
+        QB: { min: 1.4, max: 2.2, average: 1.8 },
+        FB: { min: 1.5, max: 2.3, average: 1.9 },
+      },
+      backpedalSpeed: {
+        CB: { ratio: 0.55, min: 4.5, max: 5.5 },
+        S: { ratio: 0.53, min: 4.2, max: 5.2 },
+        NB: { ratio: 0.54, min: 4.3, max: 5.3 },
+      },
+      changeOfDirection: {
+        cut45: { speedRetention: 0.875, recoveryTime: 0.15 },
+        cut90: { speedRetention: 0.75, recoveryTime: 0.3 },
+        cut180: { speedRetention: 0.575, recoveryTime: 0.6 },
+        backpedalTransition: { speedRetention: 0.675, recoveryTime: 0.35 },
       },
       gameplay: {
         minSackTime: 2.0,
@@ -570,7 +592,7 @@ export class FootballEngine {
 
             defender.position = {
               x: assignedReceiver.position.x + leverageOffset,
-              y: losY + cushion
+              y: losY - cushion
             };
 
             // Reset velocity to prevent sliding
@@ -1149,7 +1171,7 @@ export class FootballEngine {
         const newTarget = offensePlayers.find(p => p.id === fs.coverageResponsibility?.target);
         if (newTarget) {
           fs.position.x = newTarget.position.x;
-          fs.position.y = this.gameState.lineOfScrimmage + 8;
+          fs.position.y = this.gameState.lineOfScrimmage - 8;
         }
       }
 
@@ -1157,7 +1179,7 @@ export class FootballEngine {
         const newTarget = offensePlayers.find(p => p.id === ss.coverageResponsibility?.target);
         if (newTarget) {
           ss.position.x = newTarget.position.x;
-          ss.position.y = this.gameState.lineOfScrimmage + 8;
+          ss.position.y = this.gameState.lineOfScrimmage - 8;
         }
       }
     }
@@ -2400,7 +2422,7 @@ export class FootballEngine {
         const offsetX = blockerSide === 'left' ? player.position.x - 2 : player.position.x + 2;
         player.blockingPosition = {
           x: offsetX,
-          y: this.gameState.lineOfScrimmage + 2 // Just upfield from LOS
+          y: this.gameState.lineOfScrimmage - 2 // Just upfield from LOS
         };
       }
 
@@ -2445,12 +2467,36 @@ export class FootballEngine {
     );
 
     const direction = Vector.direction(player.position, targetPosition);
-    const maxMovement = speed * deltaTime;
-    const desiredMovement = Vector.multiply(direction, maxMovement);
+    const distance = Vector.distance(player.position, targetPosition);
 
-    player.velocity = desiredMovement;
-    player.position = Vector.add(player.position, desiredMovement);
-    player.currentSpeed = Vector.magnitude(desiredMovement) / deltaTime;
+    // Check for direction change
+    const oldDirection = Vector.normalize(player.velocity);
+    const angleDiff = Math.acos(Math.max(-1, Math.min(1,
+      oldDirection.x * direction.x + oldDirection.y * direction.y
+    )));
+
+    // Apply direction change penalty
+    if (angleDiff > Math.PI / 4) { // 45 degree change
+      if (angleDiff > Math.PI * 0.75) { // 135+ degree change (cut back)
+        player.directionChangeRecoveryTime = 0.6;
+        player.currentSpeed *= 0.575; // 180 degree penalty
+      } else if (angleDiff > Math.PI / 2) { // 90 degree change
+        player.directionChangeRecoveryTime = 0.3;
+        player.currentSpeed *= 0.75; // 90 degree penalty
+      } else {
+        player.directionChangeRecoveryTime = 0.15;
+        player.currentSpeed *= 0.875; // 45 degree penalty
+      }
+    }
+
+    // Apply acceleration to reach target speed
+    const targetSpeed = Math.min(speed, distance / deltaTime);
+    const actualSpeed = this.applyAcceleration(player, targetSpeed, deltaTime);
+
+    const movement = Vector.multiply(direction, actualSpeed * deltaTime);
+    player.velocity = movement;
+    player.position = Vector.add(player.position, movement);
+    player.currentSpeed = actualSpeed;
   }
 
   private updateDefensivePlayerPosition(player: Player, deltaTime: number, speed: number): void {
@@ -2584,14 +2630,14 @@ export class FootballEngine {
     // Tampa 2 - 2 deep safeties, Mike LB drops to deep middle
     if (player.playerType === 'LB' && player.coverageResponsibility.zone?.name === 'deep-middle') {
       // Mike LB drops to deep hole between safeties
-      const deepHolePosition = { x: 26.665, y: this.gameState.lineOfScrimmage + 15 }; // Middle of field, 15 yards deep from LOS
+      const deepHolePosition = { x: 26.665, y: this.gameState.lineOfScrimmage - 15 }; // Middle of field, 15 yards deep from LOS
       this.moveDefenderToTarget(player, deepHolePosition, deltaTime, speed * 1.1);
     } else if (player.playerType === 'S') {
       // Safeties play deep halves
       const isFieldSide = player.position.x > 26.665;
       const halfZone = {
         x: isFieldSide ? 40 : 13.33,
-        y: this.gameState.lineOfScrimmage + 20 // 20 yards deep from LOS
+        y: this.gameState.lineOfScrimmage - 20 // 20 yards deep from LOS
       };
       this.moveDefenderToTarget(player, halfZone, deltaTime, speed);
     } else if (player.playerType === 'CB') {
@@ -2620,7 +2666,7 @@ export class FootballEngine {
         this.moveDefenderToTarget(player, flatZone, deltaTime, speed);
       } else if (player.playerType === 'S' && player.position.x < 26.665) {
         // Boundary safety plays deep half
-        const deepHalf = { x: 13.33, y: this.gameState.lineOfScrimmage + 20 };
+        const deepHalf = { x: 13.33, y: this.gameState.lineOfScrimmage - 20 };
         this.moveDefenderToTarget(player, deepHalf, deltaTime, speed);
       } else {
         this.executeStandardCoverage(player, deltaTime, speed);
@@ -2693,7 +2739,7 @@ export class FootballEngine {
     const isLeft = defender.position.x < 26.665;
     return {
       x: isLeft ? 10 : 43.33, // Near sideline
-      y: this.gameState.lineOfScrimmage + 15 // 15 yards deep from LOS
+      y: this.gameState.lineOfScrimmage - 15 // 15 yards deep from LOS
     };
   }
 
@@ -2702,7 +2748,7 @@ export class FootballEngine {
     const isLeft = defender.position.x < 26.665;
     return {
       x: isLeft ? 10 : 43.33,
-      y: this.gameState.lineOfScrimmage + 5 // 5 yards deep from LOS
+      y: this.gameState.lineOfScrimmage - 5 // 5 yards deep from LOS
     };
   }
 
@@ -2735,13 +2781,36 @@ export class FootballEngine {
     const direction = Vector.direction(player.position, targetPosition);
     const distance = Vector.distance(player.position, targetPosition);
 
-    // Smooth deceleration when close to target
-    const speedMultiplier = distance > 5 ? 1 : distance / 5;
-    const maxMovement = speed * deltaTime * speedMultiplier * 0.9;
+    // Check if defender is backpedaling (defensive backs)
+    const isDB = ['CB', 'S', 'NB'].includes(player.playerType);
+    if (isDB && !player.isBackpedaling && distance > 5) {
+      // Start backpedaling for DBs when target is far
+      player.isBackpedaling = true;
+    } else if (player.isBackpedaling && distance < 2) {
+      // Stop backpedaling when close
+      player.isBackpedaling = false;
+      player.directionChangeRecoveryTime = 0.35; // Transition penalty
+    }
 
-    player.velocity = Vector.multiply(direction, maxMovement);
-    player.position = Vector.add(player.position, player.velocity);
-    player.currentSpeed = Vector.magnitude(player.velocity) / deltaTime;
+    // Apply backpedal speed reduction
+    let targetSpeed = speed;
+    if (player.isBackpedaling) {
+      const backpedalRatio = this.config.backpedalSpeed?.[player.playerType]?.ratio || 0.55;
+      targetSpeed = speed * backpedalRatio;
+    }
+
+    // Smooth deceleration when close to target
+    if (distance < 5) {
+      targetSpeed *= (distance / 5);
+    }
+
+    // Apply acceleration
+    const actualSpeed = this.applyAcceleration(player, targetSpeed, deltaTime);
+
+    const movement = Vector.multiply(direction, actualSpeed * deltaTime);
+    player.velocity = movement;
+    player.position = Vector.add(player.position, movement);
+    player.currentSpeed = actualSpeed;
   }
 
   private updateBallPhysics(deltaTime: number): void {
@@ -2935,6 +3004,10 @@ export class FootballEngine {
         hasMotionBoost: false,
         motionBoostTimeLeft: 0,
         isBlocking: false,
+        acceleration: this.getPlayerAcceleration(playerType),
+        isAccelerating: false,
+        isDecelerating: false,
+        timeToTopSpeed: 0,
       };
 
       newOffensivePlayers.push(player);
@@ -3033,7 +3106,7 @@ export class FootballEngine {
 
         const safetyCoverage: Player = {
           id: safetyId,
-          position: { x: 26.665, y: this.gameState.lineOfScrimmage + 15 },
+          position: { x: 26.665, y: this.gameState.lineOfScrimmage - 15 },
           velocity: { x: 0, y: 0 },
           team: 'defense',
           playerType: 'S',
@@ -3041,7 +3114,7 @@ export class FootballEngine {
             defenderId: safetyId,
             type: 'zone',
             zone: {
-              center: { x: 26.665, y: this.gameState.lineOfScrimmage + 15 },
+              center: { x: 26.665, y: this.gameState.lineOfScrimmage - 15 },
               width: 30,
               height: 40,
               depth: 15
@@ -3305,7 +3378,62 @@ export class FootballEngine {
 
   private getPlayerSpeed(playerType: PlayerType): number {
     const speedRange = this.config.playerSpeeds[playerType];
+    // Use average speed with ±10% variation for realistic gameplay
+    if (speedRange.average) {
+      const variation = speedRange.average * 0.1; // 10% variation
+      return speedRange.average + (Math.random() - 0.5) * 2 * variation;
+    }
+    // Fallback to range if average not specified
     return Random.range(speedRange.min, speedRange.max);
+  }
+
+  private getPlayerAcceleration(playerType: PlayerType): number {
+    const accelData = this.config.acceleration?.[playerType];
+    if (accelData?.average) {
+      const variation = accelData.average * 0.15; // 15% variation for acceleration
+      return accelData.average + (Math.random() - 0.5) * 2 * variation;
+    }
+    // Default acceleration values if not specified
+    const defaults: Record<PlayerType, number> = {
+      WR: 2.7, CB: 2.8, RB: 2.5, S: 2.5, NB: 2.6,
+      LB: 2.2, TE: 2.0, QB: 1.8, FB: 1.9
+    };
+    return defaults[playerType] || 2.0;
+  }
+
+  private applyAcceleration(player: Player, targetSpeed: number, deltaTime: number): number {
+    // If in direction change recovery, reduce speed
+    if (player.directionChangeRecoveryTime && player.directionChangeRecoveryTime > 0) {
+      player.directionChangeRecoveryTime -= deltaTime;
+      return player.currentSpeed * 0.75; // Reduced speed during recovery
+    }
+
+    // Calculate speed difference
+    const speedDiff = targetSpeed - player.currentSpeed;
+
+    if (Math.abs(speedDiff) < 0.1) {
+      // Already at target speed
+      player.isAccelerating = false;
+      player.isDecelerating = false;
+      return targetSpeed;
+    }
+
+    // Apply acceleration or deceleration
+    if (speedDiff > 0) {
+      // Accelerating
+      player.isAccelerating = true;
+      player.isDecelerating = false;
+      const accelRate = player.acceleration;
+      const newSpeed = Math.min(player.currentSpeed + accelRate * deltaTime, targetSpeed);
+      return newSpeed;
+    } else {
+      // Decelerating
+      player.isAccelerating = false;
+      player.isDecelerating = true;
+      const decelRate = player.acceleration * 1.2; // Deceleration is typically faster
+      const newSpeed = Math.max(player.currentSpeed - decelRate * deltaTime, targetSpeed);
+      return newSpeed;
+    }
   }
 
   // Removed old getOptimalDefensivePersonnelForCoverage - now using improved version from alignment.ts

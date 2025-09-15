@@ -29,6 +29,13 @@ export interface Player {
   routeSegmentIndex?: number; // current segment in route waypoints
   coverageAssignment?: string; // zone name or man assignment
   speed?: number; // current speed
+  // Acceleration mechanics
+  acceleration: number; // current acceleration rate (yd/s²)
+  isAccelerating: boolean;
+  isDecelerating: boolean;
+  isBackpedaling?: boolean; // for defensive backs
+  directionChangeRecoveryTime?: number; // time left to recover from direction change
+  timeToTopSpeed?: number; // time needed to reach max speed from current
 }
 
 export type PlayerType = 'QB' | 'RB' | 'WR' | 'TE' | 'FB' | 'CB' | 'S' | 'LB' | 'NB';
