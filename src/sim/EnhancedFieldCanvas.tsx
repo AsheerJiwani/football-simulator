@@ -29,9 +29,17 @@ function EnhancedFieldCanvas({
   const clearCustomPositions = useGameStore(state => state.clearCustomPositions);
   const initializeEngine = useInitializeEngine();
 
-  // Debug logging for player count
+  // Debug logging for player count and positions
   if (typeof window !== 'undefined') {
     console.log('EnhancedFieldCanvas: Players count:', players.length);
+    if (players.length > 0) {
+      console.log('Sample player positions:', players.slice(0, 3).map(p => ({
+        id: p.id,
+        team: p.team,
+        position: p.position,
+        playerType: p.playerType
+      })));
+    }
   }
 
   // We're using the regular players selector since we don't need forced re-renders
