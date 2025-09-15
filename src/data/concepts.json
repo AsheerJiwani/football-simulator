@@ -1319,6 +1319,28 @@
         "timing": [0, 2.6, 3.2],
         "depth": 16,
         "delayedRelease": 0.8
+      },
+      "WR4": {
+        "type": "deep_comeback",
+        "waypoints": [
+          { "x": 10, "y": 0 },
+          { "x": 8, "y": 20 },
+          { "x": 8, "y": 17 }
+        ],
+        "timing": [0, 3.0, 3.5],
+        "depth": 17,
+        "delayedRelease": 0.6
+      },
+      "RB1": {
+        "type": "checkdown_flat",
+        "waypoints": [
+          { "x": 26.665, "y": -6 },
+          { "x": 35, "y": -2 },
+          { "x": 40, "y": 3 }
+        ],
+        "timing": [0, 1.0, 1.8],
+        "depth": 3,
+        "delayedRelease": 0.8
       }
     }
   },
@@ -1326,7 +1348,7 @@
     "name": "PA Pocket Seams",
     "description": "Play Action pocket drop with vertical seam routes",
     "difficulty": "intermediate",
-    "formation": "spread",
+    "formation": "spread-2x2",
     "playAction": "pocket-drop",
     "routes": {
       "WR1": {
@@ -1369,6 +1391,28 @@
         "timing": [0, 1.5, 2.0],
         "depth": 8,
         "delayedRelease": 0.6
+      },
+      "WR4": {
+        "type": "comeback",
+        "waypoints": [
+          { "x": 10, "y": 0 },
+          { "x": 8, "y": 12 },
+          { "x": 8, "y": 10 }
+        ],
+        "timing": [0, 2.0, 2.4],
+        "depth": 10,
+        "delayedRelease": 0.6
+      },
+      "RB1": {
+        "type": "checkdown",
+        "waypoints": [
+          { "x": 26.665, "y": -7 },
+          { "x": 22, "y": -3 },
+          { "x": 18, "y": 2 }
+        ],
+        "timing": [0, 0.8, 1.5],
+        "depth": 2,
+        "delayedRelease": 0.8
       }
     }
   },
@@ -1376,7 +1420,7 @@
     "name": "PA Deep Cross",
     "description": "Play Action with crossing routes at multiple levels",
     "difficulty": "advanced",
-    "formation": "i-form",
+    "formation": "singleback",
     "playAction": "deep-cross",
     "routes": {
       "WR1": {
@@ -1421,6 +1465,28 @@
         ],
         "timing": [0, 0.4, 1.2],
         "depth": 3,
+        "delayedRelease": 0.6
+      },
+      "RB1": {
+        "type": "wheel",
+        "waypoints": [
+          { "x": 26.665, "y": -7 },
+          { "x": 10, "y": -2 },
+          { "x": 5, "y": 20 }
+        ],
+        "timing": [0, 1.2, 3.0],
+        "depth": 20,
+        "delayedRelease": 0.8
+      },
+      "WR3": {
+        "type": "comeback",
+        "waypoints": [
+          { "x": 48, "y": 0 },
+          { "x": 50, "y": 15 },
+          { "x": 50, "y": 12 }
+        ],
+        "timing": [0, 2.5, 3.0],
+        "depth": 12,
         "delayedRelease": 0.6
       }
     }
@@ -1474,6 +1540,28 @@
         "timing": [0, 2.0, 2.4],
         "depth": 12,
         "delayedRelease": 0.4
+      },
+      "TE2": {
+        "type": "drag",
+        "waypoints": [
+          { "x": 21, "y": 0 },
+          { "x": 21, "y": 2 },
+          { "x": 40, "y": 5 }
+        ],
+        "timing": [0, 0.5, 2.5],
+        "depth": 5,
+        "delayedRelease": 0.6
+      },
+      "RB1": {
+        "type": "flat",
+        "waypoints": [
+          { "x": 26.665, "y": -7 },
+          { "x": 38, "y": -2 },
+          { "x": 45, "y": 3 }
+        ],
+        "timing": [0, 1.0, 1.8],
+        "depth": 3,
+        "delayedRelease": 0.8
       }
     }
   }

@@ -9,7 +9,7 @@ const { chromium } = require('playwright-core');
   });
 
   const page = await browser.newPage();
-  await page.goto('http://localhost:3000/sim');
+  await page.goto('http://localhost:3004/sim');
 
   // Wait for initial load
   await page.waitForTimeout(3000);
