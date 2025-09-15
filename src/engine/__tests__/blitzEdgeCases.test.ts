@@ -19,7 +19,7 @@ describe('Blitz Mechanics Edge Cases - User Autonomy & Defensive Adaptation', ()
 
   afterEach(() => {
     // Clean up any running game loops
-    engine.stopGameLoop();
+    (engine as any).stopGameLoop();
   });
 
   describe('User Autonomy - Offensive Control', () => {

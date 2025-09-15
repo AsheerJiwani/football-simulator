@@ -45,6 +45,20 @@ import { QuarterbackMovement, type QBMovementConfig } from './quarterbackMovemen
 import { HotRoutesSystem } from './hotRoutes';
 import { OptionRoutesSystem } from './optionRoutes';
 import { RubRoutesSystem } from './rubRoutes';
+import {
+  BlitzPackage,
+  BlitzResponsibility,
+  calculatePressureTiming,
+  shouldTriggerBlitz,
+  getBlitzPackage,
+  getPressureEffect,
+  canBlockRusher,
+  updateBlitzerMovement,
+  shouldTriggerHotRoute,
+  PROTECTION_ASSIGNMENTS,
+  PRESSURE_EFFECTS,
+  HOT_ROUTE_TRIGGER_TIME
+} from './blitzMechanics';
 
 export class FootballEngine {
   private gameState: GameState;
@@ -2702,12 +2716,21 @@ export class FootballEngine {
     this.gameState.timeElapsed = 0;
 
     // Check for blitz and apply hot route conversions
-    if (this.hotRoutesSystem.detectBlitz(this.gameState)) {
-      this.gameState.players = this.hotRoutesSystem.autoConvertForBlitz(this.gameState.players);
+    const blitzerCount = this.gameState.players.filter(p =>
+      p.team === 'defense' && p.coverageResponsibility?.type === 'blitz'
+    ).length;
 
-      // Adjust sack time for pressure
-      const timingAdjustment = this.hotRoutesSystem.getPressureTimingAdjustment(true);
-      this.gameState.sackTime = Math.max(1.0, this.gameState.sackTime - timingAdjustment);
+    if (blitzerCount >= 5) {
+      // Apply automatic sight adjustments for blitz situations
+      const formationStrength = this.analyzeFormationComprehensive(
+        this.gameState.players.filter(p => p.team === 'offense')
+      ).strength;
+
+      this.gameState.players = this.hotRoutesSystem.applyAutomaticSightAdjustments(
+        this.gameState.players,
+        this.gameState.coverage!.type,
+        formationStrength
+      );
     }
 
     // Apply motion boosts to players who have them
@@ -3054,6 +3077,9 @@ export class FootballEngine {
 
     // Update player positions first
     this.updatePlayerPositions(deltaTime);
+
+    // Update blitzer movements and pass rush
+    this.updateBlitzMovement(deltaTime);
 
     // Process option route decisions
     this.processOptionRoutes(deltaTime);
@@ -3838,6 +3864,10 @@ export class FootballEngine {
     const offensivePlayers = this.gameState.players.filter(p => p.team === 'offense');
     const existingDefenders = this.gameState.players.filter(p => p.team === 'defense');
 
+    // Check if blitz package should be applied
+    const shouldBlitz = shouldTriggerBlitz(coverage.type);
+    const blitzPackage = shouldBlitz ? getBlitzPackage(coverage.type) : null;
+
     // Check if we can preserve existing defenders (same coverage type)
     // Use passed previousCoverage if available, otherwise use current
     const oldCoverageType = previousCoverage?.type || this.gameState.currentCoverage?.type;
@@ -4114,6 +4144,11 @@ export class FootballEngine {
       // Create completely new players array
       this.gameState.players = [...offensivePlayers, ...newDefensivePlayers];
     }
+
+    // Apply blitz package adjustments if applicable
+    if (blitzPackage && this.gameState.players) {
+      this.applyBlitzPackage(blitzPackage);
+    }
   }
 
   private getDefensivePosition(defenderId: string, coverage: Coverage): Vector2D {
@@ -4159,48 +4194,42 @@ export class FootballEngine {
     // Store original sack time for dynamic adjustments
     const baseSackTime = this.gameState.sackTime;
 
-    // Count only unblocked blitzing defenders
-    const unblockedBlitzers = this.gameState.players.filter(player =>
+    // Count total blitzing defenders for NFL timing calculation
+    const totalBlitzers = this.gameState.players.filter(player =>
       player.team === 'defense' &&
-      player.coverageResponsibility?.type === 'blitz' &&
-      !this.isBlitzerBlocked(player.id)
+      player.coverageResponsibility?.type === 'blitz'
+    );
+
+    const totalBlitzerCount = totalBlitzers.length;
+
+    if (totalBlitzerCount === 0) {
+      // No blitzers - use standard timing
+      return;
+    }
+
+    // Use NFL-based timing calculations
+    const { pressureTime, sackTime } = calculatePressureTiming(
+      totalBlitzerCount,
+      baseSackTime
+    );
+
+    // Store pressure timing for QB accuracy effects
+    this.gameState.pressureTime = pressureTime;
+    this.gameState.sackTime = sackTime;
+
+    // Count only unblocked blitzing defenders for additional adjustments
+    const unblockedBlitzers = totalBlitzers.filter(blitzer =>
+      !this.isBlitzerBlocked(blitzer.id)
     );
 
     const unblockedCount = unblockedBlitzers.length;
 
-    if (unblockedCount === 0) {
-      // No unblocked blitzers - no adjustment needed
-      return;
+    // Additional adjustment for blocked vs unblocked rushers
+    if (unblockedCount < totalBlitzerCount) {
+      // Some blitzers are blocked - slightly extend sack time
+      const blockingBonus = (totalBlitzerCount - unblockedCount) * 0.3;
+      this.gameState.sackTime = Math.min(baseSackTime, this.gameState.sackTime + blockingBonus);
     }
-
-    // Get base sack time for scaling
-    const maxSackTime = this.config.gameplay.maxSackTime;
-
-    // Calculate proportional reduction based on Claude.md specs
-    let minReduction = 0;
-    let maxReduction = 0;
-
-    if (unblockedCount === 1) {
-      // 1 blitzer: 0.3-2.0s reduction (scaled to sack time)
-      minReduction = 0.3;
-      maxReduction = 2.0;
-    } else if (unblockedCount >= 2) {
-      // 2+ blitzers: 0.7-4.0s reduction (scaled to sack time)
-      minReduction = 0.7;
-      maxReduction = 4.0;
-    }
-
-    // Scale reduction based on current sack time (proportional to 10s max)
-    const scaleFactor = baseSackTime / maxSackTime;
-    const scaledMinReduction = minReduction * scaleFactor;
-    const scaledMaxReduction = maxReduction * scaleFactor;
-
-    // Random reduction within scaled range
-    const reduction = scaledMinReduction +
-      Math.random() * (scaledMaxReduction - scaledMinReduction);
-
-    // Apply reduction, ensuring sack time doesn't go below 0.5s
-    this.gameState.sackTime = Math.max(0.5, baseSackTime - reduction);
   }
 
   // Update sack time dynamically during play for newly blocked blitzers
@@ -4575,5 +4604,248 @@ export class FootballEngine {
     // Return likely slot receiver IDs based on common naming conventions
     const slotReceivers = ['WR3', 'WR4', 'TE1', 'RB1'];
     return slotReceivers[slotIndex] || null;
+  }
+
+  /**
+   * Update blitzer movements and pass protection
+   */
+  private updateBlitzMovement(deltaTime: number): void {
+    if (this.gameState.phase !== 'post-snap') return;
+
+    // Update all blitzing defenders
+    this.gameState.players
+      .filter(p => p.team === 'defense' && p.coverageResponsibility?.type === 'blitz')
+      .forEach(blitzer => {
+        const responsibility = blitzer.coverageResponsibility as BlitzResponsibility;
+        if (responsibility.rushLane) {
+          updateBlitzerMovement(blitzer, responsibility.rushLane, deltaTime);
+        }
+      });
+
+    // Update pass protection assignments
+    this.updatePassProtection(deltaTime);
+
+    // Check for hot route triggers
+    if (this.shouldTriggerHotRoutes()) {
+      this.processHotRouteAdjustments();
+    }
+  }
+
+  /**
+   * Update pass protection assignments and blocking
+   */
+  private updatePassProtection(deltaTime: number): void {
+    const blockers = this.gameState.players.filter(p => p.isBlocking);
+    const blitzers = this.gameState.players.filter(p =>
+      p.team === 'defense' &&
+      p.coverageResponsibility?.type === 'blitz'
+    );
+
+    blockers.forEach(blocker => {
+      const assignment = PROTECTION_ASSIGNMENTS[blocker.playerType];
+      if (!assignment) return;
+
+      // Find closest unblocked blitzer based on protection priority
+      const targetBlitzer = this.findTargetBlitzer(blocker, blitzers, assignment);
+
+      if (targetBlitzer && !targetBlitzer.isBlocked) {
+        // Move toward blitzer to block
+        const dx = targetBlitzer.position.x - blocker.position.x;
+        const dy = targetBlitzer.position.y - blocker.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > 1.5) {
+          // Move toward blitzer
+          const direction = { x: dx / distance, y: dy / distance };
+          blocker.velocity = {
+            x: direction.x * blocker.maxSpeed,
+            y: direction.y * blocker.maxSpeed
+          };
+          blocker.position.x += blocker.velocity.x * deltaTime;
+          blocker.position.y += blocker.velocity.y * deltaTime;
+        } else {
+          // Close enough to block
+          if (canBlockRusher(blocker, targetBlitzer, assignment)) {
+            targetBlitzer.isBlocked = true;
+            blocker.blockingTarget = targetBlitzer.id;
+          }
+        }
+      } else if (!targetBlitzer) {
+        // No blitzers to block - move to default blocking position
+        this.moveToDefaultBlockingPosition(blocker, deltaTime);
+      }
+    });
+  }
+
+  /**
+   * Find the best blitzer target for a blocker based on protection scheme
+   */
+  private findTargetBlitzer(
+    blocker: Player,
+    blitzers: Player[],
+    assignment: typeof PROTECTION_ASSIGNMENTS[keyof typeof PROTECTION_ASSIGNMENTS]
+  ): Player | null {
+    const unblockedBlitzers = blitzers.filter(b => !b.isBlocked);
+    if (unblockedBlitzers.length === 0) return null;
+
+    // Sort by priority based on protection scheme
+    const prioritizedBlitzers = unblockedBlitzers.sort((a, b) => {
+      const aPriority = assignment.priority.indexOf(a.playerType);
+      const bPriority = assignment.priority.indexOf(b.playerType);
+
+      if (aPriority !== -1 && bPriority !== -1) {
+        return aPriority - bPriority;
+      } else if (aPriority !== -1) {
+        return -1;
+      } else if (bPriority !== -1) {
+        return 1;
+      }
+
+      // If neither in priority list, sort by distance
+      const distA = Vector.distance(blocker.position, a.position);
+      const distB = Vector.distance(blocker.position, b.position);
+      return distA - distB;
+    });
+
+    return prioritizedBlitzers[0];
+  }
+
+  /**
+   * Move blocker to default blocking position when no blitzers present
+   */
+  private moveToDefaultBlockingPosition(blocker: Player, deltaTime: number): void {
+    // Default blocking position is near line of scrimmage
+    const defaultPosition: Vector2D = {
+      x: blocker.position.x,
+      y: Math.max(this.gameState.lineOfScrimmage - 1, blocker.position.y - 2)
+    };
+
+    const dx = defaultPosition.x - blocker.position.x;
+    const dy = defaultPosition.y - blocker.position.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance > 0.5) {
+      const direction = { x: dx / distance, y: dy / distance };
+      blocker.velocity = {
+        x: direction.x * blocker.maxSpeed * 0.5, // Slower movement to position
+        y: direction.y * blocker.maxSpeed * 0.5
+      };
+      blocker.position.x += blocker.velocity.x * deltaTime;
+      blocker.position.y += blocker.velocity.y * deltaTime;
+    }
+  }
+
+  /**
+   * Check if hot routes should be triggered due to blitz pressure
+   */
+  private shouldTriggerHotRoutes(): boolean {
+    const blitzerCount = this.gameState.players.filter(p =>
+      p.team === 'defense' &&
+      p.coverageResponsibility?.type === 'blitz' &&
+      !p.isBlocked
+    ).length;
+
+    return shouldTriggerHotRoute(blitzerCount, this.gameState.timeElapsed);
+  }
+
+  /**
+   * Process hot route adjustments when pressure is detected
+   */
+  private processHotRouteAdjustments(): void {
+    if (!this.gameState.coverage) return;
+
+    const formationStrength = this.analyzeFormationComprehensive(
+      this.gameState.players.filter(p => p.team === 'offense')
+    ).strength;
+
+    // Apply automatic sight adjustments for pressure situations
+    this.gameState.players = this.hotRoutesSystem.applyAutomaticSightAdjustments(
+      this.gameState.players,
+      this.gameState.coverage.type,
+      formationStrength
+    );
+
+    // Reinitialize receivers in movement system
+    this.gameState.players
+      .filter(p => p.team === 'offense' && p.route && p.playerType !== 'QB')
+      .forEach(receiver => this.receiverMovement.initializeReceiver(receiver));
+  }
+
+  /**
+   * Apply pressure effects to quarterback accuracy
+   */
+  public getQBAccuracyModifier(): number {
+    if (!this.gameState.pressureTime) return 1.0;
+
+    const pressureEffect = getPressureEffect(
+      this.gameState.timeElapsed,
+      this.gameState.pressureTime,
+      this.gameState.sackTime
+    );
+
+    return PRESSURE_EFFECTS[pressureEffect].accuracyMultiplier;
+  }
+
+  /**
+   * Get quarterback throw timing under pressure
+   */
+  public getQBThrowTime(): number {
+    if (!this.gameState.pressureTime) return 0.8;
+
+    const pressureEffect = getPressureEffect(
+      this.gameState.timeElapsed,
+      this.gameState.pressureTime,
+      this.gameState.sackTime
+    );
+
+    return PRESSURE_EFFECTS[pressureEffect].throwTime;
+  }
+
+  /**
+   * Apply blitz package responsibilities to defensive players
+   */
+  private applyBlitzPackage(blitzPackage: BlitzPackage): void {
+    const defensivePlayers = this.gameState.players.filter(p => p.team === 'defense');
+
+    blitzPackage.responsibilities.forEach(blitzResponsibility => {
+      const defender = defensivePlayers.find(d =>
+        d.playerType === this.getPlayerTypeFromBlitzResponsibility(blitzResponsibility) ||
+        d.id === blitzResponsibility.defenderId
+      );
+
+      if (defender) {
+        // Update coverage responsibility to blitz
+        defender.coverageResponsibility = {
+          defenderId: defender.id,
+          type: 'blitz',
+          target: blitzResponsibility.target,
+        };
+
+        // Add rush lane information for blitz movement
+        (defender.coverageResponsibility as BlitzResponsibility).rushLane = blitzResponsibility.rushLane;
+        (defender.coverageResponsibility as BlitzResponsibility).timingSeconds = blitzResponsibility.timingSeconds;
+        (defender.coverageResponsibility as BlitzResponsibility).priority = blitzResponsibility.priority;
+      }
+    });
+  }
+
+  /**
+   * Map blitz responsibility to player type for assignment
+   */
+  private getPlayerTypeFromBlitzResponsibility(responsibility: BlitzResponsibility): PlayerType {
+    // Map common defender IDs to player types
+    const idToTypeMap: Record<string, PlayerType> = {
+      'SS': 'S',
+      'FS': 'S',
+      'S1': 'S',
+      'S2': 'S',
+      'MIKE': 'LB',
+      'WILL': 'LB',
+      'SAM': 'LB',
+      'CB1': 'CB',
+      'CB2': 'CB'
+    };
+
+    return idToTypeMap[responsibility.defenderId] || 'LB';
   }
 }

@@ -167,6 +167,7 @@ export interface GameState {
   phase: GamePhase;
   timeElapsed: number; // seconds since snap
   sackTime: number; // seconds until sack
+  pressureTime?: number; // seconds until pressure affects QB
   players: Player[];
   ball: Ball;
   playConcept?: PlayConcept;

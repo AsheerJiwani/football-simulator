@@ -30,7 +30,7 @@ describe('Blitz Mechanics', () => {
 
   afterEach(() => {
     // Clean up any running game loops
-    engine.stopGameLoop();
+    (engine as any).stopGameLoop();
   });
 
   describe('Pressure Timing Calculations', () => {
