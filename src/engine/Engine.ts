@@ -114,6 +114,24 @@ export class FootballEngine {
         challengeModeSackTime: 2.7,
         maxAudibles: 2,
       },
+      // NFL-accurate zone landmarks for realistic coverage
+      zoneLandmarks: {
+        // Deep zones (all depths are negative from LOS toward defensive endzone)
+        deepThird: { depth: -15, width: 17.5 },    // Hash to sideline
+        deepHalf: { depth: -13, width: 13.5 },     // Hash to hash
+        deepMiddle: { depth: -18, width: 8 },      // Between hashes
+        deepQuarter: { depth: -15, width: 13.33 }, // Field split into 4
+
+        // Underneath zones
+        curl: { depth: -12, width: 13.5 },         // Top of numbers
+        flat: { depth: -10, width: 8 },            // Numbers to sideline
+        hook: { depth: -10, width: 11.25 },        // Outside hash
+        lowHole: { depth: -10, width: 9.25 },      // Between hashes (Tampa 2)
+
+        // Shallow zones
+        buzzFlat: { depth: -5, width: 10 },        // Quick flat route area
+        shallowCross: { depth: -6, width: 15 },    // Crossing route area
+      },
     };
   }
 
@@ -2735,20 +2753,46 @@ export class FootballEngine {
   }
 
   private getDeepQuarterZone(defender: Player): Vector2D {
-    // Calculate deep quarter zone position
+    // NFL-accurate deep quarter zone position
+    const landmarks = this.config.zoneLandmarks.deepQuarter;
     const isLeft = defender.position.x < 26.665;
+
     return {
-      x: isLeft ? 10 : 43.33, // Near sideline
-      y: this.gameState.lineOfScrimmage - 15 // 15 yards deep from LOS
+      x: isLeft ? (26.665 - landmarks.width) : (26.665 + landmarks.width),
+      y: this.gameState.lineOfScrimmage + landmarks.depth // depth is negative
     };
   }
 
   private getFlatZone(defender: Player): Vector2D {
-    // Calculate flat zone position
+    // NFL-accurate flat zone position (numbers to sideline)
+    const landmarks = this.config.zoneLandmarks.flat;
     const isLeft = defender.position.x < 26.665;
+
     return {
-      x: isLeft ? 10 : 43.33,
-      y: this.gameState.lineOfScrimmage - 5 // 5 yards deep from LOS
+      x: isLeft ? 8 : 45, // Numbers position (18 yards from center)
+      y: this.gameState.lineOfScrimmage + landmarks.depth
+    };
+  }
+
+  private getCurlZone(defender: Player): Vector2D {
+    // NFL-accurate curl zone (top of numbers)
+    const landmarks = this.config.zoneLandmarks.curl;
+    const isLeft = defender.position.x < 26.665;
+
+    return {
+      x: isLeft ? (26.665 - landmarks.width) : (26.665 + landmarks.width),
+      y: this.gameState.lineOfScrimmage + landmarks.depth
+    };
+  }
+
+  private getHookZone(defender: Player): Vector2D {
+    // NFL-accurate hook zone (outside hash)
+    const landmarks = this.config.zoneLandmarks.hook;
+    const isLeft = defender.position.x < 26.665;
+
+    return {
+      x: isLeft ? (26.665 - landmarks.width) : (26.665 + landmarks.width),
+      y: this.gameState.lineOfScrimmage + landmarks.depth
     };
   }
 

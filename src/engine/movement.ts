@@ -4,41 +4,60 @@ import { Bezier } from '@/lib/math';
 export interface MovementConfig {
   pressCushion: number;
   offCushion: number;
+  bailCushion: number;
   trailDistance: number;
   cushionBreakThreshold: number;
+  cushionThreatThreshold: number;
   breakReactionDelay: number;
   backpedalSpeedRatio: number;
+  controlPedalRatio: number;
+  speedPedalRatio: number;
   zoneDropSpeedRatio: number;
   hipFlipDuration: number;
   patternMatchTriggerTime: number;
   rallyAngle: number;
+  jamWindow: number;
+  jamSuccessRate: number;
+  rerouteDistance: number;
 }
 
 export const DEFAULT_MOVEMENT_CONFIG: MovementConfig = {
   pressCushion: 1.0,
-  offCushion: 7.0,
+  offCushion: 7.5,  // NFL standard off-man depth
+  bailCushion: 10.0, // Deep zone bail technique
   trailDistance: 1.5,
-  cushionBreakThreshold: 2.5,
-  breakReactionDelay: 0.4,
-  backpedalSpeedRatio: 0.75,
+  cushionBreakThreshold: 2.0,  // Hip turn trigger
+  cushionThreatThreshold: 3.0, // Speed pedal trigger
+  breakReactionDelay: 0.3,  // Elite DB reaction time
+  backpedalSpeedRatio: 0.55, // 55% of forward speed
+  controlPedalRatio: 0.75,   // Control pedal speed
+  speedPedalRatio: 1.0,      // Full speed when threatened
   zoneDropSpeedRatio: 0.85,
   hipFlipDuration: 0.25,
   patternMatchTriggerTime: 1.25,
   rallyAngle: 45,
+  jamWindow: 0.5,  // Press jam timing window
+  jamSuccessRate: 0.7, // 70% success rate
+  rerouteDistance: 2.0, // Push receiver outside
 };
 
 export interface DefenderState {
-  technique: 'press' | 'off' | 'trail' | 'zone' | 'blitz';
+  technique: 'press' | 'off' | 'bail' | 'trail' | 'zone' | 'blitz';
   leverage: 'inside' | 'outside' | 'head-up';
+  pedalType: 'control' | 'speed' | 'sprint';
   isBackpedaling: boolean;
   isTransitioning: boolean;
   transitionTimeLeft: number;
   reactionTimeLeft: number;
   hasReactedToBreak: boolean;
   cushionDistance: number;
+  currentCushion: number;
   targetPosition?: Vector2D;
   assignedReceiver?: string;
   zoneResponsibility?: string;
+  hasSafetyHelp: boolean;
+  jamAttempted?: boolean;
+  visionFocus?: 'receiver_hips' | 'quarterback_eyes' | 'zone_scan';
 }
 
 export class DefensiveMovement {
@@ -54,17 +73,25 @@ export class DefensiveMovement {
     coverage: Coverage,
     assignedReceiver?: Player
   ): void {
+    // Determine if defender has safety help for leverage decisions
+    const hasSafetyHelp = this.checkSafetyHelp(defender, coverage);
+
     const state: DefenderState = {
       technique: this.determineTechnique(defender, coverage),
-      leverage: this.determineLeverage(defender, assignedReceiver),
+      leverage: this.determineLeverage(defender, assignedReceiver, hasSafetyHelp),
+      pedalType: 'control', // Start with control pedal
       isBackpedaling: defender.coverageResponsibility?.type === 'zone' || this.shouldBackpedal(defender),
       isTransitioning: false,
       transitionTimeLeft: 0,
       reactionTimeLeft: 0,
       hasReactedToBreak: false,
       cushionDistance: this.getInitialCushion(defender, coverage),
+      currentCushion: this.getInitialCushion(defender, coverage),
       assignedReceiver: assignedReceiver?.id,
       zoneResponsibility: defender.coverageAssignment,
+      hasSafetyHelp,
+      jamAttempted: false,
+      visionFocus: defender.coverageResponsibility?.type === 'man' ? 'receiver_hips' : 'quarterback_eyes'
     };
 
     this.defenderStates.set(defender.id, state);
@@ -74,26 +101,42 @@ export class DefensiveMovement {
     if (defender.coverageAssignment === 'blitz') return 'blitz';
 
     // Check if defender has zone responsibility
-    if (defender.coverageResponsibility?.type === 'zone') return 'zone';
+    if (defender.coverageResponsibility?.type === 'zone') {
+      // Deep zones use bail technique
+      if (defender.coverageResponsibility.zone?.name?.includes('deep')) {
+        return 'bail';
+      }
+      return 'zone';
+    }
 
-    if (coverage.name === 'Cover 0' || coverage.name === 'Cover 1') {
+    // Man coverage techniques based on coverage and position
+    if (coverage.name === 'Cover 0') {
+      return 'press'; // Always press in Cover 0
+    } else if (coverage.name === 'Cover 1') {
       return defender.playerType === 'CB' ? 'press' : 'off';
     }
 
     return 'off';
   }
 
-  private determineLeverage(defender: Player, receiver?: Player): DefenderState['leverage'] {
+  private determineLeverage(defender: Player, receiver?: Player, hasSafetyHelp?: boolean): DefenderState['leverage'] {
     if (!receiver) return 'head-up';
 
-    const fieldCenter = 0;
-    const receiverTowardsBoundary = Math.abs(receiver.position.x) > 15;
+    const fieldCenter = 26.665; // Center of field
+    const receiverTowardsBoundary = Math.abs(receiver.position.x - fieldCenter) > 15;
 
-    if (receiverTowardsBoundary) {
-      return receiver.position.x > fieldCenter ? 'inside' : 'inside';
+    // NFL leverage rules based on help
+    if (hasSafetyHelp) {
+      // With safety help, take outside leverage to funnel receiver inside
+      return 'outside';
+    } else {
+      // Without safety help, take inside leverage to protect deep
+      if (receiverTowardsBoundary) {
+        // Near boundary, can use sideline as extra defender
+        return 'inside';
+      }
+      return 'inside';
     }
-
-    return 'inside';
   }
 
   private shouldBackpedal(defender: Player): boolean {
@@ -104,11 +147,49 @@ export class DefensiveMovement {
     const technique = this.determineTechnique(defender, coverage);
 
     if (technique === 'press') return this.config.pressCushion;
+    if (technique === 'bail') return this.config.bailCushion;
     if (technique === 'zone') return 8.0;
 
     if (defender.playerType === 'LB') return 7.0;
 
     return this.config.offCushion;
+  }
+
+  // Check if defender has safety help for leverage decisions
+  private checkSafetyHelp(defender: Player, coverage: Coverage): boolean {
+    // Cover 2, Cover 3, Cover 4, Tampa 2 provide safety help
+    const helpCoverages = ['Cover 2', 'Cover 3', 'Cover 4', 'Tampa 2', 'Quarters'];
+
+    // Cover 0 and man-only Cover 1 have no deep help
+    if (coverage.name === 'Cover 0') return false;
+    if (coverage.name === 'Cover 1' && defender.playerType === 'CB') return false;
+
+    return helpCoverages.includes(coverage.name || '');
+  }
+
+  // Update cushion management based on threat assessment
+  private updateCushionManagement(state: DefenderState, separation: number): void {
+    if (separation <= this.config.cushionBreakThreshold) {
+      // Cushion broken - need to turn and run
+      state.pedalType = 'sprint';
+      state.isBackpedaling = false;
+    } else if (separation <= this.config.cushionThreatThreshold) {
+      // Cushion threatened - speed pedal
+      state.pedalType = 'speed';
+    } else {
+      // Comfortable cushion - control pedal
+      state.pedalType = 'control';
+    }
+  }
+
+  // Apply jam effect (doesn't prevent catches, just affects positioning)
+  private applyJamEffect(receiver: Player): void {
+    // Jam reroutes receiver but QB can still throw to them
+    // This only affects the receiver's route efficiency, not catchability
+    if (receiver.velocity) {
+      receiver.velocity.x *= 0.8; // Slight disruption
+      // Note: receiver remains eligible and catchable
+    }
   }
 
   public updateManCoverage(
