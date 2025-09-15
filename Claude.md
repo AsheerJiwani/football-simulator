@@ -127,6 +127,7 @@ Route Concepts: Choose from pre-loaded NFL plays (e.g., Smash, Mesh, Flood).
 Personnel & Formations: Adjust RB/TE/WR counts; each concept has a default formation.
 
 Defensive Coverage: User selects coverage (Cover 0–6, Quarters, Tampa 2, etc.); defense auto-aligns based on formation/personnel.
+**Coverage-Personnel Compatibility**: Certain coverages are disabled/warned when incompatible with current defensive personnel (e.g., Tampa 2 requires 3+ LBs, unavailable in Dime package).
 
 Throw: After the snap, QB may throw to any non-pass-pro eligible at any time before he gets sacked
 

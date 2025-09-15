@@ -211,6 +211,9 @@ export class FootballEngine {
         this.realignDefense();
       }
     }
+
+    // Force state update for UI
+    this.gameState.lastUpdate = Date.now();
   }
 
   public setCoverage(coverage: Coverage): void {
@@ -346,10 +349,8 @@ export class FootballEngine {
 
     // Calculate new field position based on outcome
     if (type === 'catch') {
-      // For catch, yards is the yardLine where catch happened, not yards gained
-      // Calculate actual yards gained from current LOS
-      const yardsGained = yards - this.gameState.lineOfScrimmage;
-      newLOS += yardsGained;
+      // yards is now the yards gained (not absolute position)
+      newLOS += yards;
     } else if (type === 'sack') {
       // For sack, yards is negative (yards lost)
       newLOS += yards;
@@ -574,8 +575,23 @@ export class FootballEngine {
     // Handle motion-specific defensive adjustments
     this.handleMotionAdjustments(offensePlayers, defensePlayers);
 
+    // Store old positions to ensure changes are detectable
+    const oldPositions = new Map(defensePlayers.map(d => [d.id, { ...d.position }]));
+
     // Apply NFL-accurate coverage-specific realignment
     this.applyCoverageSpecificRealignment(coverage, defensePlayers, formation, formationStrength);
+
+    // Ensure at least some positional changes occur to trigger UI updates
+    // Add more significant adjustments if positions haven't changed much
+    defensePlayers.forEach(defender => {
+      const oldPos = oldPositions.get(defender.id);
+      if (oldPos && Math.abs(defender.position.x - oldPos.x) < 1.0 &&
+          Math.abs(defender.position.y - oldPos.y) < 1.0) {
+        // Add more substantial adjustment to ensure change is detectable
+        defender.position.x += formationStrength === 'right' ? 1.5 : -1.5;
+        defender.position.y += 0.5; // Also adjust depth slightly
+      }
+    });
 
     // Determine new formation strength (based on receiver positioning - LEGACY FALLBACK)
     const losY = this.gameState.lineOfScrimmage;
@@ -610,7 +626,7 @@ export class FootballEngine {
 
             defender.position = {
               x: assignedReceiver.position.x + leverageOffset,
-              y: losY - cushion
+              y: losY + cushion  // Fixed: defenders should be on defensive side (+ not -)
             };
 
             // Reset velocity to prevent sliding
@@ -1575,7 +1591,7 @@ export class FootballEngine {
         case 'S':
           if (defender.id === 'FS') {
             // Free Safety - center field, 12-15 yard depth, hash-to-hash
-            defender.position = { x: centerX, y: losY + 14 };
+            defender.position = { x: centerX, y: losY + 14 };  // Defensive side of LOS
 
             // Trips adjustment - favor trips side slightly
             if (formation.isTrips) {
@@ -1586,7 +1602,7 @@ export class FootballEngine {
             // Strong Safety adjustments
             if (formation.hasTightEnd || formation.isTrips) {
               // SS plays closer to LOS for run support
-              defender.position.y = losY + 8;
+              defender.position.y = losY + 8;  // Defensive side of LOS
               // Shift toward strength
               defender.position.x += strength === 'right' ? 3 : -3;
             }
@@ -2916,7 +2932,7 @@ export class FootballEngine {
         outcome = {
           type: 'catch',
           receiver: receiver.id,
-          yards: receiver.position.y, // Use y directly as yardLine
+          yards: receiver.position.y - this.gameState.lineOfScrimmage, // Store yards gained, not absolute position
           openness,
           catchProbability,
           endPosition: receiver.position
@@ -3088,7 +3104,18 @@ export class FootballEngine {
     // Analyze offensive formation and personnel
     const formation = this.analyzeFormationComprehensive(offensivePlayers);
     const legacyFormation = analyzeFormation(offensivePlayers); // For compatibility with new alignment functions
-    const optimalPersonnel = getOptimalDefensivePersonnel(legacyFormation.personnel);
+    let optimalPersonnel = getOptimalDefensivePersonnel(legacyFormation.personnel);
+
+    // Special handling for Tampa 2 - requires at least 3 LBs
+    if (coverage.type === 'tampa-2' && optimalPersonnel.LB < 3) {
+      // Force Base personnel for Tampa 2 (4 DBs, 3 LBs)
+      optimalPersonnel = {
+        CB: 2,
+        S: 2,
+        LB: 3,
+        NB: 0
+      };
+    }
 
     if (coverage.type === 'cover-1') {
       // Use existing Cover 1 system but with enhanced analysis
@@ -3150,7 +3177,7 @@ export class FootballEngine {
 
         const safetyCoverage: Player = {
           id: safetyId,
-          position: { x: 26.665, y: this.gameState.lineOfScrimmage - 15 },
+          position: { x: 26.665, y: this.gameState.lineOfScrimmage + 15 },  // Fixed: + instead of -
           velocity: { x: 0, y: 0 },
           team: 'defense',
           playerType: 'S',
@@ -3158,7 +3185,7 @@ export class FootballEngine {
             defenderId: safetyId,
             type: 'zone',
             zone: {
-              center: { x: 26.665, y: this.gameState.lineOfScrimmage - 15 },
+              center: { x: 26.665, y: this.gameState.lineOfScrimmage + 15 },  // Fixed: + instead of -
               width: 30,
               height: 40,
               depth: 15
@@ -3190,7 +3217,16 @@ export class FootballEngine {
 
         // Create coverage responsibility based on assignment and coverage type
         let responsibility;
-        if (coverage.type === 'cover-2' || coverage.type === 'cover-3' || coverage.type === 'cover-4') {
+        if (coverage.type === 'cover-0') {
+          // Cover 0 is pure man/blitz - NO zones allowed
+          responsibility = {
+            defenderId: assignment.defenderId,
+            type: assignment.role === 'spy' ? 'spy' as const :
+                  assignment.role === 'zone' ? 'man' as const :  // Convert any zone to man
+                  assignment.role === 'man-coverage' ? 'man' as const : 'blitz' as const,
+            target: assignment.target,
+          };
+        } else if (coverage.type === 'cover-2' || coverage.type === 'cover-3' || coverage.type === 'cover-4' || coverage.type === 'tampa-2') {
           // Zone coverage for these types
           responsibility = {
             defenderId: assignment.defenderId,

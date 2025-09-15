@@ -675,19 +675,21 @@ export function getOptimalDefensivePersonnel(offensivePersonnel: PersonnelPackag
   // Personnel package adjustments based on NFL standards
   if (wrCount >= 4) {
     // 10 personnel (4+ WRs): Dime package (need 6 DBs total)
+    // CB: 3, S: 2, NB: 1 = 6 DBs total
     personnel = {
-      CB: 2,
-      S: 2, // FS + SS or two deep safeties
-      LB: 1,
-      NB: 2, // Two dime backs for 4+ WRs
+      CB: 3,  // Increased from 2 to 3 for proper Dime
+      S: 2,   // FS + SS or two deep safeties
+      LB: 1,  // Only 1 LB in Dime
+      NB: 1,  // One nickel/dime back
     };
   } else if (wrCount >= 3) {
-    // 11 personnel (3+ WRs): Nickel package
+    // 11 personnel (3+ WRs): Nickel package (need 5 DBs total)
+    // CB: 2, S: 2, NB: 1 = 5 DBs total
     personnel = {
       CB: 2,
-      S: 1, // Free Safety
-      LB: 3,
-      NB: 1, // Nickel back
+      S: 2,   // Both FS and SS for proper Nickel
+      LB: 2,  // Reduced from 3 to 2
+      NB: 1,  // Nickel back
     };
   }
 
@@ -698,6 +700,12 @@ export function getOptimalDefensivePersonnel(offensivePersonnel: PersonnelPackag
     if (personnel.CB + personnel.S + personnel.LB + personnel.NB > 7) {
       personnel.LB = Math.max(2, 7 - personnel.CB - personnel.S - personnel.NB);
     }
+  }
+
+  // Ensure minimum DBs for proper coverage
+  // Always need at least 2 CBs and 2 Safeties for most coverages
+  if (personnel.S < 2) {
+    personnel.S = 2; // Always have both FS and SS
   }
 
   // Ensure exactly 7 defenders
@@ -777,7 +785,7 @@ export function generateDefensiveAssignments(
     }
 
     assignments.push({
-      defenderId: isFreeSafety ? 'FS1' : `SS${i}`,
+      defenderId: `S${i + 1}`,  // Use consistent S1, S2 naming
       playerType: 'S',
       target: targetReceiver?.id,
       role: isFreeSafety ? 'free-safety' : 'strong-safety'
@@ -1144,6 +1152,10 @@ export function generateTampa2Alignment(
 ): Record<string, Vector2D> {
   const positions: Record<string, Vector2D> = {};
 
+  // Tampa 2 requires specific roles, handle missing LBs gracefully
+  const linebackers = defensivePlayers.filter(d => d.playerType === 'LB');
+  const hasEnoughLBs = linebackers.length >= 3;
+
   defensivePlayers.forEach(defender => {
     switch (defender.playerType) {
       case 'CB':
@@ -1152,6 +1164,9 @@ export function generateTampa2Alignment(
           positions[defender.id] = { x: 8, y: los + 5 }; // Press-bail technique, 5 yards behind LOS
         } else if (defender.id === 'CB2') {
           positions[defender.id] = { x: 45, y: los + 5 };
+        } else if (defender.id === 'CB3') {
+          // Extra CB in dime package plays underneath
+          positions[defender.id] = { x: 35, y: los + 4 };
         }
         break;
 
@@ -1166,13 +1181,27 @@ export function generateTampa2Alignment(
 
       case 'LB':
         // Mike LB drops to deep middle third, others play underneath
-        if (defender.id === 'LB2') {
-          // Mike linebacker - will drop to deep middle
-          positions[defender.id] = { x: 26.665, y: los + 5 };
-        } else if (defender.id === 'LB1') {
-          positions[defender.id] = { x: 18, y: los + 4 }; // Left curl, 4 yards behind LOS
-        } else if (defender.id === 'LB3') {
-          positions[defender.id] = { x: 35, y: los + 4 }; // Right curl
+        if (hasEnoughLBs) {
+          if (defender.id === 'LB2') {
+            // Mike linebacker - will drop to deep middle
+            positions[defender.id] = { x: 26.665, y: los + 5 };
+          } else if (defender.id === 'LB1') {
+            positions[defender.id] = { x: 18, y: los + 4 }; // Left curl, 4 yards behind LOS
+          } else if (defender.id === 'LB3') {
+            positions[defender.id] = { x: 35, y: los + 4 }; // Right curl
+          }
+        } else {
+          // With only 1 LB (Dime package), that LB plays deep middle
+          positions[defender.id] = { x: 26.665, y: los + 8 }; // Deep middle role
+        }
+        break;
+
+      case 'NB':
+        // Nickel/Dime backs play underneath zones
+        if (defender.id === 'NB1') {
+          positions[defender.id] = { x: 18, y: los + 4 }; // Left curl replacement
+        } else if (defender.id === 'NB2') {
+          positions[defender.id] = { x: 35, y: los + 4 }; // Right curl replacement
         }
         break;
     }

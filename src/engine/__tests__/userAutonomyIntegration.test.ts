@@ -171,7 +171,7 @@ describe('User Autonomy Integration Tests', () => {
       const defenders = state.players.filter(p => p.team === 'defense');
       const boxDefenders = defenders.filter(p =>
         p.playerType === 'LB' ||
-        (p.playerType === 'S' && p.position.y < state.lineOfScrimmage - 8)
+        (p.playerType === 'S' && p.position.y < state.lineOfScrimmage + 10) // Safeties within 10 yards on defensive side
       );
 
       // More defenders in the box against heavy personnel
