@@ -34,9 +34,18 @@ export default function EnhancedFieldCanvas({
   // Initialize engine on client mount (only once)
   const hasInitialized = useRef(false);
   useEffect(() => {
-    if (!hasInitialized.current) {
-      initializeEngine();
-      hasInitialized.current = true;
+    if (!hasInitialized.current && typeof window !== 'undefined') {
+      // Add a small delay to ensure all components are mounted
+      const timer = setTimeout(() => {
+        try {
+          initializeEngine();
+          hasInitialized.current = true;
+        } catch (error) {
+          console.error('Engine initialization failed:', error);
+        }
+      }, 100);
+
+      return () => clearTimeout(timer);
     }
   }, []); // Empty dependency array to run only once
 

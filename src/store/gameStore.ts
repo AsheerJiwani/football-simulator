@@ -466,20 +466,31 @@ export const useGameStore = create<GameStore>()(
       },
 
       initializeEngine: () => {
-        const { engine } = get();
-        if (engine) {
-          // Engine already initialized
+        const state = get();
+
+        // Multiple safeguards to prevent double initialization
+        if (state.engine) {
+          console.log('Engine already initialized, skipping');
           return;
         }
 
         if (typeof window === 'undefined') {
-          // Don't initialize on server
+          console.log('Server-side detected, skipping engine initialization');
+          return;
+        }
+
+        // Check if we're already in the process of initializing
+        if ((globalThis as any).__footballEngineInitializing) {
+          console.log('Engine initialization already in progress, skipping');
           return;
         }
 
         try {
+          (globalThis as any).__footballEngineInitializing = true;
+          console.log('Starting engine initialization...');
+
           const newEngine = new FootballEngine();
-          const { selectedConcept, selectedCoverage, sackTime } = get();
+          const { selectedConcept, selectedCoverage, sackTime } = state;
 
           // Load default data
           const concept = DataLoader.getConcept(selectedConcept);
@@ -497,15 +508,27 @@ export const useGameStore = create<GameStore>()(
           // Validate that both offense and defense are properly set up
           newEngine.validateSetup();
 
-          set((state) => ({
-            ...state,
-            engine: newEngine,
-            gameState: newEngine.getGameState(),
-            lastRouteUpdate: Date.now(),
-            lastDefenseUpdate: Date.now()
-          }));
+          set((currentState) => {
+            // Double-check that engine is still null before setting
+            if (currentState.engine) {
+              console.log('Engine was initialized by another call, skipping set');
+              return currentState;
+            }
+
+            return {
+              ...currentState,
+              engine: newEngine,
+              gameState: newEngine.getGameState(),
+              lastRouteUpdate: Date.now(),
+              lastDefenseUpdate: Date.now()
+            };
+          });
+
+          console.log('Engine initialization completed successfully');
         } catch (error) {
           console.error('Failed to initialize engine on client:', error);
+        } finally {
+          (globalThis as any).__footballEngineInitializing = false;
         }
       },
     };
