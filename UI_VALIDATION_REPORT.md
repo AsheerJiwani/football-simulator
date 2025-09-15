@@ -1,88 +1,33 @@
 # UI Validation Test Report
-Generated: 2025-09-15T21:41:03.420Z
+Generated: 2025-09-15T21:58:52.648Z
 
 ## Summary
-- **Total Tests**: 6
-- **Passed**: 1
-- **Failed**: 5
-- **Pass Rate**: 16.7%
+- **Total Tests**: 1
+- **Passed**: 0
+- **Failed**: 1
+- **Pass Rate**: 0.0%
 
 ## Test Results
 
 
 ### 1. Initial Player Rendering
-- **Status**: ✅ PASS
-- **Details**:
-```json
-{
-  "totalCircles": 55,
-  "playerCircles": 14,
-  "offensePlayers": 7,
-  "defensePlayers": 7
-}
-```
-
-
-### 2. Play Concept Changes Update Formation
 - **Status**: ❌ FAIL
 - **Details**:
 ```json
 {
-  "formationChanged": false,
-  "playerCount": 7
-}
-```
-
-
-### 3. Coverage Changes Update Defensive Alignment
-- **Status**: ❌ FAIL
-- **Details**:
-```json
-{
-  "alignmentChanged": false,
-  "defenderCount": 7
-}
-```
-
-
-### 4. Player Movement After Snap
-- **Status**: ❌ FAIL
-- **Details**:
-```json
-{
-  "playersMoving": 0,
-  "totalPlayers": 14,
-  "averageMovement": 0
-}
-```
-
-
-### 5. Motion Functionality
-- **Status**: ❌ FAIL
-- **Details**:
-```json
-{
-  "motionDetected": false,
-  "preMotionX": "0",
-  "postMotionX": "0"
-}
-```
-
-
-### 6. NFL-Realistic Positioning
-- **Status**: ❌ FAIL
-- **Details**:
-```json
-{
-  "correctSides": false,
-  "avgOffenseY": 0,
-  "avgDefenseY": 0
+  "totalCircles": 0,
+  "playerCircles": 0,
+  "offensePlayers": 0,
+  "defensePlayers": 0
 }
 ```
 
 
 ## Issues Found
-No critical issues detected.
+- **error**: locator.selectOption: Target page, context or browser has been closed
+Call log:
+[2m  - waiting for locator('select').first()[22m
+
 
 ## Recommendations
 
