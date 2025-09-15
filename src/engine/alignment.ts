@@ -362,9 +362,10 @@ export function getCover2Cornerback(
 /**
  * Calculate Cover 2 Hook/Curl defender position
  */
-export function getCover2HookDefender(side: 'left' | 'right' | 'middle', formation: FormationAnalysis, los: number): Vector2D {
+export function getCover2HookDefender(side: 'left' | 'right' | 'middle', formation: FormationAnalysis, los: number, qbMovementType?: string): Vector2D {
   const centerX = 26.665;
-  const depth = COVER_2_CONSTANTS.HOOK_DEPTH;
+  const baseDepth = COVER_2_CONSTANTS.HOOK_DEPTH;
+  const depth = calculateLinebackerDepthWithQBTiming(baseDepth, qbMovementType);
 
   let xPosition: number;
   if (side === 'middle') {
@@ -473,9 +474,10 @@ export function getCover3StrongSafety(
 /**
  * Calculate Cover 3 Hook defender position
  */
-export function getCover3HookDefender(formation: FormationAnalysis, los: number): Vector2D {
+export function getCover3HookDefender(formation: FormationAnalysis, los: number, qbMovementType?: string): Vector2D {
   const centerX = 26.665;
-  const depth = COVER_3_CONSTANTS.HOOK_DEPTH;
+  const baseDepth = COVER_3_CONSTANTS.HOOK_DEPTH;
+  const depth = calculateLinebackerDepthWithQBTiming(baseDepth, qbMovementType);
 
   // Adjust hook defender position to provide better zone spacing
   let xAdjustment = 0;
@@ -995,7 +997,8 @@ export function generateCover4Alignment(
 export function generateCover2Alignment(
   offensivePlayers: Player[],
   defensivePlayers: Player[],
-  los: number
+  los: number,
+  qbMovementType?: string
 ): Record<string, Vector2D> {
   const formation = analyzeFormation(offensivePlayers);
   const positions: Record<string, Vector2D> = {};
@@ -1060,13 +1063,13 @@ export function generateCover2Alignment(
         // Linebackers and nickel backs play underneath zones
         if (lbCount === 0) {
           // First LB plays left hook/curl
-          positions[defender.id] = getCover2HookDefender('left', formation, los);
+          positions[defender.id] = getCover2HookDefender('left', formation, los, qbMovementType);
         } else if (lbCount === 1) {
           // Second LB plays middle hook
-          positions[defender.id] = getCover2HookDefender('middle', formation, los);
+          positions[defender.id] = getCover2HookDefender('middle', formation, los, qbMovementType);
         } else if (lbCount === 2) {
           // Third LB plays right hook/curl
-          positions[defender.id] = getCover2HookDefender('right', formation, los);
+          positions[defender.id] = getCover2HookDefender('right', formation, los, qbMovementType);
         } else {
           // Additional defenders play flat zones
           const flatDepth = COVER_2_CONSTANTS.FLAT_DEPTH;
@@ -1091,7 +1094,8 @@ export function generateCover3Alignment(
   offensivePlayers: Player[],
   defensivePlayers: Player[],
   los: number,
-  rotation: 'sky' | 'buzz' | 'normal' = 'normal'
+  rotation: 'sky' | 'buzz' | 'normal' = 'normal',
+  qbMovementType?: string
 ): Record<string, Vector2D> {
   const formation = analyzeFormation(offensivePlayers);
   const positions: Record<string, Vector2D> = {};
@@ -1148,28 +1152,31 @@ export function generateCover3Alignment(
         // Underneath defenders - typically stay in zone but can use collision technique
         if (lbCount === 0) {
           // First LB plays hook
-          positions[defender.id] = getCover3HookDefender(formation, los);
+          positions[defender.id] = getCover3HookDefender(formation, los, qbMovementType);
         } else if (lbCount === 1) {
           // Second LB plays curl/flat weak side
           const weakSide = formation.strength === 'left' ? 'right' : 'left';
           const xPos = weakSide === 'left' ? 18 : 35;
+          const depth = calculateLinebackerDepthWithQBTiming(COVER_3_CONSTANTS.SS_CURL_FLAT_DEPTH, qbMovementType);
           positions[defender.id] = {
             x: xPos,
-            y: los + COVER_3_CONSTANTS.SS_CURL_FLAT_DEPTH
+            y: los + depth
           };
         } else if (lbCount === 2) {
           // Third LB plays flat on opposite side from second LB
           const strongSide = formation.strength === 'left' ? 'left' : 'right';
           const xPos = strongSide === 'left' ? 18 : 35;
+          const depth = calculateLinebackerDepthWithQBTiming(COVER_3_CONSTANTS.SS_CURL_FLAT_DEPTH, qbMovementType);
           positions[defender.id] = {
             x: xPos,
-            y: los + COVER_3_CONSTANTS.SS_CURL_FLAT_DEPTH
+            y: los + depth
           };
         } else {
           // Additional defenders - robber or additional flat coverage
+          const additionalDepth = calculateLinebackerDepthWithQBTiming(6, qbMovementType);
           positions[defender.id] = {
             x: 26.665 + (lbCount - 3) * 5, // Spread additional defenders
-            y: los + 6
+            y: los + additionalDepth
           };
         }
         lbCount++;
@@ -1365,7 +1372,7 @@ export function generateTampa2Alignment(
         if (hasEnoughLBs) {
           if (defender.id === 'LB2') {
             // Mike linebacker - will drop to deep middle (Tampa 2 hole coverage)
-            positions[defender.id] = { x: 26.665, y: los + 15 }; // 15-18 yard depth for hole coverage
+            positions[defender.id] = { x: 26.665, y: los + 18 }; // 18 yard depth for hole coverage (NFL standard)
           } else if (defender.id === 'LB1') {
             positions[defender.id] = { x: 18, y: los + 4 }; // Left curl, 4 yards behind LOS
           } else if (defender.id === 'LB3') {
@@ -1373,7 +1380,7 @@ export function generateTampa2Alignment(
           }
         } else {
           // With only 1 LB (Dime package), that LB plays deep middle (Tampa 2 hole)
-          positions[defender.id] = { x: 26.665, y: los + 15 }; // Deep middle hole coverage
+          positions[defender.id] = { x: 26.665, y: los + 18 }; // Deep middle hole coverage
         }
         break;
 
@@ -1818,4 +1825,35 @@ export function generateCover2InvertAlignment(
   });
 
   return positions;
+}
+
+/**
+ * Calculate linebacker depth based on QB movement timing coordination
+ * NFL Research: LB drops should coordinate with QB drop timing
+ */
+export function calculateLinebackerDepthWithQBTiming(
+  baseDepth: number,
+  qbMovementType?: string
+): number {
+  if (!qbMovementType) {
+    return baseDepth; // No QB movement set, use base depth
+  }
+
+  // NFL Research: Linebacker drops should coordinate with QB drop timing
+  // 3-step: max 7 yards, 5-step: max 10 yards, 7-step: max 12 yards
+  switch (qbMovementType) {
+    case '3-step':
+      return Math.min(baseDepth, 7); // 3-step drop: max 7 yards for LBs
+    case '5-step':
+      return Math.min(baseDepth, 10); // 5-step drop: max 10 yards for LBs
+    case '7-step':
+      return Math.min(baseDepth, 12); // 7-step drop: max 12 yards for LBs
+    case 'play-action':
+      return baseDepth + 1; // Play action: slightly deeper drop
+    case 'rollout-left':
+    case 'rollout-right':
+      return baseDepth - 1; // Rollout: shallower drop to maintain leverage
+    default:
+      return baseDepth;
+  }
 }

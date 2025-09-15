@@ -87,7 +87,7 @@ export class CoverageDisguiseSystem {
     currentCoverage: CoverageType
   ): void {
     const configs = this.getDisguiseConfigs();
-    const timeSinceSnap = gameTime - (gameState.snapTime || 0);
+    const timeSinceSnap = gameState.timeElapsed;
 
     configs.forEach(config => {
       // Check if this is the right disguise for current coverage
@@ -266,7 +266,7 @@ export class CoverageDisguiseSystem {
     gameTime: number,
     gameState: GameState
   ): void {
-    const timeSinceSnap = gameTime - (gameState.snapTime || 0);
+    const timeSinceSnap = gameState.timeElapsed;
 
     linebackers.forEach(lb => {
       const responsibility = lb.coverageResponsibility;

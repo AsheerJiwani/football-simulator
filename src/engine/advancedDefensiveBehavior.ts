@@ -28,7 +28,7 @@ export class AdvancedDefensiveBehavior {
     if (!responsibility?.qbKeyRules) return;
 
     const { readEyes, jumpThreshold, pursuitAngle } = responsibility.qbKeyRules;
-    const timeSinceSnap = gameTime - (gameState.snapTime || 0);
+    const timeSinceSnap = gameState.timeElapsed;
 
     // Read QB eyes and find his target
     const qbTarget = this.getQBTarget(qb, receivers);

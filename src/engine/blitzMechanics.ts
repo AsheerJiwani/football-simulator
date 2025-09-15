@@ -294,7 +294,13 @@ export function getBlitzProbability(coverage: CoverageType): number {
     'cover-4': 0.10,   // Very rare
     'cover-6': 0.30,   // Higher blitz rate
     'quarters': 0.12,  // Rare
-    'tampa-2': 0.18    // Occasional
+    'tampa-2': 0.18,   // Occasional
+    'cover-1-bracket': 0.20,  // Bracket coverage with blitz
+    'cover-1-robber': 0.35,   // Robber often comes with blitz
+    'cover-1-lurk': 0.30,     // Lurk coverage with fire zones
+    'cover-2-roll-to-1': 0.22, // Roll coverage with occasional blitz
+    'quarters-poach': 0.15,   // Poach concept with rare blitz
+    'cover-2-invert': 0.18    // Invert coverage with occasional blitz
   };
 
   return blitzRates[coverage] || 0.15;
