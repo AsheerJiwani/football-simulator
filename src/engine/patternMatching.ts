@@ -75,7 +75,7 @@ export class PatternMatchingSystem {
     const triggers = this.getPatternMatchTriggers();
 
     triggers.forEach(trigger => {
-      const timeSinceSnap = gameTime - (gameState.snapTime || 0);
+      const timeSinceSnap = gameState.timeElapsed;
 
       // Check if timing window is met
       if (timeSinceSnap < trigger.triggerTiming) return;
