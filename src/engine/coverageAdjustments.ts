@@ -241,16 +241,23 @@ export class CoverageAdjustments {
 
           // Only adjust if receivers are truly bunched (within 4 yards)
           if (maxSpacing < 4) {
-            // FS comes down for man coverage
+            // In rare bunch situations, FS may help but maintains deep position
+            // This is a specific adjustment that shouldn't happen in normal Cover 1
             adjustments.push({
               defenderId: fs.id,
-              newPosition: { x: cb.position.x + 5, y: los + 8 },
+              newPosition: { x: cb.position.x + 5, y: los + 14 }, // Maintain deep position (12-15 yards)
               newResponsibility: {
                 defenderId: fs.id,
-                type: 'man',
-                target: undefined // Will be assigned to specific receiver
+                type: 'zone', // Keep zone in Cover 1
+                zone: {
+                  name: 'deep-middle',
+                  center: { x: this.FIELD_CENTER, y: 14 },
+                  width: 20,
+                  height: 15,
+                  depth: 14
+                }
               },
-              technique: 'jump'
+              technique: 'deep-help'
             });
 
             // CB rotates to deep
@@ -394,17 +401,42 @@ export class CoverageAdjustments {
       });
     }
 
-    // vs Trips: Skinny coverage to trips side
+    // vs Trips: Enhanced adjustments based on NFL research
     if (formation.receiverSets.includes('trips')) {
       const tripsSide = formation.strength;
       const ss = defenders.find(d => d.id === 'SS' || (d.playerType === 'S' && d.id.includes('2')));
+      const weakCorner = corners.find(c =>
+        tripsSide === 'left' ? c.position.x > this.FIELD_CENTER : c.position.x < this.FIELD_CENTER
+      );
 
+      // Strong safety rotates to deep third over trips
       if (ss) {
         const xPos = tripsSide === 'left' ? 15 : 38;
         adjustments.push({
           defenderId: ss.id,
           newPosition: { x: xPos, y: los + 10 },
-          technique: 'curl-flat'
+          technique: 'deep-third-trips'
+        });
+      }
+
+      // Weak-side corner "Cone" technique - expansion rule
+      if (weakCorner) {
+        const weakSideX = tripsSide === 'left' ? 44 : 9;
+        adjustments.push({
+          defenderId: weakCorner.id,
+          newPosition: { x: weakSideX + (tripsSide === 'left' ? 2 : -2), y: los + 7 }, // Expand 2 yards
+          leverage: 'outside',
+          technique: 'cone'  // Outside release = man, inside = bracket with FS
+        });
+      }
+
+      // Free safety shades toward trips but maintains deep middle
+      if (fs) {
+        const shadeAmount = tripsSide === 'left' ? -2 : 2;
+        adjustments.push({
+          defenderId: fs.id,
+          newPosition: { x: this.FIELD_CENTER + shadeAmount, y: los + 15 },
+          technique: 'deep-middle-trips'
         });
       }
     }
@@ -438,14 +470,41 @@ export class CoverageAdjustments {
       });
     }
 
-    // vs 3×1: Stubbie to trips, Solo backside
+    // vs 3×1: Trix coverage concept (NFL research-based)
     if (formation.receiverDistribution.left >= 3 || formation.receiverDistribution.right >= 3) {
       const tripsSide = formation.receiverDistribution.left >= 3 ? 'left' : 'right';
       const backSideSafety = safeties.find(s =>
         tripsSide === 'left' ? s.position.x > this.FIELD_CENTER : s.position.x < this.FIELD_CENTER
       );
+      const backSideCorner = corners.find(c =>
+        tripsSide === 'left' ? c.position.x > this.FIELD_CENTER : c.position.x < this.FIELD_CENTER
+      );
 
+      // Trix Safety - read #2 and #3 for vertical routes
       if (backSideSafety) {
+        adjustments.push({
+          defenderId: backSideSafety.id,
+          newPosition: { x: this.FIELD_CENTER, y: los + 12 },
+          technique: 'trix'  // Help on trips vertical routes
+        });
+      }
+
+      // Solo Corner - lock on backside X receiver
+      if (backSideCorner) {
+        const weakSideX = tripsSide === 'left' ? 44 : 9;
+        adjustments.push({
+          defenderId: backSideCorner.id,
+          newPosition: { x: weakSideX, y: los + 6 },
+          leverage: 'outside',
+          technique: 'solo'  // Man coverage on backside X
+        });
+      }
+
+      // Strong side safety maintains quarter coverage
+      const strongSideSafety = safeties.find(s =>
+        tripsSide === 'left' ? s.position.x < this.FIELD_CENTER : s.position.x > this.FIELD_CENTER
+      );
+      if (strongSideSafety) {
         adjustments.push({
           defenderId: backSideSafety.id,
           newPosition: { x: this.FIELD_CENTER, y: los + 14 },

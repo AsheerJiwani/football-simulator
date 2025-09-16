@@ -3131,6 +3131,11 @@ export class FootballEngine {
     // Apply motion boosts to players who have them
     this.applyMotionBoosts();
 
+    // Check for play action and queue freeze responses
+    if (this.gameState.playConcept && (this.gameState.playConcept as any).playAction) {
+      this.queuePlayActionFreezeResponses();
+    }
+
     // Initialize receivers in the movement system
     this.gameState.players
       .filter(p => p.team === 'offense' && p.route && p.playerType !== 'QB')
@@ -3513,6 +3518,29 @@ export class FootballEngine {
       if (this.defensiveTimingSystem.isDefenderFrozen(defender.id)) {
         // Temporarily reduce speed for frozen defenders
         defender.currentSpeed = 0;
+      }
+    });
+  }
+
+  private queuePlayActionFreezeResponses(): void {
+    const defenders = this.gameState.players.filter(p => p.team === 'defense');
+
+    defenders.forEach(defender => {
+      // Linebackers freeze for 0.4-0.6s on play action
+      if (defender.playerType === 'LB') {
+        this.defensiveTimingSystem.queuePlayActionResponse(
+          defender.id,
+          'LB',
+          defender.position
+        );
+      }
+      // Safeties hesitate for 0.2-0.3s on play action
+      else if (defender.playerType === 'S') {
+        this.defensiveTimingSystem.queuePlayActionResponse(
+          defender.id,
+          'S',
+          defender.position
+        );
       }
     });
   }
@@ -4963,24 +4991,39 @@ export class FootballEngine {
             // Adjust zone centers to be relative to current LOS with field-aware depth
             const adjustedResponsibility = { ...responsibility };
             if (adjustedResponsibility.zone) {
-              // Use zone depth calculator for proper field position adjustments
-              const zoneName = adjustedResponsibility.zone.name || '';
-              const baseCenter = {
-                x: adjustedResponsibility.zone.center.x,
-                y: adjustedResponsibility.zone.center.y + this.gameState.lineOfScrimmage
-              };
+              // Only apply zone depth calculator for zone coverage types
+              // Cover 0 and Cover 1 use man coverage primarily and shouldn't be adjusted
+              const isManCoverage = coverage.type === 'cover-0' || coverage.type === 'cover-1';
 
-              const adjustedCenter = this.zoneDepthCalculator.calculateZonePosition(
-                zoneName,
-                { x: baseCenter.x, y: 0 }, // Base position without depth
-                this.gameState.lineOfScrimmage,
-                coverage.type
-              );
+              if (isManCoverage) {
+                // For man coverage, just adjust to LOS without depth calculator
+                adjustedResponsibility.zone = {
+                  ...adjustedResponsibility.zone,
+                  center: {
+                    x: adjustedResponsibility.zone.center.x,
+                    y: adjustedResponsibility.zone.center.y + this.gameState.lineOfScrimmage
+                  }
+                };
+              } else {
+                // Use zone depth calculator for proper field position adjustments
+                const zoneName = adjustedResponsibility.zone.name || '';
+                const baseCenter = {
+                  x: adjustedResponsibility.zone.center.x,
+                  y: adjustedResponsibility.zone.center.y + this.gameState.lineOfScrimmage
+                };
 
-              adjustedResponsibility.zone = {
-                ...adjustedResponsibility.zone,
-                center: adjustedCenter
-              };
+                const adjustedCenter = this.zoneDepthCalculator.calculateZonePosition(
+                  zoneName,
+                  { x: baseCenter.x, y: 0 }, // Base position without depth
+                  this.gameState.lineOfScrimmage,
+                  coverage.type
+                );
+
+                adjustedResponsibility.zone = {
+                  ...adjustedResponsibility.zone,
+                  center: adjustedCenter
+                };
+              }
             }
 
             return {

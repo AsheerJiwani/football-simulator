@@ -1,6 +1,6 @@
 import { FootballEngine } from '../Engine';
 import type { PlayOutcome } from '../types';
-import DataLoader from '../../data/DataLoader';
+import { DataLoader } from '@/lib/dataLoader';
 
 describe('Next Play and Reset Integration', () => {
   let engine: FootballEngine;
