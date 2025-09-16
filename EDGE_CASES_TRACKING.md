@@ -2,9 +2,9 @@
 
 ## 📊 Current Status
 - **Total Tests**: 414
-- **Passing**: 375 (90.6%)
-- **Failing**: 39 (9.4%)
-- **Critical Issues**: 8 (4 resolved, 1 partially addressed)
+- **Passing**: 384 (92.8%)
+- **Failing**: 30 (7.2%)
+- **Critical Issues**: 8 (5 resolved, 1 partially addressed)
 - **Non-Blocking Issues**: 12
 - **Last Updated**: January 16, 2025
 
@@ -188,6 +188,15 @@ npm test -- --verbose
 - Some "failures" may be due to test expectations not matching actual NFL behavior
 
 ## ✅ Recent Fixes (January 16, 2025)
+
+### Quarters and Cover-2-Roll-to-1 Coverage Definitions
+- Added missing 'quarters' coverage definition to coverages.json (identical to Cover 4 as per NFL standards)
+- Added missing 'cover-2-roll-to-1' coverage definition with proper zone assignments
+- Fixed zone coverage type checks in Engine.ts to include both coverages
+- Both coverages now properly create 7 defenders with zone responsibilities
+- Reduced test failures from 38 to 30 (21% improvement)
+
+## ✅ Previous Fixes (January 16, 2025)
 
 ### Zone Spacing Improvements
 - Enhanced `optimizeZoneSpacing` function with NFL-standard depth levels

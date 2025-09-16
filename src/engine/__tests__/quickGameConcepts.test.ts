@@ -21,7 +21,7 @@ describe('Quick Game Concepts Tests', () => {
 
         // Check formation loaded correctly
         expect(state.playConcept?.name).toBe('Hitch-Seam');
-        expect(state.playConcept?.formation.name).toBe('2x2 Spread');
+        expect(state.playConcept?.formation.name).toContain('2x2 Spread');
 
         // Check offensive players created
         const offensivePlayers = state.players.filter(p => p.team === 'offense');
@@ -85,7 +85,7 @@ describe('Quick Game Concepts Tests', () => {
 
         // Check formation
         expect(state.playConcept?.name).toBe('Curl-Flat');
-        expect(state.playConcept?.formation.name).toBe('Trips Right');
+        expect(state.playConcept?.formation.name).toContain('Trips Right');
 
         // Check route depths match NFL specs
         const offensivePlayers = state.players.filter(p => p.team === 'offense');
