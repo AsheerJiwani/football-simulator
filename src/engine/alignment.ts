@@ -1253,10 +1253,9 @@ export function generateCover3Alignment(
   });
 
   // Apply zone spacing optimization to prevent overcrowding
-  // Pass QB movement type to respect depth constraints
-  // NOTE: This optimization can override correct CB depths in Cover 3
-  // TODO: Make optimization aware of coverage-specific depth requirements
-  const optimizedPositions = optimizeZoneSpacing(positions, los, defensivePlayers, qbMovementType);
+  // Pass QB movement type and coverage type to respect depth constraints
+  // Coverage-specific depth requirements are now preserved
+  const optimizedPositions = optimizeZoneSpacing(positions, los, defensivePlayers, qbMovementType, 'cover-3');
 
   // Debug logging for position changes after optimization
   if (process.env.NODE_ENV === 'test') {
@@ -1285,73 +1284,119 @@ export function generateCover3Alignment(
 
 /**
  * Optimize zone spacing to ensure NFL standard separation
+ * Based on NFL principles: 2-4 yard horizontal overlap, 3-5 yard vertical overlap
  */
 function optimizeZoneSpacing(
   positions: Record<string, Vector2D>,
   los: number,
   defenders?: Player[],
-  qbMovementType?: string
+  qbMovementType?: string,
+  coverageType?: string
 ): Record<string, Vector2D> {
   const optimized = { ...positions };
 
-  // Group defenders by similar depth levels (within 5 yards)
-  const depthGroups: Array<Array<[string, Vector2D]>> = [];
-  const sortedPositions = Object.entries(optimized).sort((a, b) => a[1].y - b[1].y);
+  // Define critical depth thresholds based on NFL zone principles
+  const DEPTH_LEVELS = {
+    UNDERNEATH: { min: los + 0, max: los + 13 },  // LOS to 13 yards
+    INTERMEDIATE: { min: los + 13, max: los + 20 }, // 13-20 yards
+    DEEP: { min: los + 20, max: los + 40 }         // 20+ yards
+  };
 
-  let currentGroup: Array<[string, Vector2D]> = [];
-  let lastDepth = -1;
+  // Coverage-specific protected positions that should maintain their depths
+  const getProtectedPositions = (coverage?: string): Set<string> => {
+    switch (coverage) {
+      case 'cover-3':
+        // In Cover 3: CB1/CB2 are deep thirds, CB3 is underneath slot
+        // FS is deep middle, SS is curl/flat
+        return new Set(['CB1', 'CB2', 'FS']);
+      case 'cover-2':
+        // In Cover 2: Both safeties are deep halves
+        return new Set(['S1', 'S2', 'FS', 'SS']);
+      case 'cover-4':
+        // In Cover 4: CBs and Safeties are deep quarters
+        return new Set(['CB1', 'CB2', 'S1', 'S2', 'FS', 'SS']);
+      case 'tampa-2':
+        // In Tampa 2: Safeties are deep, MLB drops to hole
+        return new Set(['S1', 'S2', 'FS', 'SS', 'MLB']);
+      case 'cover-6':
+        // In Cover 6: Field side quarters, boundary half
+        return new Set(['CB1', 'CB2', 'S1', 'S2']);
+      default:
+        return new Set();
+    }
+  };
 
-  for (const [id, pos] of sortedPositions) {
-    if (lastDepth === -1 || Math.abs(pos.y - lastDepth) < 5) {
-      currentGroup.push([id, pos]);
-      lastDepth = pos.y;
+  const protectedDefenders = getProtectedPositions(coverageType);
+
+  // Group defenders by NFL standard depth levels
+  const depthGroups: Map<string, Array<[string, Vector2D]>> = new Map([
+    ['underneath', []],
+    ['intermediate', []],
+    ['deep', []]
+  ]);
+
+  for (const [id, pos] of Object.entries(optimized)) {
+    if (pos.y < DEPTH_LEVELS.UNDERNEATH.max) {
+      depthGroups.get('underneath')!.push([id, pos]);
+    } else if (pos.y < DEPTH_LEVELS.INTERMEDIATE.max) {
+      depthGroups.get('intermediate')!.push([id, pos]);
     } else {
-      if (currentGroup.length > 0) {
-        depthGroups.push(currentGroup);
-      }
-      currentGroup = [[id, pos]];
-      lastDepth = pos.y;
+      depthGroups.get('deep')!.push([id, pos]);
     }
   }
-  if (currentGroup.length > 0) {
-    depthGroups.push(currentGroup);
-  }
 
-  // For each depth group, ensure proper horizontal spacing
-  for (const group of depthGroups) {
+  // Apply horizontal spacing rules for each depth level
+  for (const [level, group] of depthGroups) {
     if (group.length < 2) continue;
 
     // Sort by x position
     group.sort((a, b) => a[1].x - b[1].x);
 
-    // Spread defenders evenly across the field with minimum spacing
-    const fieldWidth = 45 - 8; // Usable field width (8 to 45 yards)
-    const minSpacing = 7.5;
+    // NFL horizontal spacing requirements by level
+    const horizontalRequirements = {
+      underneath: { minOverlap: 2, maxGap: 4, optimalSpacing: 10.67 }, // 5 underneath typically
+      intermediate: { minOverlap: 3, maxGap: 5, optimalSpacing: 13.33 }, // 4 defenders typically
+      deep: { minOverlap: 2, maxGap: 3, optimalSpacing: 17.78 } // 3 deep typically
+    };
+
+    const req = horizontalRequirements[level as keyof typeof horizontalRequirements];
+    const fieldWidth = 53.33;
+    const sideline_buffer = 3; // Stay 3 yards from sidelines
+    const usableWidth = fieldWidth - (2 * sideline_buffer);
+
+    // Calculate optimal spacing based on number of defenders
     const numDefenders = group.length;
+    const optimalSpacing = usableWidth / numDefenders;
 
-    if (numDefenders * minSpacing <= fieldWidth) {
-      // Can achieve minimum spacing for all
-      const totalSpacing = fieldWidth;
-      const spacing = totalSpacing / (numDefenders - 1);
-
-      for (let i = 0; i < group.length; i++) {
-        const [id, pos] = group[i];
-        const newX = 8 + (i * spacing);
-        optimized[id] = { ...pos, x: newX };
+    // Only adjust if spacing is problematic
+    let needsAdjustment = false;
+    for (let i = 0; i < group.length - 1; i++) {
+      const gap = group[i + 1][1].x - group[i][1].x;
+      if (gap < req.minOverlap || gap > req.optimalSpacing * 1.5) {
+        needsAdjustment = true;
+        break;
       }
-    } else {
-      // Not enough space - prioritize even distribution
+    }
+
+    if (needsAdjustment) {
+      // Redistribute defenders evenly across their level
       for (let i = 0; i < group.length; i++) {
         const [id, pos] = group[i];
-        const spacing = fieldWidth / (numDefenders - 1);
-        const newX = 8 + (i * spacing);
-        optimized[id] = { ...pos, x: newX };
+
+        // Skip protected defenders
+        if (protectedDefenders.has(id)) continue;
+
+        // Calculate new position with even distribution
+        const segmentWidth = usableWidth / (numDefenders + 1);
+        const newX = sideline_buffer + (segmentWidth * (i + 1));
+
+        optimized[id] = { ...pos, x: Math.max(sideline_buffer, Math.min(newX, fieldWidth - sideline_buffer)) };
       }
     }
   }
 
-  // Additional pass: ensure vertical spacing within lanes
-  return optimizeVerticalSpacing(optimized, los, defenders, qbMovementType);
+  // Apply vertical spacing while respecting coverage depths
+  return optimizeVerticalSpacing(optimized, los, defenders, qbMovementType, coverageType);
 }
 
 /**
@@ -1385,12 +1430,14 @@ function getLinebackerMaxDepth(qbMovementType?: string): number {
 
 /**
  * Optimize vertical spacing within defensive lanes
+ * Respects coverage-specific depth requirements
  */
 function optimizeVerticalSpacing(
   positions: Record<string, Vector2D>,
   los: number,
   defenderPlayers?: Player[],
-  qbMovementType?: string
+  qbMovementType?: string,
+  coverageType?: string
 ): Record<string, Vector2D> {
   const optimized = { ...positions };
 
@@ -1412,9 +1459,36 @@ function optimizeVerticalSpacing(
     }
   }
 
-  // CB positions in Cover 3 should not be adjusted for vertical spacing
-  // CB1 and CB2 are deep thirds, CB3 is slot coverage
-  const protectedDefenders = new Set(['CB1', 'CB2', 'CB3']);
+  // Coverage-specific protected positions that should maintain their depths
+  const getProtectedPositions = (coverage?: string): Set<string> => {
+    switch (coverage) {
+      case 'cover-3':
+        // CB1/CB2 are deep thirds, CB3 is slot, FS deep middle
+        return new Set(['CB1', 'CB2', 'CB3', 'FS']);
+      case 'cover-2':
+        // Both safeties must maintain deep half depths
+        return new Set(['S1', 'S2', 'FS', 'SS']);
+      case 'cover-4':
+        // All deep quarters must maintain their depths
+        return new Set(['CB1', 'CB2', 'S1', 'S2', 'FS', 'SS']);
+      case 'tampa-2':
+        // Safeties deep, MLB drops to hole
+        return new Set(['S1', 'S2', 'FS', 'SS', 'MLB']);
+      case 'cover-6':
+        // Quarter-quarter-half defenders
+        return new Set(['CB1', 'CB2', 'S1', 'S2']);
+      case 'cover-0':
+        // No deep help - all man coverage at proper depths
+        return new Set(['CB1', 'CB2', 'CB3']);
+      case 'cover-1':
+        // Free safety deep
+        return new Set(['FS']);
+      default:
+        return new Set();
+    }
+  };
+
+  const protectedDefenders = getProtectedPositions(coverageType);
 
   // For each lane with multiple defenders, ensure minimum vertical spacing
   for (const lane of lanes) {
@@ -1423,7 +1497,22 @@ function optimizeVerticalSpacing(
     // Sort by depth (y position)
     lane.sort((a, b) => a[1].y - b[1].y);
 
-    const minVerticalSpacing = 5; // Slightly above 4-yard requirement
+    // NFL vertical spacing requirements: 3-5 yard overlap between levels
+    // Adjust minimum based on coverage type
+    const getMinVerticalSpacing = (coverage?: string): number => {
+      switch (coverage) {
+        case 'cover-3':
+          return 4; // Tighter spacing for 4 underneath
+        case 'cover-2':
+          return 3.5; // 5 underneath need less vertical spacing
+        case 'cover-4':
+          return 5; // 3 underneath need more vertical spacing
+        default:
+          return 4;
+      }
+    };
+
+    const minVerticalSpacing = getMinVerticalSpacing(coverageType);
     let adjustmentNeeded = false;
 
     // Check if any spacing is too small

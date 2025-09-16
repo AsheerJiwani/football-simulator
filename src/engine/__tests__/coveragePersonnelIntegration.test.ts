@@ -191,6 +191,21 @@ describe('Coverage-Personnel Integration Tests', () => {
           }
         });
 
+        // Debug output for Cover 0
+        if (coverageType === 'cover-0') {
+          console.log(`[Test] Cover 0 defenders:`);
+          state.players.filter(p => p.team === 'defense').forEach(defender => {
+            console.log(`  ${defender.id}: ${defender.coverageResponsibility?.type} -> ${defender.coverageResponsibility?.target || 'none'}`);
+          });
+
+          if (manAssignments.size > 0) {
+            console.log(`[Test] Cover 0 man assignments:`);
+            manAssignments.forEach((defenders, target) => {
+              console.log(`  Target ${target}: ${defenders.join(', ')}`);
+            });
+          }
+        }
+
         // Check for duplicates
         manAssignments.forEach((defenders, target) => {
           expect(defenders.length).toBe(1); // Each receiver should have exactly 1 defender

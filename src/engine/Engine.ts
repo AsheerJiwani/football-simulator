@@ -619,7 +619,10 @@ export class FootballEngine {
     const formationStrength = formationAnalysis.strength;
 
     // First, reassign coverage responsibilities based on new formation
-    this.reassignCoverageResponsibilities(offensePlayers, defensePlayers, formation);
+    // Skip for Cover 0 - assignments are already correct from setupDefense
+    if (coverage.type !== 'cover-0') {
+      this.reassignCoverageResponsibilities(offensePlayers, defensePlayers, formation);
+    }
 
     // Handle motion-specific defensive adjustments
     this.handleMotionAdjustments(offensePlayers, defensePlayers);
@@ -803,10 +806,25 @@ export class FootballEngine {
     // TODO: This should be removed or refactored to avoid triple positioning
     if (coverage.type === 'cover-1' || coverage.type === 'cover-0') {
       // Man coverage - realign defenders to follow their assigned receivers
+      const coveredTargets = new Set<string>(); // Track to prevent duplicates in Cover 0
+
       defensePlayers.forEach(defender => {
         // Check if defender has man coverage responsibility
         if (defender.coverageResponsibility?.type === 'man' && defender.coverageResponsibility.target) {
           const assignedReceiver = offensePlayers.find(p => p.id === defender.coverageResponsibility!.target);
+
+          // For Cover 0, check for duplicates
+          if (coverage.type === 'cover-0' && assignedReceiver) {
+            if (coveredTargets.has(assignedReceiver.id)) {
+              // Duplicate - convert this defender to blitz
+              console.log(`[realignDefense] Cover 0 duplicate: ${defender.id} targeting already covered ${assignedReceiver.id}`);
+              defender.coverageResponsibility.type = 'blitz';
+              defender.coverageResponsibility.target = undefined;
+              return; // Skip positioning
+            }
+            coveredTargets.add(assignedReceiver.id);
+          }
+
           if (assignedReceiver) {
             // Position defender based on receiver's new position
             // Determine cushion based on defender type and coverage
@@ -1130,9 +1148,19 @@ export class FootballEngine {
     if (!coverage) return;
 
     // For man coverage, reassign defenders to receivers based on new positions
+    // IMPORTANT: Prevent duplicate assignments
     if (coverage.type === 'cover-1' || coverage.type === 'cover-0') {
-      const eligibleReceivers = offensePlayers.filter(p => p.isEligible);
+      const eligibleReceivers = offensePlayers.filter(p => p.isEligible && p.playerType !== 'QB');
       const centerX = 26.665;
+
+      if (coverage.type === 'cover-0' && process.env.NODE_ENV === 'test') {
+        console.log('[reassignCoverageResponsibilities] Cover 0 - BEFORE changes:');
+        defensePlayers.forEach(d => {
+          if (d.coverageResponsibility?.type === 'man') {
+            console.log(`  ${d.id} -> ${d.coverageResponsibility.target}`);
+          }
+        });
+      }
 
       // Sort receivers by position (outside to inside)
       const leftReceivers = eligibleReceivers
@@ -1143,6 +1171,63 @@ export class FootballEngine {
         .filter(r => r.position.x >= centerX)
         .sort((a, b) => b.position.x - a.position.x);
 
+      // Track which receivers have already been assigned to prevent duplicates
+      const assignedReceivers = new Set<string>();
+      const assignedDefenders = new Set<string>();
+
+      // For Cover 0, maintain existing assignments if valid
+      // Only reassign if receiver moved significantly or assignment is missing
+      if (coverage.type === 'cover-0') {
+        // First pass: validate existing assignments
+        defensePlayers.forEach(defender => {
+          if (defender.coverageResponsibility?.type === 'man' && defender.coverageResponsibility.target) {
+            const targetReceiver = eligibleReceivers.find(r => r.id === defender.coverageResponsibility!.target);
+            if (targetReceiver && !assignedReceivers.has(targetReceiver.id)) {
+              // Keep this assignment
+              assignedReceivers.add(targetReceiver.id);
+              assignedDefenders.add(defender.id);
+            } else {
+              // Clear invalid assignment
+              defender.coverageResponsibility.target = undefined;
+            }
+          }
+        });
+
+        // Second pass: assign unassigned defenders to unassigned receivers
+        const unassignedDefenders = defensePlayers.filter(d =>
+          d.coverageResponsibility?.type === 'man' &&
+          !assignedDefenders.has(d.id)
+        );
+
+        const unassignedReceivers = eligibleReceivers.filter(r => !assignedReceivers.has(r.id));
+
+        unassignedReceivers.forEach((receiver, index) => {
+          if (index < unassignedDefenders.length) {
+            const defender = unassignedDefenders[index];
+            if (defender.coverageResponsibility) {
+              defender.coverageResponsibility.target = receiver.id;
+              assignedReceivers.add(receiver.id);
+              assignedDefenders.add(defender.id);
+            }
+          }
+        });
+
+        // Skip zone update for Cover 0 - it has no zones and assignments are already correct
+        // this.updateZoneResponsibilitiesFromDefinition(defensePlayers, coverage);
+
+        if (process.env.NODE_ENV === 'test') {
+          console.log('[reassignCoverageResponsibilities] Cover 0 - AFTER changes:');
+          defensePlayers.forEach(d => {
+            if (d.coverageResponsibility?.type === 'man') {
+              console.log(`  ${d.id} -> ${d.coverageResponsibility.target}`);
+            }
+          });
+        }
+
+        return; // Don't do additional reassignment for Cover 0
+      }
+
+      // For Cover 1, use existing CB assignment logic
       // Reassign cornerbacks to outside receivers
       const cornerbacks = defensePlayers.filter(d => d.playerType === 'CB');
       let cbIndex = 0;
@@ -1153,6 +1238,7 @@ export class FootballEngine {
         if (cb.coverageResponsibility) {
           cb.coverageResponsibility.target = leftReceivers[0].id;
           cb.coverageResponsibility.type = 'man';
+          assignedReceivers.add(leftReceivers[0].id);
         }
       }
 
@@ -1162,11 +1248,12 @@ export class FootballEngine {
         if (cb.coverageResponsibility) {
           cb.coverageResponsibility.target = rightReceivers[0].id;
           cb.coverageResponsibility.type = 'man';
+          assignedReceivers.add(rightReceivers[0].id);
         }
       }
 
-      // Assign other defenders to remaining receivers
-      const remainingReceivers = [...leftReceivers.slice(1), ...rightReceivers.slice(1)];
+      // Assign other defenders to remaining receivers (excluding already assigned)
+      const remainingReceivers = eligibleReceivers.filter(r => !assignedReceivers.has(r.id));
       const otherDefenders = defensePlayers.filter(d =>
         d.playerType !== 'CB' &&
         d.coverageResponsibility?.type === 'man'
@@ -1189,7 +1276,8 @@ export class FootballEngine {
       const formation = analyzeFormation(offensePlayers);
 
       // Handle different zone coverage types
-      if (coverage.type === 'cover-2' || coverage.type === 'cover-3' || coverage.type === 'cover-4') {
+      if (coverage.type === 'cover-2' || coverage.type === 'cover-3' || coverage.type === 'cover-4' ||
+          coverage.type === 'quarters' || coverage.type === 'tampa-2' || coverage.type === 'cover-2-roll-to-1') {
         this.adjustZoneCoverageResponsibilities(defensePlayers, formation, coverage.type);
       } else {
         // Generic zone adjustments for other coverages
@@ -4545,6 +4633,17 @@ export class FootballEngine {
         // Get all eligible offensive players (excluding QB)
         const eligibleTargets = offensivePlayers.filter(p => p.isEligible && p.playerType !== 'QB');
 
+        if (process.env.NODE_ENV === 'test') {
+          console.log(`[Cover 0] Eligible receivers: ${eligibleTargets.map(t => t.id).join(', ')}`);
+        }
+
+        // Clear all existing assignments and rebuild for Cover 0
+        // This prevents duplicate assignments
+        assignments.forEach(assignment => {
+          assignment.target = undefined;
+          assignment.role = 'pending';
+        });
+
         // Sort defenders by man coverage priority for Cover 0
         // CBs -> NBs -> LBs -> Safeties
         const defenderPriority = ['CB', 'NB', 'LB', 'S'];
@@ -4554,25 +4653,100 @@ export class FootballEngine {
           return aPriority - bPriority;
         });
 
+        // Create a map to track assignments and prevent duplicates
+        const assignedTargets = new Set<string>();
+        const assignedDefenders = new Set<string>();
+
         // Assign man coverage to all eligible receivers first
-        let targetIdx = 0;
+        // Cover 0 principle: Cover all eligibles, everyone else blitzes
         assignments.forEach(assignment => {
-          if (targetIdx < eligibleTargets.length) {
+          if (assignedDefenders.has(assignment.defenderId)) {
+            return; // Skip if defender already assigned
+          }
+
+          // Check if this defender's pre-assigned target is valid
+          if (assignment.target) {
+            const targetExists = eligibleTargets.find(t => t.id === assignment.target);
+            if (targetExists && !assignedTargets.has(assignment.target)) {
+              // Keep existing valid assignment
+              assignedTargets.add(assignment.target);
+              assignedDefenders.add(assignment.defenderId);
+              assignment.role = 'man-coverage';
+              return;
+            } else {
+              // Clear invalid target
+              assignment.target = undefined;
+            }
+          }
+
+          // Find an unassigned eligible target for this defender
+          const unassignedTarget = eligibleTargets.find(t => !assignedTargets.has(t.id));
+
+          if (unassignedTarget) {
+            // Assign this defender to cover the receiver
             assignment.role = 'man-coverage';
-            assignment.target = eligibleTargets[targetIdx].id;
-            targetIdx++;
+            assignment.target = unassignedTarget.id;
+            assignedTargets.add(unassignedTarget.id);
+            assignedDefenders.add(assignment.defenderId);
           } else {
-            // Only blitz if all eligibles are covered
+            // No more receivers to cover - this defender blitzes
+            // This is the essence of Cover 0: all unneeded defenders rush
             assignment.role = 'blitz';
             assignment.target = undefined;
+            assignedDefenders.add(assignment.defenderId);
           }
         });
 
         if (process.env.NODE_ENV === 'test') {
-          console.log(`[Cover 0] Assigned ${targetIdx} man coverages for ${eligibleTargets.length} eligibles`);
+          const manCoverages = assignments.filter(a => a.role === 'man-coverage').length;
+          console.log(`[Cover 0] Assigned ${manCoverages} man coverages for ${eligibleTargets.length} eligibles`);
           const blitzers = assignments.filter(a => a.role === 'blitz').length;
           console.log(`[Cover 0] ${blitzers} defenders blitzing`);
+
+          // Debug: Check for duplicate targets
+          const targetCount = new Map<string, number>();
+          assignments.forEach(a => {
+            if (a.target) {
+              targetCount.set(a.target, (targetCount.get(a.target) || 0) + 1);
+            }
+          });
+          targetCount.forEach((count, target) => {
+            if (count > 1) {
+              console.log(`[Cover 0 WARNING] Target ${target} has ${count} defenders assigned!`);
+            }
+          });
+
+          // Debug: Show all assignments
+          console.log('[Cover 0] Final assignments after setup:');
+          assignments.forEach(a => {
+            if (a.role === 'man-coverage') {
+              console.log(`  ${a.defenderId} -> ${a.target}`);
+            }
+          });
         }
+
+        // Final validation: Ensure assignments are valid and no duplicates
+        const finalTargetCheck = new Map<string, string>();
+        assignments.forEach(a => {
+          if (a.role === 'man-coverage' && a.target) {
+            // Verify target exists in eligible receivers
+            const targetExists = eligibleTargets.find(t => t.id === a.target);
+            if (!targetExists) {
+              // Invalid target - convert to blitz
+              console.log(`[Cover 0] Invalid target ${a.target} for ${a.defenderId} - converting to blitz`);
+              a.role = 'blitz';
+              a.target = undefined;
+            } else if (finalTargetCheck.has(a.target)) {
+              // Duplicate found - convert this defender to blitz
+              console.log(`[Cover 0] Duplicate assignment detected: ${a.defenderId} and ${finalTargetCheck.get(a.target)} both assigned to ${a.target}`);
+              console.log(`[Cover 0] Converting ${a.defenderId} to blitz`);
+              a.role = 'blitz';
+              a.target = undefined;
+            } else {
+              finalTargetCheck.set(a.target, a.defenderId);
+            }
+          }
+        });
       }
 
       // Build new defensive players from assignments
@@ -4588,7 +4762,8 @@ export class FootballEngine {
             type: assignment.role === 'man-coverage' ? 'man' as const : 'blitz' as const,
             target: assignment.target,
           };
-        } else if (coverage.type === 'cover-2' || coverage.type === 'cover-3' || coverage.type === 'cover-4' || coverage.type === 'tampa-2') {
+        } else if (coverage.type === 'cover-2' || coverage.type === 'cover-3' || coverage.type === 'cover-4' ||
+                   coverage.type === 'quarters' || coverage.type === 'tampa-2' || coverage.type === 'cover-2-roll-to-1') {
           // Zone coverage for these types
           responsibility = {
             defenderId: assignment.defenderId,

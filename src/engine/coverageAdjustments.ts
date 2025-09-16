@@ -97,48 +97,40 @@ export class CoverageAdjustments {
   private adjustCover0(defenders: Player[], offensive: Player[], formation: FormationAnalysis, los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
 
-    // First, ensure all CBs are in press coverage (1 yard depth)
-    const cbs = defenders.filter(d => d.playerType === 'CB');
-    const receivers = offensive.filter(p => p.isEligible && p.playerType !== 'QB');
+    // Cover 0 - all defenders with man coverage should be in press alignment
+    // Don't reassign targets - use existing assignments from setupDefense
+    defenders.forEach(defender => {
+      if (defender.coverageResponsibility?.type === 'man' && defender.coverageResponsibility.target) {
+        // Find the receiver this defender is covering
+        const targetReceiver = offensive.find(p => p.id === defender.coverageResponsibility!.target);
 
-    // Sort receivers by distance from center (outside receivers first)
-    const sortedReceivers = receivers.sort((a, b) => {
-      const aDistFromCenter = Math.abs(a.position.x - 26.665);
-      const bDistFromCenter = Math.abs(b.position.x - 26.665);
-      return bDistFromCenter - aDistFromCenter;
-    });
-
-    // Assign CBs to receivers in press coverage
-    for (let i = 0; i < cbs.length; i++) {
-      const cb = cbs[i];
-      const receiver = sortedReceivers[i];
-
-      if (receiver) {
+        if (targetReceiver) {
+          // Position defender in press coverage on their assigned receiver
+          adjustments.push({
+            defenderId: defender.id,
+            newPosition: {
+              x: targetReceiver.position.x,
+              y: los + 1  // Press coverage depth (1 yard off LOS)
+            },
+            leverage: 'head-up',
+            technique: 'press'
+            // DON'T include newResponsibility - keep existing assignments
+          });
+        }
+      } else if (defender.coverageResponsibility?.type === 'blitz') {
+        // Position blitzers appropriately
+        const blitzX = defender.id.includes('1') ? 20 : 33; // Distribute blitzers
         adjustments.push({
-          defenderId: cb.id,
+          defenderId: defender.id,
           newPosition: {
-            x: receiver.position.x,
-            y: los + 1  // Press coverage depth
+            x: blitzX,
+            y: los + 2  // Slightly deeper than press coverage
           },
           leverage: 'head-up',
-          technique: 'press',
-          newResponsibility: {
-            defenderId: cb.id,
-            type: 'man',
-            target: receiver.id
-          }
-        });
-      } else {
-        // No receiver to cover - still maintain press depth
-        const defaultX = cb.id === 'CB1' ? 8 : cb.id === 'CB2' ? 45 : 26.665;
-        adjustments.push({
-          defenderId: cb.id,
-          newPosition: { x: defaultX, y: los + 1 },
-          leverage: 'head-up',
-          technique: 'press'
+          technique: 'blitz'
         });
       }
-    }
+    });
 
     // vs Trips: Bump NCB to trips #3 (override if needed)
     if (formation.receiverSets.includes('trips')) {
