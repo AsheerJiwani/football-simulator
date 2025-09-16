@@ -2030,8 +2030,14 @@ export class FootballEngine {
           break;
 
         case 'S':
-          if (defender.id === 'FS') {
-            // Free Safety - center field, deep coverage
+          // Check if this is the free safety (could be FS, S1, or first safety with zone responsibility)
+          const isFreeSafety = defender.id === 'FS' ||
+                               defender.id === 'S1' ||
+                               (defender.coverageResponsibility?.type === 'zone' &&
+                                defender.coverageResponsibility?.zone?.name?.includes('deep'));
+
+          if (isFreeSafety) {
+            // Free Safety - center field, deep coverage (NFL standard 12-15 yards)
             const baseDepth = formation.isEmpty || formation.isSpread ? 18 : 14; // Deeper vs empty/spread
             defender.position = { x: centerX, y: losY + baseDepth };
 
