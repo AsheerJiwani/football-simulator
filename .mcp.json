@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "perplexity-ask": {
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "server-perplexity-ask"],
+      "env": { "PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}" }
+    }
+  }
+}

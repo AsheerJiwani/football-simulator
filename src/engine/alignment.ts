@@ -1354,9 +1354,9 @@ function optimizeZoneSpacing(
 
     // NFL horizontal spacing requirements by level
     const horizontalRequirements = {
-      underneath: { minOverlap: 2, maxGap: 4, optimalSpacing: 10.67 }, // 5 underneath typically
-      intermediate: { minOverlap: 3, maxGap: 5, optimalSpacing: 13.33 }, // 4 defenders typically
-      deep: { minOverlap: 2, maxGap: 3, optimalSpacing: 17.78 } // 3 deep typically
+      underneath: { minOverlap: 8, maxGap: 15, optimalSpacing: 10.67 }, // 5 underneath typically
+      intermediate: { minOverlap: 8, maxGap: 15, optimalSpacing: 13.33 }, // 4 defenders typically
+      deep: { minOverlap: 10, maxGap: 20, optimalSpacing: 17.78 } // 3 deep typically
     };
 
     const req = horizontalRequirements[level as keyof typeof horizontalRequirements];
@@ -1372,7 +1372,8 @@ function optimizeZoneSpacing(
     let needsAdjustment = false;
     for (let i = 0; i < group.length - 1; i++) {
       const gap = group[i + 1][1].x - group[i][1].x;
-      if (gap < req.minOverlap || gap > req.optimalSpacing * 1.5) {
+      // Gap should be between minOverlap and maxGap
+      if (gap < req.minOverlap || gap > req.maxGap) {
         needsAdjustment = true;
         break;
       }
@@ -1502,13 +1503,13 @@ function optimizeVerticalSpacing(
     const getMinVerticalSpacing = (coverage?: string): number => {
       switch (coverage) {
         case 'cover-3':
-          return 4; // Tighter spacing for 4 underneath
+          return 6; // Proper spacing for 4 underneath with deep zones
         case 'cover-2':
-          return 3.5; // 5 underneath need less vertical spacing
+          return 5; // 5 underneath need adequate spacing
         case 'cover-4':
-          return 5; // 3 underneath need more vertical spacing
+          return 7; // 3 underneath with deeper zones need more
         default:
-          return 4;
+          return 6;
       }
     };
 
@@ -1530,10 +1531,8 @@ function optimizeVerticalSpacing(
     if (adjustmentNeeded) {
       // Ensure all defenders are behind the line of scrimmage
       const minDefensiveY = los + 1; // At least 1 yard behind LOS
-      const firstY = Math.max(lane[0][1].y, minDefensiveY);
-      const lastY = lane[lane.length - 1][1].y;
-      const availableSpace = Math.max(lastY - firstY, (lane.length - 1) * minVerticalSpacing);
 
+      // Calculate proper spacing for all defenders in lane
       for (let i = 0; i < lane.length; i++) {
         const [id, pos] = lane[i];
 
@@ -1542,17 +1541,24 @@ function optimizeVerticalSpacing(
           continue;
         }
 
-        let newY = firstY + (i * availableSpace / (lane.length - 1));
+        // Calculate target depth based on position in lane
+        let targetY = minDefensiveY + (i * minVerticalSpacing * 1.5);
 
         // Respect linebacker depth constraints based on QB movement
         if (id.startsWith('LB')) {
           const lbMaxDepth = getLinebackerMaxDepth(qbMovementType);
           const maxY = los + lbMaxDepth;
-          newY = Math.min(newY, maxY);
+          targetY = Math.min(targetY, maxY);
+        }
+
+        // Ensure proper minimum spacing from previous defender
+        if (i > 0) {
+          const prevY = optimized[lane[i-1][0]].y;
+          targetY = Math.max(targetY, prevY + minVerticalSpacing);
         }
 
         // Ensure defensive player never goes in front of LOS
-        optimized[id] = { ...pos, y: Math.max(newY, minDefensiveY) };
+        optimized[id] = { ...pos, y: Math.max(targetY, minDefensiveY) };
       }
     }
   }

@@ -422,6 +422,17 @@ export class FootballEngine {
     const { type, yards, endPosition } = this.gameState.outcome;
     let newLOS = this.gameState.lineOfScrimmage;
 
+    // Handle touchdown immediately
+    if (type === 'touchdown') {
+      // Touchdown! Reset to offensive 30-yard line
+      this.setLineOfScrimmage(30);
+      this.gameState.currentDown = 1;
+      this.gameState.yardsToGo = 10;
+      this.gameState.driveStartPosition = 30;
+      this.resetPlay();
+      return;
+    }
+
     // Calculate new field position based on outcome
     if (type === 'catch') {
       // yards is now the yards gained (not absolute position)

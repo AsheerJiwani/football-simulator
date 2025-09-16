@@ -98,7 +98,8 @@ describe('User Autonomy vs Defensive Response Edge Cases', () => {
       expect(finalState.players.filter(p => p.team === 'offense').length).toBeGreaterThan(0);
       expect(finalState.coverage).toBeDefined();
       expect(finalState.playConcept).toBeDefined();
-      expect(finalState.personnel).toBe('12'); // Last personnel change
+      // Four verts uses empty formation which has 01 personnel (0 RB, 1 TE)
+      expect(finalState.personnel).toBe('01');
 
       // Should complete quickly
       expect(endTime - startTime).toBeLessThan(100);

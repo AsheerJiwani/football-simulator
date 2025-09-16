@@ -1,5 +1,6 @@
 import { FootballEngine } from '../Engine';
 import type { PlayOutcome } from '../types';
+import DataLoader from '../../data/DataLoader';
 
 describe('Next Play and Reset Integration', () => {
   let engine: FootballEngine;
@@ -11,8 +12,10 @@ describe('Next Play and Reset Integration', () => {
   describe('nextPlay functionality', () => {
     it('should advance to next play after completion', () => {
       // Setup and snap
-      engine.setPlayConcept('slant-flat');
-      engine.setCoverage('cover-1');
+      const concept = DataLoader.getConcept('slant-flat');
+      const coverage = DataLoader.getCoverage('cover-1');
+      if (concept) engine.setPlayConcept(concept);
+      if (coverage) engine.setCoverage(coverage);
       engine.snap();
 
       // Simulate play completion
@@ -75,8 +78,10 @@ describe('Next Play and Reset Integration', () => {
       engine['gameState'].lineOfScrimmage = 95;
       engine['gameState'].ballOn = 95;
 
-      engine.setPlayConcept('smash');
-      engine.setCoverage('cover-3');
+      const smashConcept = DataLoader.getConcept('smash');
+      const cover3 = DataLoader.getCoverage('cover-3');
+      if (smashConcept) engine.setPlayConcept(smashConcept);
+      if (cover3) engine.setCoverage(cover3);
       engine.snap();
 
       // Simulate touchdown
@@ -105,8 +110,10 @@ describe('Next Play and Reset Integration', () => {
       engine['gameState'].lineOfScrimmage = 1;
       engine['gameState'].ballOn = 1;
 
-      engine.setPlayConcept('mesh');
-      engine.setCoverage('cover-0');
+      const meshConcept = DataLoader.getConcept('mesh');
+      if (meshConcept) engine.setPlayConcept(meshConcept);
+      const cover0 = DataLoader.getCoverage('cover-0');
+      if (cover0) engine.setCoverage(cover0);
       engine.snap();
 
       // Simulate sack in endzone
@@ -130,8 +137,10 @@ describe('Next Play and Reset Integration', () => {
     });
 
     it('should not advance if play not over', () => {
-      engine.setPlayConcept('slant-flat');
-      engine.setCoverage('cover-1');
+      const concept = DataLoader.getConcept('slant-flat');
+      const coverage = DataLoader.getCoverage('cover-1');
+      if (concept) engine.setPlayConcept(concept);
+      if (coverage) engine.setCoverage(coverage);
 
       const initialState = { ...engine.getGameState() };
 
