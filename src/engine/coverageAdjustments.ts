@@ -193,9 +193,10 @@ export class CoverageAdjustments {
     const fs = defenders.find(d => d.id === 'FS' || (d.playerType === 'S' && d.id.includes('1')));
     if (fs) {
       const shadeX = formation.strength === 'left' ? -2 : formation.strength === 'right' ? 2 : 0;
+      // NFL standard: Cover 1 FS at 12-15 yards (use 14 as middle)
       adjustments.push({
         defenderId: fs.id,
-        newPosition: { x: this.FIELD_CENTER + shadeX, y: los + 13.5 },
+        newPosition: { x: this.FIELD_CENTER + shadeX, y: los + 14 },
         technique: 'center-field'
       });
     }
@@ -213,30 +214,53 @@ export class CoverageAdjustments {
     }
 
     // vs Bunch: Jump call (FS comes down, CB rotates deep)
+    // NOTE: This special adjustment is only for true bunch formations
+    // Standard Cover 1 should maintain the free safety at proper depth (12-15 yards)
     if (formation.receiverSets.includes('bunch')) {
       const bunchSide = formation.strength;
       const cb = defenders.find(d => d.playerType === 'CB' &&
         (bunchSide === 'left' ? d.position.x < this.FIELD_CENTER : d.position.x > this.FIELD_CENTER));
 
-      if (fs && cb) {
-        // FS comes down for man coverage
-        adjustments.push({
-          defenderId: fs.id,
-          newPosition: { x: cb.position.x + 5, y: los + 8 },
-          newResponsibility: {
-            defenderId: fs.id,
-            type: 'man',
-            target: undefined // Will be assigned to specific receiver
-          },
-          technique: 'jump'
+      // Only apply bunch adjustment if we actually have a bunch AND a corner to rotate
+      // This prevents inadvertent FS position changes in standard formations
+      if (fs && cb && formation.receiverSets.includes('bunch')) {
+        // Verify it's a true bunch situation before adjusting
+        const receivers = offensive.filter(p => p.isEligible && p.playerType !== 'QB');
+        const bunchReceivers = receivers.filter(r => {
+          const sameSide = bunchSide === 'left' ? r.position.x < this.FIELD_CENTER : r.position.x > this.FIELD_CENTER;
+          return sameSide;
         });
 
-        // CB rotates to deep
-        adjustments.push({
-          defenderId: cb.id,
-          newPosition: { x: this.FIELD_CENTER, y: los + 15 },
-          technique: 'rotate-deep'
-        });
+        // Only apply if we have 3+ receivers tightly bunched
+        if (bunchReceivers.length >= 3) {
+          const maxSpacing = Math.max(...bunchReceivers.map((r1, i) =>
+            Math.min(...bunchReceivers.slice(i + 1).map(r2 =>
+              Math.abs(r1.position.x - r2.position.x)
+            ))
+          ).filter(d => !isNaN(d)));
+
+          // Only adjust if receivers are truly bunched (within 4 yards)
+          if (maxSpacing < 4) {
+            // FS comes down for man coverage
+            adjustments.push({
+              defenderId: fs.id,
+              newPosition: { x: cb.position.x + 5, y: los + 8 },
+              newResponsibility: {
+                defenderId: fs.id,
+                type: 'man',
+                target: undefined // Will be assigned to specific receiver
+              },
+              technique: 'jump'
+            });
+
+            // CB rotates to deep
+            adjustments.push({
+              defenderId: cb.id,
+              newPosition: { x: this.FIELD_CENTER, y: los + 15 },
+              technique: 'rotate-deep'
+            });
+          }
+        }
       }
     }
 

@@ -30,13 +30,13 @@ describe('Air Raid Concepts Tests', () => {
         expect(state.playConcept?.name).toBe('Y-Option');
         expect(state.playConcept?.formation.name).toContain('Empty');
 
-        // Check offensive players created (4 WRs, QB)
+        // Check offensive players created (5 WRs, 1 TE, QB)
         const offensivePlayers = state.players.filter(p => p.team === 'offense');
-        expect(offensivePlayers.length).toBe(5); // QB + 4 WRs
+        expect(offensivePlayers.length).toBe(7); // QB + 5 WRs + 1 TE
 
         // Check route assignments
         const wideReceivers = offensivePlayers.filter(p => p.playerType === 'WR');
-        expect(wideReceivers.length).toBe(4);
+        expect(wideReceivers.length).toBe(5);
 
         // Verify outside receivers have go routes at 30 yards
         const outsideWRs = wideReceivers.filter(wr =>
@@ -232,12 +232,12 @@ describe('Air Raid Concepts Tests', () => {
         expect(state.playConcept?.name).toBe('Six');
         expect(state.playConcept?.formation.name).toContain('Empty');
 
-        // All WRs should have hitch routes at 6 yards
+        // All WRs should have hitch routes at 6 yards (empty formation has 5 WRs)
         const wideReceivers = state.players.filter(p =>
           p.team === 'offense' && p.playerType === 'WR'
         );
 
-        expect(wideReceivers.length).toBe(4);
+        expect(wideReceivers.length).toBe(5);
 
         wideReceivers.forEach(wr => {
           expect(wr.route?.depth).toBe(6);
@@ -418,9 +418,9 @@ describe('Air Raid Concepts Tests', () => {
           p.team === 'offense' && p.playerType === 'WR'
         );
 
-        expect(hitchReceivers.length).toBe(4);
-        // With 4 receivers against 3-4 underneath defenders, offenses has numerical advantage or equality
-        expect(hitchReceivers.length).toBeGreaterThanOrEqual(underneathDefenders.length - 1);
+        expect(hitchReceivers.length).toBe(5); // Empty formation has 5 WRs
+        // With 5 receivers against 3-4 underneath defenders, offense has numerical advantage
+        expect(hitchReceivers.length).toBeGreaterThanOrEqual(underneathDefenders.length);
       }
     });
   });

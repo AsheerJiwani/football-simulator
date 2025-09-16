@@ -895,7 +895,11 @@ export function generateCover1Alignment(
       case 'S':
         if (defender.id === 'S1' || defender.id === 'FS') {
           // Free Safety - always deep middle
-          positions[defender.id] = getCover1FreeSafety(formation, los);
+          const fsPosition = getCover1FreeSafety(formation, los);
+          positions[defender.id] = fsPosition;
+          if (process.env.NODE_ENV === 'test') {
+            console.log(`[Cover1] Free Safety ${defender.id} positioned at y=${fsPosition.y}, depth=${fsPosition.y - los}`);
+          }
         } else if (responsibility.type === 'man' && responsibility.target) {
           // Strong Safety in man coverage - align over assigned receiver
           const assignedReceiver = offensivePlayers.find(p => p.id === responsibility.target);
