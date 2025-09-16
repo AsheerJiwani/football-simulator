@@ -97,7 +97,50 @@ export class CoverageAdjustments {
   private adjustCover0(defenders: Player[], offensive: Player[], formation: FormationAnalysis, los: number = 30): CoverageAdjustment[] {
     const adjustments: CoverageAdjustment[] = [];
 
-    // vs Trips: Bump NCB to trips #3
+    // First, ensure all CBs are in press coverage (1 yard depth)
+    const cbs = defenders.filter(d => d.playerType === 'CB');
+    const receivers = offensive.filter(p => p.isEligible && p.playerType !== 'QB');
+
+    // Sort receivers by distance from center (outside receivers first)
+    const sortedReceivers = receivers.sort((a, b) => {
+      const aDistFromCenter = Math.abs(a.position.x - 26.665);
+      const bDistFromCenter = Math.abs(b.position.x - 26.665);
+      return bDistFromCenter - aDistFromCenter;
+    });
+
+    // Assign CBs to receivers in press coverage
+    for (let i = 0; i < cbs.length; i++) {
+      const cb = cbs[i];
+      const receiver = sortedReceivers[i];
+
+      if (receiver) {
+        adjustments.push({
+          defenderId: cb.id,
+          newPosition: {
+            x: receiver.position.x,
+            y: los + 1  // Press coverage depth
+          },
+          leverage: 'head-up',
+          technique: 'press',
+          newResponsibility: {
+            defenderId: cb.id,
+            type: 'man',
+            target: receiver.id
+          }
+        });
+      } else {
+        // No receiver to cover - still maintain press depth
+        const defaultX = cb.id === 'CB1' ? 8 : cb.id === 'CB2' ? 45 : 26.665;
+        adjustments.push({
+          defenderId: cb.id,
+          newPosition: { x: defaultX, y: los + 1 },
+          leverage: 'head-up',
+          technique: 'press'
+        });
+      }
+    }
+
+    // vs Trips: Bump NCB to trips #3 (override if needed)
     if (formation.receiverSets.includes('trips')) {
       const tripsSide = formation.strength;
       const ncb = defenders.find(d => d.playerType === 'NB');
@@ -553,20 +596,20 @@ export class CoverageAdjustments {
 
   private getMotionResponse(coverage: CoverageType, motionType: Motion['type']): MotionResponse {
     const responseMatrix: Record<CoverageType, Record<Motion['type'], MotionResponse>> = {
-      'cover-0': { 'fly': 'lock', 'orbit': 'lock', 'jet': 'lock', 'return': 'lock', 'shift': 'lock' },
-      'cover-1': { 'fly': 'lock', 'orbit': 'travel', 'jet': 'lock', 'return': 'lock', 'shift': 'travel' },
-      'cover-2': { 'fly': 'bump', 'orbit': 'bump', 'jet': 'bump', 'return': 'bump', 'shift': 'bump' },
-      'cover-3': { 'fly': 'buzz', 'orbit': 'spin', 'jet': 'buzz', 'return': 'minimal', 'shift': 'buzz' },
-      'cover-4': { 'fly': 'pattern-adjust', 'orbit': 'lock', 'jet': 'meg-trigger', 'return': 'minimal', 'shift': 'pattern-adjust' },
-      'quarters': { 'fly': 'pattern-adjust', 'orbit': 'lock', 'jet': 'meg-trigger', 'return': 'minimal', 'shift': 'pattern-adjust' },
-      'cover-6': { 'fly': 'check', 'orbit': 'minimal', 'jet': 'pattern-adjust', 'return': 'minimal', 'shift': 'check' },
-      'tampa-2': { 'fly': 'minimal', 'orbit': 'minimal', 'jet': 'minimal', 'return': 'minimal', 'shift': 'minimal' },
-      'cover-1-bracket': { 'fly': 'lock', 'orbit': 'travel', 'jet': 'lock', 'return': 'lock', 'shift': 'travel' },
-      'cover-1-robber': { 'fly': 'lock', 'orbit': 'travel', 'jet': 'lock', 'return': 'lock', 'shift': 'travel' },
-      'cover-1-lurk': { 'fly': 'lock', 'orbit': 'travel', 'jet': 'lock', 'return': 'lock', 'shift': 'travel' },
-      'cover-2-roll-to-1': { 'fly': 'bump', 'orbit': 'bump', 'jet': 'bump', 'return': 'bump', 'shift': 'bump' },
-      'quarters-poach': { 'fly': 'pattern-adjust', 'orbit': 'lock', 'jet': 'meg-trigger', 'return': 'minimal', 'shift': 'pattern-adjust' },
-      'cover-2-invert': { 'fly': 'bump', 'orbit': 'bump', 'jet': 'bump', 'return': 'bump', 'shift': 'bump' }
+      'cover-0': { 'fly': 'lock', 'orbit': 'lock', 'jet': 'lock', 'return': 'lock', 'shift': 'lock', 'across': 'lock', 'glide': 'lock' },
+      'cover-1': { 'fly': 'lock', 'orbit': 'travel', 'jet': 'lock', 'return': 'lock', 'shift': 'travel', 'across': 'travel', 'glide': 'lock' },
+      'cover-2': { 'fly': 'bump', 'orbit': 'bump', 'jet': 'bump', 'return': 'bump', 'shift': 'bump', 'across': 'bump', 'glide': 'bump' },
+      'cover-3': { 'fly': 'buzz', 'orbit': 'spin', 'jet': 'buzz', 'return': 'minimal', 'shift': 'buzz', 'across': 'spin', 'glide': 'buzz' },
+      'cover-4': { 'fly': 'pattern-adjust', 'orbit': 'lock', 'jet': 'meg-trigger', 'return': 'minimal', 'shift': 'pattern-adjust', 'across': 'pattern-adjust', 'glide': 'lock' },
+      'quarters': { 'fly': 'pattern-adjust', 'orbit': 'lock', 'jet': 'meg-trigger', 'return': 'minimal', 'shift': 'pattern-adjust', 'across': 'pattern-adjust', 'glide': 'lock' },
+      'cover-6': { 'fly': 'check', 'orbit': 'minimal', 'jet': 'pattern-adjust', 'return': 'minimal', 'shift': 'check', 'across': 'check', 'glide': 'minimal' },
+      'tampa-2': { 'fly': 'minimal', 'orbit': 'minimal', 'jet': 'minimal', 'return': 'minimal', 'shift': 'minimal', 'across': 'minimal', 'glide': 'minimal' },
+      'cover-1-bracket': { 'fly': 'lock', 'orbit': 'travel', 'jet': 'lock', 'return': 'lock', 'shift': 'travel', 'across': 'travel', 'glide': 'lock' },
+      'cover-1-robber': { 'fly': 'lock', 'orbit': 'travel', 'jet': 'lock', 'return': 'lock', 'shift': 'travel', 'across': 'travel', 'glide': 'lock' },
+      'cover-1-lurk': { 'fly': 'lock', 'orbit': 'travel', 'jet': 'lock', 'return': 'lock', 'shift': 'travel', 'across': 'travel', 'glide': 'lock' },
+      'cover-2-roll-to-1': { 'fly': 'bump', 'orbit': 'bump', 'jet': 'bump', 'return': 'bump', 'shift': 'bump', 'across': 'bump', 'glide': 'bump' },
+      'quarters-poach': { 'fly': 'pattern-adjust', 'orbit': 'lock', 'jet': 'meg-trigger', 'return': 'minimal', 'shift': 'pattern-adjust', 'across': 'pattern-adjust', 'glide': 'lock' },
+      'cover-2-invert': { 'fly': 'bump', 'orbit': 'bump', 'jet': 'bump', 'return': 'bump', 'shift': 'bump', 'across': 'bump', 'glide': 'bump' }
     };
 
     return responseMatrix[coverage]?.[motionType] || 'minimal';

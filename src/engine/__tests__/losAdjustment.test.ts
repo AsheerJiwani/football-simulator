@@ -124,10 +124,23 @@ describe('Line of Scrimmage Adjustment Tests', () => {
 
       engine.setLineOfScrimmage(losPosition);
 
-      coverages.forEach(coverageType => {
+      coverages.forEach((coverageType, index) => {
         const coverage = DataLoader.getCoverage(coverageType);
         if (coverage) {
+          if (coverageType === 'cover-0') {
+            console.log(`[Test] Setting ${coverageType} as coverage #${index}`);
+          }
           engine.setCoverage(coverage);
+
+          // Check CB1 position immediately after setCoverage
+          if (coverageType === 'cover-0') {
+            const immediateState = engine.getGameState();
+            const cb1 = immediateState.players.find(p => p.id === 'CB1');
+            if (cb1) {
+              console.log(`[Test] CB1 immediately after setCoverage: y=${cb1.position.y}, depth=${cb1.position.y - losPosition}`);
+            }
+          }
+
           const state = engine.getGameState();
 
           const defenders = state.players.filter(p => p.team === 'defense');
@@ -144,6 +157,7 @@ describe('Line of Scrimmage Adjustment Tests', () => {
 
             // Coverage-specific checks
             if (coverageType === 'cover-0' && defender.playerType === 'CB') {
+              console.log(`[Cover-0 Test] ${defender.id} at depth ${depth} from LOS ${losPosition}`);
               // Press coverage - should be very close to LOS
               expect(depth).toBeLessThanOrEqual(5);
             } else if (coverageType === 'cover-2' && defender.playerType === 'S') {

@@ -13,6 +13,7 @@ import type {
   PersonnelPackage,
   MotionType,
   HashPosition,
+  Zone,
 } from './types';
 
 import { Vector, Physics, Field, Random, Route as RouteUtil } from '@/lib/math';
@@ -45,6 +46,8 @@ import { FormationAnalyzer } from './formationAnalyzer';
 import { PersonnelMatcher } from './personnelMatcher';
 import { CoverageAdjustments } from './coverageAdjustments';
 import { PostSnapRules } from './postSnapRules';
+import { MotionMechanics } from './motionMechanics';
+import { ZoneMovementFluidity } from './zoneMovementFluidity';
 import { updateDefensiveMovement, calculateDefensiveMovement } from './defensiveMovement';
 import { QuarterbackMovement, type QBMovementConfig } from './quarterbackMovement';
 import { HotRoutesSystem } from './hotRoutes';
@@ -67,6 +70,7 @@ import {
 import { AdvancedDefensiveBehavior } from './advancedDefensiveBehavior';
 import { PatternMatchingSystem } from './patternMatching';
 import { CoverageDisguiseSystem } from './coverageDisguise';
+import { CoverageValidator } from './coverageValidator';
 
 export class FootballEngine {
   private gameState: GameState;
@@ -79,9 +83,12 @@ export class FootballEngine {
   private personnelMatcher: PersonnelMatcher;
   private coverageAdjustments: CoverageAdjustments;
   private postSnapRules: PostSnapRules;
+  private motionMechanics: MotionMechanics;
+  private zoneMovementFluidity: ZoneMovementFluidity;
   private hotRoutesSystem: HotRoutesSystem;
   private optionRoutesSystem: OptionRoutesSystem;
   private rubRoutesSystem: RubRoutesSystem;
+  private coverageValidator: CoverageValidator;
   private preSnapState?: {
     currentDown: number;
     yardsToGo: number;
@@ -103,9 +110,12 @@ export class FootballEngine {
     this.personnelMatcher = new PersonnelMatcher();
     this.coverageAdjustments = new CoverageAdjustments();
     this.postSnapRules = new PostSnapRules();
+    this.motionMechanics = new MotionMechanics();
+    this.zoneMovementFluidity = new ZoneMovementFluidity();
     this.hotRoutesSystem = new HotRoutesSystem();
     this.optionRoutesSystem = new OptionRoutesSystem();
     this.rubRoutesSystem = new RubRoutesSystem();
+    this.coverageValidator = new CoverageValidator();
   }
 
   private getDefaultConfig(): GameConfig {
@@ -238,7 +248,20 @@ export class FootballEngine {
 
     // Force a full realignment when coverage changes to ensure significant position changes
     if (previousCoverage && previousCoverage.type !== coverage.type) {
+      if (process.env.NODE_ENV === 'test' && coverage.type === 'cover-0') {
+        console.log(`[setCoverage] Calling realignDefense after setupDefense for coverage change from ${previousCoverage.type} to ${coverage.type}`);
+        const cb1Before = this.gameState.players.find(p => p.id === 'CB1');
+        if (cb1Before) {
+          console.log(`[setCoverage] CB1 BEFORE extra realignDefense: y=${cb1Before.position.y}`);
+        }
+      }
       this.realignDefense();
+      if (process.env.NODE_ENV === 'test' && coverage.type === 'cover-0') {
+        const cb1After = this.gameState.players.find(p => p.id === 'CB1');
+        if (cb1After) {
+          console.log(`[setCoverage] CB1 AFTER extra realignDefense: y=${cb1After.position.y}`);
+        }
+      }
     }
   }
 
@@ -284,6 +307,10 @@ export class FootballEngine {
 
   public setShowRoutes(show: boolean): void {
     this.gameState.isShowingRoutes = show;
+  }
+
+  public setShowDebugOverlay(show: boolean): void {
+    this.gameState.isShowingDebugOverlay = show;
   }
 
   public setPersonnel(personnel: PersonnelPackage): void {
@@ -375,7 +402,8 @@ export class FootballEngine {
           console.log(`[setLineOfScrimmage] Setting up defense with LOS=${this.gameState.lineOfScrimmage}, coverage=${this.gameState.coverage.name}`);
         }
         // Force complete defensive recreation to ensure positions update
-        this.setupDefense();
+        // Pass current coverage as previous to maintain coverage type
+        this.setupDefense(this.gameState.currentCoverage);
       } else {
         if (process.env.NODE_ENV === 'test') {
           console.log(`[setLineOfScrimmage] No coverage set, skipping defense setup`);
@@ -477,54 +505,16 @@ export class FootballEngine {
     this.gameState.motionPlayer = playerId;
     this.gameState.isMotionActive = true;
 
-    const startPos = { ...player.position };
-    let endPos: Vector2D;
-    let path: Vector2D[] = [];
+    // Use MotionMechanics for NFL-authentic path calculation
+    const motionResult = this.motionMechanics.calculateMotionPath(
+      player,
+      motionType,
+      this.gameState.lineOfScrimmage
+    );
 
-    switch (motionType) {
-      case 'fly':
-        // Straight across formation
-        endPos = {
-          x: player.position.x > 26.665 ? 10 : 43,
-          y: player.position.y
-        };
-        path = [startPos, endPos];
-        break;
-      case 'orbit':
-        // Behind QB then out (2 yards behind LOS on offensive side)
-        const behindQB = { x: 26.665, y: this.gameState.lineOfScrimmage - 2 };
-        endPos = {
-          x: player.position.x > 26.665 ? 10 : 43,
-          y: this.gameState.lineOfScrimmage
-        };
-        path = [startPos, behindQB, endPos];
-        break;
-      case 'jet':
-        // Fast sweep motion
-        endPos = {
-          x: player.position.x > 26.665 ? 5 : 48,
-          y: this.gameState.lineOfScrimmage
-        };
-        path = [startPos, endPos];
-        break;
-      case 'return':
-        // Out and back
-        const midPoint = {
-          x: player.position.x > 26.665 ? player.position.x - 5 : player.position.x + 5,
-          y: player.position.y
-        };
-        endPos = { ...startPos };
-        path = [startPos, midPoint, endPos];
-        break;
-      case 'shift':
-        // Short adjustment
-        endPos = {
-          x: player.position.x + (player.position.x > 26.665 ? -3 : 3),
-          y: player.position.y
-        };
-        path = [startPos, endPos];
-        break;
-    }
+    const startPos = { ...player.position };
+    const path = motionResult.path;
+    const endPos = path[path.length - 1] || startPos;
 
     // Store motion path but don't update position yet (will be animated)
     player.motionPath = path;
@@ -536,7 +526,7 @@ export class FootballEngine {
       startPosition: startPos,
       endPosition: endPos,
       path,
-      duration: motionType === 'jet' ? 0.8 : 1.2,
+      duration: motionResult.duration, // Use NFL-authentic timing
       currentTime: 0
     };
 
@@ -646,10 +636,22 @@ export class FootballEngine {
       this.gameState.lineOfScrimmage
     );
 
+    // Debug logging for Cover 0 adjustments
+    if (coverage.type === 'cover-0' && process.env.NODE_ENV === 'test') {
+      console.log(`[realignDefense] Cover 0 adjustments count: ${adjustments.length}`);
+      adjustments.forEach(adj => {
+        const depth = adj.newPosition.y - this.gameState.lineOfScrimmage;
+        console.log(`[realignDefense] ${adj.defenderId} adjustment: y=${adj.newPosition.y}, depth=${depth}`);
+      });
+    }
+
     // Apply adjustments to defenders
     for (const adjustment of adjustments) {
       const defender = defensePlayers.find(d => d.id === adjustment.defenderId);
       if (defender) {
+        if (process.env.NODE_ENV === 'test' && coverage.type === 'cover-3' && defender.id === 'CB3') {
+          console.log(`[realignDefense] Applying adjustment to CB3: from y=${defender.position.y} to y=${adjustment.newPosition.y}`);
+        }
         defender.position = adjustment.newPosition;
         if (adjustment.newResponsibility) {
           defender.coverageResponsibility = adjustment.newResponsibility;
@@ -660,7 +662,22 @@ export class FootballEngine {
     // Apply NFL-accurate coverage-specific realignment (legacy fallback)
     // Convert 'balanced' to 'right' as default for legacy method
     const legacyStrength = formationStrength === 'balanced' ? 'right' : formationStrength;
+
+    if (process.env.NODE_ENV === 'test' && coverage.type === 'cover-3') {
+      const cb3 = defensePlayers.find(d => d.id === 'CB3');
+      if (cb3) {
+        console.log(`[realignDefense] BEFORE applyCoverageSpecificRealignment - CB3 at y=${cb3.position.y}, responsibility=${cb3.coverageResponsibility?.type}`);
+      }
+    }
+
     this.applyCoverageSpecificRealignment(coverage, defensePlayers, formation, legacyStrength);
+
+    if (process.env.NODE_ENV === 'test' && coverage.type === 'cover-3') {
+      const cb3 = defensePlayers.find(d => d.id === 'CB3');
+      if (cb3) {
+        console.log(`[realignDefense] AFTER applyCoverageSpecificRealignment - CB3 at y=${cb3.position.y}`);
+      }
+    }
 
     // Ensure at least 4 defenders move significantly when facing spread/empty formations
     const isSpreadFormation = formation.isSpread || formation.isEmpty ||
@@ -674,12 +691,18 @@ export class FootballEngine {
     ).length >= 4;
 
     if (isFourVerts || isSpreadFormation) {
-      // Ensure at least 2 defenders are positioned deep (>15 yards) for deep zone integrity
-      const deepDefenders = defensePlayers.filter(d =>
-        d.position.y > this.gameState.lineOfScrimmage + 15
-      );
+      // Skip deep coverage enforcement for Cover 0 (all-out blitz with press coverage)
+      if (coverage.type === 'cover-0') {
+        if (process.env.NODE_ENV === 'test') {
+          console.log(`[realignDefense] Skipping deep coverage enforcement for Cover 0`);
+        }
+      } else {
+        // Ensure at least 2 defenders are positioned deep (>15 yards) for deep zone integrity
+        const deepDefenders = defensePlayers.filter(d =>
+          d.position.y > this.gameState.lineOfScrimmage + 15
+        );
 
-      if (deepDefenders.length < 2) {
+        if (deepDefenders.length < 2) {
         // Force safeties and corners to play deeper coverage
         const safeties = defensePlayers.filter(d => d.playerType === 'S');
         const corners = defensePlayers.filter(d => d.playerType === 'CB');
@@ -702,6 +725,7 @@ export class FootballEngine {
           }
         }
       }
+      } // End of else (non-Cover 0)
     }
 
     let significantMovements = 0;
@@ -719,7 +743,8 @@ export class FootballEngine {
     });
 
     // If spread formation and not enough significant movements, force additional adjustments
-    if (isSpreadFormation && significantMovements < 4) {
+    // Skip for Cover 0 to preserve press coverage positions
+    if (isSpreadFormation && significantMovements < 4 && coverage.type !== 'cover-0') {
       let adjustmentsNeeded = 4 - significantMovements;
 
       defensePlayers.forEach(defender => {
@@ -773,6 +798,9 @@ export class FootballEngine {
     const strongSide: 'left' | 'right' = rightReceivers > leftReceivers ? 'right' : 'left';
 
     // Realign based on coverage type
+    // NOTE: This is redundant logic that overrides the correct positions already set
+    // by generateCover[X]Alignment and coverageAdjustments.
+    // TODO: This should be removed or refactored to avoid triple positioning
     if (coverage.type === 'cover-1' || coverage.type === 'cover-0') {
       // Man coverage - realign defenders to follow their assigned receivers
       defensePlayers.forEach(defender => {
@@ -782,7 +810,9 @@ export class FootballEngine {
           if (assignedReceiver) {
             // Position defender based on receiver's new position
             // Determine cushion based on defender type and coverage
-            const cushion = defender.playerType === 'CB' ? 7 :
+            // Cover 0 uses press coverage (1 yard cushion) for all defenders
+            const cushion = coverage.type === 'cover-0' ? 1 :
+                           defender.playerType === 'CB' ? 7 :
                            defender.playerType === 'S' ? 12 :
                            defender.playerType === 'LB' ? 5 : 3;
 
@@ -1331,7 +1361,23 @@ export class FootballEngine {
     const originalSide = motionPlayer.position.x < centerX ? 'left' : 'right';
     const motionCrossesFormation = this.doesMotionCrossFormation(motionPlayer, offensePlayers);
 
-    // Use new motion response system
+    // Use enhanced NFL-authentic motion response system
+    const defensiveResponses = this.motionMechanics.calculateDefensiveMotionResponse(
+      coverage.type,
+      this.gameState.motion,
+      defensePlayers,
+      offensePlayers
+    );
+
+    // Apply enhanced motion adjustments
+    defensiveResponses.forEach((newPosition, defenderId) => {
+      const defender = defensePlayers.find(d => d.id === defenderId);
+      if (defender) {
+        defender.position = newPosition;
+      }
+    });
+
+    // Also use existing coverage adjustment system for responsibilities
     const motionAdjustments = this.coverageAdjustments.handleMotionAdjustments(
       coverage.type,
       this.gameState.motion,
@@ -1340,14 +1386,11 @@ export class FootballEngine {
       this.gameState.lineOfScrimmage
     );
 
-    // Apply motion adjustments
+    // Apply responsibility changes
     for (const adjustment of motionAdjustments) {
       const defender = defensePlayers.find(d => d.id === adjustment.defenderId);
-      if (defender) {
-        defender.position = adjustment.newPosition;
-        if (adjustment.newResponsibility) {
-          defender.coverageResponsibility = adjustment.newResponsibility;
-        }
+      if (defender && adjustment.newResponsibility) {
+        defender.coverageResponsibility = adjustment.newResponsibility;
       }
     }
 
@@ -2182,12 +2225,34 @@ export class FootballEngine {
   private applyCover0Adjustments(defensePlayers: Player[], formation: any, strength: 'left' | 'right'): void {
     const losY = this.gameState.lineOfScrimmage;
 
+    // Debug log for Cover 0
+    if (process.env.NODE_ENV === 'test') {
+      console.log(`[applyCover0Adjustments] Called for ${defensePlayers.length} defenders at LOS ${losY}`);
+      const cb1 = defensePlayers.find(d => d.id === 'CB1');
+      if (cb1) {
+        console.log(`[applyCover0Adjustments] CB1 entering with y=${cb1.position.y}, responsibility=${cb1.coverageResponsibility?.type}`);
+      }
+    }
+
     defensePlayers.forEach(defender => {
-      if (!defender.coverageResponsibility) return;
+      if (!defender.coverageResponsibility) {
+        if (process.env.NODE_ENV === 'test' && defender.id === 'CB1') {
+          console.log(`[applyCover0Adjustments] CB1 has NO responsibility, skipping`);
+        }
+        return;
+      }
 
       if (defender.coverageResponsibility.type === 'man') {
+        const oldY = defender.position.y;
+        const oldDepth = oldY - losY;
         // Tight man coverage with no help - press alignment, inside leverage
-        defender.position.y = losY + 1; // 0-1 yard depth
+        defender.position.y = losY + 1; // Press coverage depth
+        const newDepth = defender.position.y - losY;
+
+        if (defender.playerType === 'CB' && process.env.NODE_ENV === 'test') {
+          console.log(`[applyCover0Adjustments] ${defender.id}: oldY=${oldY} (depth=${oldDepth}) -> newY=${defender.position.y} (depth=${newDepth})`);
+        }
+
         const insideLeverage = defender.position.x < 26.665 ? 0.5 : -0.5;
         defender.position.x += insideLeverage;
 
@@ -3132,6 +3197,22 @@ export class FootballEngine {
     this.gameState = this.initializeGameState();
   }
 
+  public nextPlay(): void {
+    // Advance to next play after current play ends
+    if (this.gameState.phase !== 'play-over') {
+      console.warn('Cannot advance to next play - current play not over');
+      return;
+    }
+
+    if (!this.gameState.outcome) {
+      console.warn('No play outcome to process');
+      return;
+    }
+
+    // Use existing method to process drive progression
+    this.advanceToNextPlay();
+  }
+
   public resetPlay(): void {
     // Reset only play-specific state, preserving drive state
     this.stopGameLoop();
@@ -3296,6 +3377,11 @@ export class FootballEngine {
     // Update player positions first
     this.updatePlayerPositions(deltaTime);
 
+    // Maintain zone integrity for zone defenders (post-snap only)
+    if (this.gameState.phase === 'post-snap') {
+      this.maintainZoneIntegrity(deltaTime);
+    }
+
     // Update blitzer movements and pass rush
     this.updateBlitzMovement(deltaTime);
 
@@ -3380,8 +3466,13 @@ export class FootballEngine {
 
   private updatePlayerPositions(deltaTime: number): void {
     this.gameState.players.forEach(player => {
-      // Update motion boost
-      if (player.hasMotionBoost) {
+      // Update motion boost using NFL-authentic mechanics
+      if (player.motionBoostRemaining && player.motionBoostRemaining > 0) {
+        this.motionMechanics.updateMotionBoost(player, deltaTime);
+      }
+
+      // Legacy support for motionBoostTimeLeft
+      if (player.hasMotionBoost && player.motionBoostTimeLeft) {
         player.motionBoostTimeLeft -= deltaTime;
         if (player.motionBoostTimeLeft <= 0) {
           player.hasMotionBoost = false;
@@ -3500,6 +3591,47 @@ export class FootballEngine {
     }
   }
 
+  private maintainZoneIntegrity(deltaTime: number): void {
+    const defensePlayers = this.gameState.players.filter(p => p.team === 'defense');
+    const offensePlayers = this.gameState.players.filter(p => p.team === 'offense');
+
+    // Build zone map
+    const zones = new Map<string, Zone>();
+    defensePlayers.forEach(defender => {
+      if (defender.coverageResponsibility?.type === 'zone' && defender.coverageResponsibility.zone) {
+        zones.set(defender.id, defender.coverageResponsibility.zone);
+      }
+    });
+
+    if (zones.size === 0) return;
+
+    // Calculate zone integrity adjustments
+    const integrityAdjustments = this.zoneMovementFluidity.maintainZoneIntegrity(
+      defensePlayers,
+      zones,
+      offensePlayers
+    );
+
+    // Apply gradual adjustments for smooth movement
+    integrityAdjustments.forEach((targetPosition, defenderId) => {
+      const defender = defensePlayers.find(d => d.id === defenderId);
+      if (defender) {
+        // Interpolate toward target position
+        const dx = targetPosition.x - defender.position.x;
+        const dy = targetPosition.y - defender.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > 0.5) { // Only adjust if meaningful distance
+          const adjustmentSpeed = Math.min(defender.maxSpeed * 0.5, distance / deltaTime);
+          const adjustmentRatio = (adjustmentSpeed * deltaTime) / distance;
+
+          defender.position.x += dx * adjustmentRatio;
+          defender.position.y += dy * adjustmentRatio;
+        }
+      }
+    });
+  }
+
   private isBlitzerBlocked(blitzerId: string): boolean {
     // Check if blitzer is marked as blocked or if any blocker is currently blocking this blitzer
     const blitzer = this.gameState.players.find(p => p.id === blitzerId);
@@ -3549,27 +3681,88 @@ export class FootballEngine {
     // Check if this is a Play Action concept (future implementation)
     const isPlayAction = false; // TODO: Implement Play Action detection
 
-    // Use new comprehensive defensive movement system
-    const updatedDefenders = updateDefensiveMovement(
-      [player], // Single player for individual updates
-      offensivePlayers,
-      this.gameState.coverage.type,
-      this.gameState.timeElapsed,
-      deltaTime,
-      isPlayAction
-    );
+    // For zone defenders, use enhanced zone movement fluidity
+    if (player.coverageResponsibility.type === 'zone' && player.coverageResponsibility.zone) {
+      const zone = player.coverageResponsibility.zone;
 
-    if (updatedDefenders.length > 0) {
-      const updatedPlayer = updatedDefenders[0];
+      // Calculate fluid zone drop
+      const dropResult = this.zoneMovementFluidity.calculateZoneDrop(
+        player,
+        zone,
+        this.gameState.lineOfScrimmage,
+        this.gameState.timeElapsed
+      );
 
-      // Calculate velocity for smooth animations
-      if (updatedPlayer.position.x !== player.position.x || updatedPlayer.position.y !== player.position.y) {
-        player.velocity = {
-          x: (updatedPlayer.position.x - player.position.x) / deltaTime,
-          y: (updatedPlayer.position.y - player.position.y) / deltaTime
-        };
-        player.currentSpeed = Vector.magnitude(player.velocity);
-        player.position = updatedPlayer.position;
+      // Check for pattern matching triggers
+      const nearbyReceivers = offensivePlayers.filter(p =>
+        p.isEligible &&
+        Vector.distance(p.position, player.position) < 15
+      );
+
+      for (const receiver of nearbyReceivers) {
+        if (receiver.route && receiver.route.waypoints.length > 0) {
+          const shouldPatternMatch = this.zoneMovementFluidity.shouldTriggerPatternMatch(
+            player,
+            receiver,
+            receiver.route,
+            this.gameState.timeElapsed
+          );
+
+          if (shouldPatternMatch) {
+            // Convert to man coverage
+            player.coverageResponsibility.type = 'man';
+            player.coverageResponsibility.target = receiver.id;
+            break;
+          }
+        }
+      }
+
+      // Check for zone handoffs
+      if (nearbyReceivers.length > 0) {
+        const primaryReceiver = nearbyReceivers[0];
+        const handoffResult = this.zoneMovementFluidity.handleZoneHandoff(
+          player,
+          primaryReceiver,
+          defensivePlayers.filter(d => d.id !== player.id),
+          zone
+        );
+
+        if (handoffResult.shouldHandoff && handoffResult.newResponsibility) {
+          player.coverageResponsibility = handoffResult.newResponsibility;
+        }
+      }
+
+      // Apply calculated movement
+      player.position = dropResult.position;
+      player.velocity = dropResult.velocity;
+      player.currentSpeed = Vector.magnitude(dropResult.velocity);
+
+      // Store technique for animation purposes
+      player.coverageTechnique = dropResult.technique;
+
+    } else {
+      // Use standard defensive movement system for man/blitz
+      const updatedDefenders = updateDefensiveMovement(
+        [player], // Single player for individual updates
+        offensivePlayers,
+        this.gameState.coverage.type,
+        this.gameState.timeElapsed,
+        deltaTime,
+        isPlayAction
+      );
+
+      if (updatedDefenders.length > 0) {
+        const updatedPlayer = updatedDefenders[0];
+
+        // Calculate velocity for smooth animations
+        if (updatedPlayer.position.x !== player.position.x || updatedPlayer.position.y !== player.position.y) {
+          player.velocity = {
+            x: (updatedPlayer.position.x - player.position.x) / deltaTime,
+            y: (updatedPlayer.position.y - player.position.y) / deltaTime
+          };
+          player.currentSpeed = Vector.magnitude(player.velocity);
+          player.position = updatedPlayer.position;
+        }
       }
     }
   }
@@ -4168,6 +4361,8 @@ export class FootballEngine {
     }
   }
 
+  private lastSetupLOS?: number;
+
   private setupDefense(previousCoverage?: Coverage): void {
     if (process.env.NODE_ENV === 'test') {
       console.log(`[setupDefense] Called with LOS=${this.gameState.lineOfScrimmage}, coverage=${this.gameState.coverage?.name}`);
@@ -4186,22 +4381,27 @@ export class FootballEngine {
     // Check if we can preserve existing defenders (same coverage type)
     // Use passed previousCoverage if available, otherwise use current
     const oldCoverageType = previousCoverage?.type || this.gameState.currentCoverage?.type;
-    // Don't preserve defenders if LOS has changed at all - force recreation for proper positioning
-    // Check if any defender's depth doesn't match expected depth from current LOS
-    const losChanged = existingDefenders.length > 0 && existingDefenders.some(d => {
-      const currentDepth = d.position.y - this.gameState.lineOfScrimmage;
-      // If any defender is positioned incorrectly relative to current LOS, recreate
-      return currentDepth < 0 || currentDepth > 40; // No defender should be in front of LOS or too deep
-    });
-    const shouldPreserveDefenders = existingDefenders.length > 0 &&
-      oldCoverageType === coverage.type && !losChanged;
 
-    if (existingDefenders.length > 0) {
-      // Debug logging removed - defense setup working properly
-      if (losChanged) {
-        // LOS change detected - will proceed with full reset
+    // Always recreate defenders if LOS has changed
+    const losHasChanged = this.lastSetupLOS !== undefined &&
+                         this.lastSetupLOS !== this.gameState.lineOfScrimmage;
+
+    const shouldPreserveDefenders = existingDefenders.length > 0 &&
+      oldCoverageType === coverage.type && !losHasChanged;
+
+    if (process.env.NODE_ENV === 'test' && coverage.type === 'cover-0') {
+      console.log(`[setupDefense] Cover 0 setup - oldCoverageType=${oldCoverageType}, newType=${coverage.type}, losChanged=${losHasChanged}, shouldPreserve=${shouldPreserveDefenders}`);
+    }
+
+    if (existingDefenders.length > 0 && losHasChanged) {
+      // LOS change detected - will proceed with full reset
+      if (process.env.NODE_ENV === 'test') {
+        console.log(`[setupDefense] LOS changed from ${this.lastSetupLOS} to ${this.gameState.lineOfScrimmage}, recreating defenders`);
       }
     }
+
+    // Store current LOS for next comparison (AFTER checking)
+    this.lastSetupLOS = this.gameState.lineOfScrimmage;
 
     if (shouldPreserveDefenders) {
       // Update existing defenders' responsibilities and realign
@@ -4244,8 +4444,11 @@ export class FootballEngine {
         const responsibility = {
           defenderId: assignment.defenderId,
           type: assignment.role === 'man-coverage' ? 'man' as const :
-                assignment.role === 'spy' ? 'spy' as const : 'zone' as const,
-          target: assignment.target,
+                assignment.role === 'hole' ? 'zone' as const : // hole/rat is a zone coverage
+                assignment.role === 'free-safety' ? 'zone' as const :
+                assignment.role === 'strong-safety' && assignment.target ? 'man' as const : 'zone' as const,
+          target: assignment.role === 'hole' ? undefined : assignment.target, // hole defenders don't have specific targets
+          zone: assignment.role === 'hole' ? { name: 'hole', center: { x: 26.665, y: this.gameState.lineOfScrimmage + 8 }, width: 10, height: 6, depth: 8 } : undefined
         };
 
         const defender: Player = {
@@ -4335,7 +4538,42 @@ export class FootballEngine {
 
     } else {
       // Enhanced: For all other coverages, use improved personnel matching system
-      const assignments = generateDefensiveAssignments(legacyFormation, optimalPersonnel);
+      let assignments = generateDefensiveAssignments(legacyFormation, optimalPersonnel);
+
+      // Special handling for Cover 0 - ensure ALL eligibles are covered
+      if (coverage.type === 'cover-0') {
+        // Get all eligible offensive players (excluding QB)
+        const eligibleTargets = offensivePlayers.filter(p => p.isEligible && p.playerType !== 'QB');
+
+        // Sort defenders by man coverage priority for Cover 0
+        // CBs -> NBs -> LBs -> Safeties
+        const defenderPriority = ['CB', 'NB', 'LB', 'S'];
+        assignments = assignments.sort((a, b) => {
+          const aPriority = defenderPriority.indexOf(a.playerType);
+          const bPriority = defenderPriority.indexOf(b.playerType);
+          return aPriority - bPriority;
+        });
+
+        // Assign man coverage to all eligible receivers first
+        let targetIdx = 0;
+        assignments.forEach(assignment => {
+          if (targetIdx < eligibleTargets.length) {
+            assignment.role = 'man-coverage';
+            assignment.target = eligibleTargets[targetIdx].id;
+            targetIdx++;
+          } else {
+            // Only blitz if all eligibles are covered
+            assignment.role = 'blitz';
+            assignment.target = undefined;
+          }
+        });
+
+        if (process.env.NODE_ENV === 'test') {
+          console.log(`[Cover 0] Assigned ${targetIdx} man coverages for ${eligibleTargets.length} eligibles`);
+          const blitzers = assignments.filter(a => a.role === 'blitz').length;
+          console.log(`[Cover 0] ${blitzers} defenders blitzing`);
+        }
+      }
 
       // Build new defensive players from assignments
       newDefensivePlayers = assignments.map(assignment => {
@@ -4347,9 +4585,7 @@ export class FootballEngine {
           // Cover 0 is pure man/blitz - NO zones allowed
           responsibility = {
             defenderId: assignment.defenderId,
-            type: assignment.role === 'spy' ? 'spy' as const :
-                  assignment.role === 'zone' ? 'man' as const :  // Convert any zone to man
-                  assignment.role === 'man-coverage' ? 'man' as const : 'blitz' as const,
+            type: assignment.role === 'man-coverage' ? 'man' as const : 'blitz' as const,
             target: assignment.target,
           };
         } else if (coverage.type === 'cover-2' || coverage.type === 'cover-3' || coverage.type === 'cover-4' || coverage.type === 'tampa-2') {
@@ -4415,6 +4651,9 @@ export class FootballEngine {
 
           // Debug log alignment positions
           if (process.env.NODE_ENV === 'test') {
+            if (alignmentPositions['CB3']) {
+              console.log(`[setupDefense] generateCover3Alignment returned CB3 at y=${alignmentPositions['CB3'].y}`);
+            }
             Object.entries(alignmentPositions).forEach(([id, pos]) => {
               if (id.startsWith('LB')) {
                 const depth = pos.y - this.gameState.lineOfScrimmage;
@@ -4502,13 +4741,19 @@ export class FootballEngine {
           defender.position = calculatedPosition;
 
           // Debug logging for calculated positions
-          if ((defender.playerType === 'LB' || defender.id === 'CB1') && process.env.NODE_ENV === 'test') {
+          if ((defender.playerType === 'LB' || defender.id === 'CB1' || defender.id === 'CB3' || (coverage.type === 'cover-0' && defender.playerType === 'CB')) && process.env.NODE_ENV === 'test') {
             const depth = defender.position.y - this.gameState.lineOfScrimmage;
-            console.log(`[setupDefense] ${defender.id} using calculated position: y=${defender.position.y}, depth=${depth}`);
+            console.log(`[setupDefense] ${coverage.type} - ${defender.id} using calculated position: y=${defender.position.y}, depth=${depth}`);
           }
         } else {
           // Enhanced fallback positioning for specific player types
           let fallbackPosition = this.getDefensivePosition(defender.id, coverage);
+
+          // Debug logging for fallback usage
+          if ((coverage.type === 'cover-0' || defender.id === 'CB3') && defender.playerType === 'CB' && process.env.NODE_ENV === 'test') {
+            const depth = fallbackPosition.y - this.gameState.lineOfScrimmage;
+            console.warn(`[setupDefense] WARNING: ${coverage.type} - ${defender.id} using FALLBACK position: y=${fallbackPosition.y}, depth=${depth}`);
+          }
 
           // Special handling for NB (Nickel backs) based on coverage type
           if (defender.playerType === 'NB') {
@@ -4534,6 +4779,11 @@ export class FootballEngine {
         if (cb1) {
           console.log(`[setupDefense] After update - CB1 at y=${cb1.position.y}, LOS=${this.gameState.lineOfScrimmage}, depth=${cb1.position.y - this.gameState.lineOfScrimmage}`);
         }
+
+        // Extra debug for Cover 0
+        if (coverage.type === 'cover-0') {
+          console.log(`[setupDefense] Cover 0 defenders created: ${newDefensivePlayers.map(d => `${d.id}:y=${d.position.y}`).join(', ')}`);
+        }
       }
     }
 
@@ -4542,10 +4792,66 @@ export class FootballEngine {
       this.applyBlitzPackage(blitzPackage);
     }
 
+    // Validate coverage assignments
+    const defensivePlayers = this.gameState.players.filter(p => p.team === 'defense');
+
+    const validationResult = this.coverageValidator.validateCoverageAssignments(
+      defensivePlayers,
+      offensivePlayers,
+      coverage.type
+    );
+
+    // Log errors and warnings
+    if (!validationResult.isValid) {
+      console.error('[Coverage Validation] Errors detected:', validationResult.errors);
+    }
+
+    if (validationResult.warnings.length > 0) {
+      validationResult.warnings.forEach(warning => {
+        if (warning.severity === 'high') {
+          console.warn(`[Coverage Warning - HIGH] ${warning.message}`);
+          if (warning.suggestion) {
+            console.warn(`  Suggestion: ${warning.suggestion}`);
+          }
+        } else if (process.env.NODE_ENV === 'development') {
+          console.log(`[Coverage Warning - ${warning.severity.toUpperCase()}] ${warning.message}`);
+        }
+      });
+    }
+
+    // Log validation stats in development
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+      console.log('[Coverage Stats]', {
+        totalDefenders: validationResult.stats.totalDefenders,
+        manAssignments: validationResult.stats.manAssignments,
+        zoneAssignments: validationResult.stats.zoneAssignments,
+        blitzers: validationResult.stats.blitzers,
+        deepSafeties: validationResult.stats.deepSafeties
+      });
+    }
+
+    // Auto-fix critical issues if needed
+    if (!validationResult.isValid && validationResult.errors.some(e => e.type === 'DEFENDER_COUNT')) {
+      console.error(`[Coverage Validation] Critical error: Wrong defender count (${validationResult.stats.totalDefenders}). Cannot proceed.`);
+      // In production, we might want to reset to a default coverage
+    }
+
     // CRITICAL: After setting up defense, ensure realignment for proper positioning
     // This applies coverage adjustments and ensures defenders are positioned correctly
     // relative to the offensive formation
+    if (process.env.NODE_ENV === 'test' && coverage.type === 'cover-0') {
+      const cb1Before = this.gameState.players.find(p => p.id === 'CB1');
+      if (cb1Before) {
+        console.log(`[setupDefense] CB1 BEFORE realignDefense: y=${cb1Before.position.y}`);
+      }
+    }
     this.realignDefense();
+    if (process.env.NODE_ENV === 'test' && coverage.type === 'cover-0') {
+      const cb1After = this.gameState.players.find(p => p.id === 'CB1');
+      if (cb1After) {
+        console.log(`[setupDefense] CB1 AFTER realignDefense: y=${cb1After.position.y}`);
+      }
+    }
   }
 
   /**
@@ -4605,17 +4911,33 @@ export class FootballEngine {
       };
 
       // Debug logging for position issues
-      if (process.env.NODE_ENV === 'test' && defenderId === 'CB1') {
-        console.log(`[getDefensivePosition] ${defenderId}: coverage.y=${coveragePosition.y}, los=${los}, result.y=${result.y}`);
+      if (process.env.NODE_ENV === 'test' && (defenderId === 'CB1' || coverage.type === 'cover-0')) {
+        console.log(`[getDefensivePosition] ${coverage.type} ${defenderId}: coverage.y=${coveragePosition.y}, los=${los}, result.y=${result.y}`);
       }
 
       return result;
+    } else {
+      // Debug when position is undefined
+      if (process.env.NODE_ENV === 'test' && coverage.type === 'cover-0' && defenderId.startsWith('CB')) {
+        console.warn(`[getDefensivePosition] WARNING: No position defined for ${defenderId} in ${coverage.type}. Coverage positions: ${JSON.stringify(coverage.positions ? Object.keys(coverage.positions) : 'undefined')}`);
+      }
+    }
+
+    // Debug when using fallback
+    if (process.env.NODE_ENV === 'test' && coverage.type === 'cover-0') {
+      console.warn(`[getDefensivePosition] WARNING: Using FALLBACK for ${coverage.type} ${defenderId} - no coverage position defined`);
     }
 
     // Fallback positions based on player type
     const playerType = this.getPlayerTypeFromId(defenderId);
     switch (playerType) {
       case 'CB':
+        // Special handling for Cover 0 - press coverage
+        if (coverage.type === 'cover-0') {
+          return defenderId === 'CB1' ? { x: 8, y: los + 1 } :
+                 defenderId === 'CB2' ? { x: 45, y: los + 1 } : { x: 38, y: los + 1 };
+        }
+        // Default CB depth for other coverages
         return defenderId === 'CB1' ? { x: 8, y: los + 7 } :
                defenderId === 'CB2' ? { x: 45, y: los + 7 } : { x: 38, y: los + 6 };
       case 'S':
@@ -4629,11 +4951,12 @@ export class FootballEngine {
   }
 
   private applyMotionBoosts(): void {
-    // Apply motion boost to players who have it
+    // Apply NFL-authentic motion boost using MotionMechanics
     this.gameState.players
-      .filter(p => p.hasMotionBoost)
+      .filter(p => p.hasMotion && p.team === 'offense')
       .forEach(p => {
-        p.motionBoostTimeLeft = this.config.physics.motionBoostDuration;
+        this.motionMechanics.applyMotionBoost(p);
+        p.hasMotionBoost = true;
       });
   }
 
@@ -4768,6 +5091,10 @@ export class FootballEngine {
     formation: any,
     optimalPersonnel: any
   ): any[] {
+    // Guard against undefined or non-array responsibilities
+    if (!originalResponsibilities || !Array.isArray(originalResponsibilities)) {
+      return [];
+    }
     let adjustedResponsibilities = [...originalResponsibilities];
 
     // Check if this is Cover 0 (all-out blitz)
@@ -4818,37 +5145,110 @@ export class FootballEngine {
       return resp;
     });
 
-    // For Cover 0, maintain all blitz and man assignments - don't add zone coverage
+    // For Cover 0, ensure all eligible receivers are covered FIRST, then add blitzers
     if (isCover0) {
-      // Ensure we have exactly 7 defenders but keep all man/blitz assignments
-      // Do NOT add any zone defenders for Cover 0
-      if (adjustedResponsibilities.length < 7) {
-        // Add more blitzers if needed
-        const defendersNeeded = 7 - adjustedResponsibilities.length;
-        for (let i = 0; i < defendersNeeded; i++) {
-          const newDefenderId = `LB${adjustedResponsibilities.filter(r => r.defenderId.startsWith('LB')).length + 1}`;
+      // NFL Cover 0 Rule: 5 defenders in man coverage, 2 blitzers (per research)
+      // Priority: Cover all eligible receivers first
+
+      // Get all eligible receivers (excluding QB)
+      const eligibleTargets = offensivePlayers.filter(p =>
+        p.isEligible && p.playerType !== 'QB'
+      );
+
+      // Clear existing responsibilities and rebuild for Cover 0
+      adjustedResponsibilities = [];
+
+      // Sort eligible receivers by priority (outside WRs first, then slots, then TEs/RBs)
+      const sortedTargets = eligibleTargets.sort((a, b) => {
+        // WRs get priority
+        if (a.playerType === 'WR' && b.playerType !== 'WR') return -1;
+        if (b.playerType === 'WR' && a.playerType !== 'WR') return 1;
+
+        // Among same type, outside receivers first
+        const aDistFromCenter = Math.abs(a.position.x - 26.665);
+        const bDistFromCenter = Math.abs(b.position.x - 26.665);
+        return bDistFromCenter - aDistFromCenter;
+      });
+
+      // Assign man coverage to all eligible receivers (up to 5)
+      const maxManDefenders = Math.min(5, sortedTargets.length);
+      let defenderCount = 0;
+
+      // Assign CBs to outside WRs
+      const cbCount = optimalPersonnel.CB || 3;
+      for (let i = 0; i < cbCount && defenderCount < maxManDefenders && i < sortedTargets.length; i++) {
+        adjustedResponsibilities.push({
+          defenderId: `CB${i + 1}`,
+          type: 'man' as const,
+          target: sortedTargets[defenderCount].id
+        });
+        defenderCount++;
+      }
+
+      // Assign Safeties to remaining receivers
+      const safetyCount = optimalPersonnel.S || 2;
+      for (let i = 0; i < safetyCount && defenderCount < maxManDefenders && defenderCount < sortedTargets.length; i++) {
+        adjustedResponsibilities.push({
+          defenderId: `S${i + 1}`,
+          type: 'man' as const,
+          target: sortedTargets[defenderCount].id
+        });
+        defenderCount++;
+      }
+
+      // Assign NBs if needed for remaining receivers
+      const nbCount = optimalPersonnel.NB || 0;
+      for (let i = 0; i < nbCount && defenderCount < maxManDefenders && defenderCount < sortedTargets.length; i++) {
+        adjustedResponsibilities.push({
+          defenderId: `NB${i + 1}`,
+          type: 'man' as const,
+          target: sortedTargets[defenderCount].id
+        });
+        defenderCount++;
+      }
+
+      // Assign LBs to cover any remaining eligibles or blitz
+      const lbCount = optimalPersonnel.LB || 1;
+      for (let i = 0; i < lbCount; i++) {
+        if (defenderCount < sortedTargets.length && defenderCount < 5) {
+          // Cover remaining eligible
           adjustedResponsibilities.push({
-            defenderId: newDefenderId,
+            defenderId: `LB${i + 1}`,
+            type: 'man' as const,
+            target: sortedTargets[defenderCount].id
+          });
+          defenderCount++;
+        } else {
+          // Blitz if all eligibles covered or we've hit 5 man defenders
+          adjustedResponsibilities.push({
+            defenderId: `LB${i + 1}`,
             type: 'blitz' as const,
             gap: i % 2 === 0 ? 'A' : 'B',
             side: i % 2 === 0 ? 'strong' : 'weak'
           });
         }
-      } else if (adjustedResponsibilities.length > 7) {
-        adjustedResponsibilities = adjustedResponsibilities.slice(0, 7);
       }
-      // Make sure no zone defenders exist in Cover 0
-      adjustedResponsibilities = adjustedResponsibilities.filter(r => r.type !== 'zone');
-      // If we filtered out zone defenders and now have less than 7, add blitzers
+
+      // Ensure exactly 7 defenders
       while (adjustedResponsibilities.length < 7) {
+        const blitzerCount = adjustedResponsibilities.filter(r => r.type === 'blitz').length;
         const newDefenderId = `LB${adjustedResponsibilities.filter(r => r.defenderId.startsWith('LB')).length + 1}`;
         adjustedResponsibilities.push({
           defenderId: newDefenderId,
           type: 'blitz' as const,
-          gap: 'A',
-          side: 'weak'
+          gap: blitzerCount % 2 === 0 ? 'A' : 'B',
+          side: blitzerCount % 2 === 0 ? 'strong' : 'weak'
         });
       }
+
+      // Trim to exactly 7 if over
+      if (adjustedResponsibilities.length > 7) {
+        // Keep man coverage defenders first, then blitzers
+        const manDefenders = adjustedResponsibilities.filter(r => r.type === 'man');
+        const blitzers = adjustedResponsibilities.filter(r => r.type === 'blitz');
+        adjustedResponsibilities = [...manDefenders, ...blitzers].slice(0, 7);
+      }
+
       return adjustedResponsibilities;
     }
 

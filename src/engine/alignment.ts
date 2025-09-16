@@ -218,23 +218,22 @@ export function getCover1FreeSafety(formation: FormationAnalysis, los: number): 
   const centerX = 26.665; // Center of field
   const depth = COVER_1_CONSTANTS.FS_DEPTH;
 
-  // Shade toward strength based on formation type
+  // In Cover 1, the free safety plays the deep middle (post safety)
+  // Should be centered with minimal shading
   let xAdjustment = 0;
 
+  // Only slight shade in extreme formations
   if (formation.isTrips) {
-    // Shade 3-4 yards toward trips side (stronger shade for 3x1)
-    xAdjustment = formation.tripsSide === 'left' ? -3.5 : 3.5;
-  } else if (formation.hasTE) {
-    // Shade 2 yards toward TE side
-    xAdjustment = formation.teSide === 'left' ? -2 : 2;
+    // Very slight shade toward trips side (1 yard max for 3x1)
+    xAdjustment = formation.tripsSide === 'left' ? -1 : 1;
   } else if (formation.strength !== 'balanced') {
-    // Slight shade toward general strength
-    xAdjustment = formation.strength === 'left' ? -1.5 : 1.5;
+    // Minimal shade toward strength (0.5 yards)
+    xAdjustment = formation.strength === 'left' ? -0.5 : 0.5;
   }
 
   return {
     x: centerX + xAdjustment,
-    y: los + depth, // Always 12 yards on defensive side
+    y: los + depth, // Always 12-15 yards on defensive side
   };
 }
 
@@ -400,7 +399,7 @@ export function getCover3Cornerback(
   formation: FormationAnalysis,
   los: number
 ): Vector2D {
-  const depth = COVER_3_CONSTANTS.CB_DEPTH_SOFT;
+  const depth = COVER_3_CONSTANTS.CB_DEPTH_SOFT; // Should be 7
   const thirdWidth = COVER_3_CONSTANTS.DEEP_THIRD_WIDTH;
 
   // Position at edge of deep third zone
@@ -415,10 +414,16 @@ export function getCover3Cornerback(
   const receiverOffset = (receiver.position.x - xPosition) * 0.3;
   xPosition += receiverOffset;
 
-  return {
+  const result = {
     x: Math.max(2, Math.min(51.33, xPosition)), // Stay in bounds
     y: los + depth
   };
+
+  if (process.env.NODE_ENV === 'test') {
+    console.log(`[getCover3Cornerback] side=${side}, los=${los}, depth=${depth}, resultY=${result.y}`);
+  }
+
+  return result;
 }
 
 /**
@@ -677,6 +682,7 @@ export function getOptimalDefensivePersonnel(offensivePersonnel: PersonnelPackag
   const teCount = offensivePersonnel.TE;
   const rbCount = offensivePersonnel.RB + offensivePersonnel.FB;
 
+
   // Start with base personnel (4-3 or 3-4 equivalent)
   let personnel: DefensivePersonnel = {
     CB: 2,
@@ -697,12 +703,13 @@ export function getOptimalDefensivePersonnel(offensivePersonnel: PersonnelPackag
     };
   } else if (wrCount >= 3) {
     // 11 personnel (3+ WRs): Nickel package (need 5 DBs total)
-    // CB: 2, S: 2, NB: 1 = 5 DBs total
+    // CB: 3, S: 2, NB: 0 = 5 DBs total (3 CBs for 3 WRs)
+    // OR CB: 2, S: 2, NB: 1 = 5 DBs (NB covers slot WR)
     personnel = {
-      CB: 2,
+      CB: 3,  // Need 3 CBs to cover 3 WRs properly
       S: 2,   // Both FS and SS for proper Nickel
       LB: 2,  // Reduced from 3 to 2
-      NB: 1,  // Nickel back
+      NB: 0,  // No nickel needed if we have 3 CBs
     };
   }
 
@@ -742,6 +749,7 @@ export function generateDefensiveAssignments(
   const assignments: Array<{ defenderId: string; playerType: string; target?: string; role: string }> = [];
   const receivers = [...formation.receiversLeft, ...formation.receiversRight];
 
+
   // Sort receivers by priority: #1 outside receivers first, then slots, then TEs/RBs
   const sortedReceivers = receivers.sort((a, b) => {
     // WRs get priority over TEs/RBs
@@ -772,9 +780,18 @@ export function generateDefensiveAssignments(
     });
   }
 
-  // 2. Add required nickel backs
+  // 2. Add required nickel backs (should prioritize slot WRs)
   for (let i = 0; i < requiredPersonnel.NB; i++) {
-    const targetReceiver = sortedReceivers.find(r => !assignedReceivers.has(r.id));
+    // Nickel backs should prioritize slot WRs (inside WRs not covered by CBs)
+    let targetReceiver = sortedReceivers.find(r =>
+      !assignedReceivers.has(r.id) && r.playerType === 'WR'
+    );
+
+    // If no WRs available, then cover other receivers
+    if (!targetReceiver) {
+      targetReceiver = sortedReceivers.find(r => !assignedReceivers.has(r.id));
+    }
+
     if (targetReceiver) {
       assignedReceivers.add(targetReceiver.id);
     }
@@ -807,18 +824,31 @@ export function generateDefensiveAssignments(
 
   // 4. Add required linebackers
   for (let i = 0; i < requiredPersonnel.LB; i++) {
-    const targetReceiver = sortedReceivers.find(r => !assignedReceivers.has(r.id));
-    if (targetReceiver) {
-      assignedReceivers.add(targetReceiver.id);
-    }
+    // Last LB is typically a hole/rat defender in Cover 1
+    const isLastLB = (i === requiredPersonnel.LB - 1 && requiredPersonnel.LB > 1);
+    const role = isLastLB ? 'hole' : 'man-coverage';
 
-    // Last LB is typically a spy
-    const role = (i === requiredPersonnel.LB - 1 && requiredPersonnel.LB > 1) ? 'spy' : 'man-coverage';
+    let targetReceiver = undefined;
+    if (role === 'man-coverage') {
+      // LBs typically cover RBs and TEs, not WRs
+      targetReceiver = sortedReceivers.find(r =>
+        !assignedReceivers.has(r.id) && (r.playerType === 'RB' || r.playerType === 'TE' || r.playerType === 'FB')
+      );
+
+      // If no RB/TE available, then take any unassigned receiver
+      if (!targetReceiver) {
+        targetReceiver = sortedReceivers.find(r => !assignedReceivers.has(r.id));
+      }
+
+      if (targetReceiver) {
+        assignedReceivers.add(targetReceiver.id);
+      }
+    }
 
     assignments.push({
       defenderId: `LB${i + 1}`,
       playerType: 'LB',
-      target: role === 'spy' ? undefined : targetReceiver?.id,
+      target: role === 'hole' ? undefined : targetReceiver?.id,
       role
     });
   }
@@ -866,18 +896,29 @@ export function generateCover1Alignment(
         if (defender.id === 'S1' || defender.id === 'FS') {
           // Free Safety - always deep middle
           positions[defender.id] = getCover1FreeSafety(formation, los);
-        } else {
-          // Strong Safety - cover #2 receiver on strength side or robber
-          const strongSideReceivers = formation.strength === 'left' ? leftReceivers : rightReceivers;
-          if (strongSideReceivers.number2) {
-            positions[defender.id] = getCover1StrongSafety(strongSideReceivers.number2, los);
+        } else if (responsibility.type === 'man' && responsibility.target) {
+          // Strong Safety in man coverage - align over assigned receiver
+          const assignedReceiver = offensivePlayers.find(p => p.id === responsibility.target);
+          if (assignedReceiver) {
+            // Position with outside leverage, 8-10 yards deep
+            const outsideLeverage = assignedReceiver.position.x < 26.665 ? -1.5 : 1.5;
+            positions[defender.id] = {
+              x: assignedReceiver.position.x + outsideLeverage,
+              y: los + 10 // Deeper than LBs but not as deep as FS
+            };
           } else {
-            // No #2 receiver, play robber in middle
+            // Fallback to robber position
             positions[defender.id] = {
               x: 26.665,
               y: los + COVER_1_CONSTANTS.SS_DEPTH_VS_TE
             };
           }
+        } else {
+          // Zone safety (shouldn't happen in Cover 1 for S2, but have fallback)
+          positions[defender.id] = {
+            x: 26.665,
+            y: los + COVER_1_CONSTANTS.SS_DEPTH_VS_TE
+          };
         }
         break;
 
@@ -1120,21 +1161,36 @@ export function generateCover3Alignment(
 
     switch (defender.playerType) {
       case 'CB':
-        // CBs play deep outside thirds with pattern matching
-        const side = cbCount === 0 ? 'left' : 'right';
-        const targetReceiver = cbCount === 0 ? leftReceivers.number1 : rightReceivers.number1;
+        // In Cover 3, first two CBs play deep outside thirds
+        // Third CB (in Dime) plays underneath/slot
+        if (cbCount < 2) {
+          // CB1 and CB2 play deep outside thirds with pattern matching
+          const side = cbCount === 0 ? 'left' : 'right';
+          const targetReceiver = cbCount === 0 ? leftReceivers.number1 : rightReceivers.number1;
 
-        if (targetReceiver) {
-          // Get base position for pre-snap alignment
-          const basePosition = getCover3Cornerback(targetReceiver, side, formation, los);
+          if (targetReceiver) {
+            // Get base position for pre-snap alignment
+            const basePosition = getCover3Cornerback(targetReceiver, side, formation, los);
 
-          // For pre-snap alignment, always use zone coverage
-          // Pattern matching will be applied during post-snap movement
-          positions[defender.id] = basePosition;
+            // For pre-snap alignment, always use zone coverage
+            // Pattern matching will be applied during post-snap movement
+            positions[defender.id] = basePosition;
+          } else {
+            // Default positioning if no receiver
+            const xPos = side === 'left' ? 8 : 45;
+            positions[defender.id] = { x: xPos, y: los + COVER_3_CONSTANTS.CB_DEPTH_SOFT };
+          }
         } else {
-          // Default positioning if no receiver
-          const xPos = side === 'left' ? 8 : 45;
-          positions[defender.id] = { x: xPos, y: los + COVER_3_CONSTANTS.CB_DEPTH_SOFT };
+          // CB3 (slot/nickel) plays underneath coverage
+          // Position in the slot area at intermediate depth
+          const slotX = formation.strength === 'left' ? 18 : 35;
+          positions[defender.id] = {
+            x: slotX,
+            y: los + 7  // Same depth as other CBs in Cover 3 (6-8 yard range)
+          };
+          if (process.env.NODE_ENV === 'test') {
+            console.log(`[generateCover3Alignment] CB3 positioned at y=${los + 7}, depth=7`);
+          }
         }
         cbCount++;
         break;
@@ -1198,6 +1254,8 @@ export function generateCover3Alignment(
 
   // Apply zone spacing optimization to prevent overcrowding
   // Pass QB movement type to respect depth constraints
+  // NOTE: This optimization can override correct CB depths in Cover 3
+  // TODO: Make optimization aware of coverage-specific depth requirements
   const optimizedPositions = optimizeZoneSpacing(positions, los, defensivePlayers, qbMovementType);
 
   // Debug logging for position changes after optimization
@@ -1354,6 +1412,10 @@ function optimizeVerticalSpacing(
     }
   }
 
+  // CB positions in Cover 3 should not be adjusted for vertical spacing
+  // CB1 and CB2 are deep thirds, CB3 is slot coverage
+  const protectedDefenders = new Set(['CB1', 'CB2', 'CB3']);
+
   // For each lane with multiple defenders, ensure minimum vertical spacing
   for (const lane of lanes) {
     if (lane.length < 2) continue;
@@ -1385,6 +1447,12 @@ function optimizeVerticalSpacing(
 
       for (let i = 0; i < lane.length; i++) {
         const [id, pos] = lane[i];
+
+        // Skip protected defenders (CBs should maintain their coverage depths)
+        if (protectedDefenders.has(id)) {
+          continue;
+        }
+
         let newY = firstY + (i * availableSpace / (lane.length - 1));
 
         // Respect linebacker depth constraints based on QB movement
@@ -1567,6 +1635,15 @@ export function generateCover0Alignment(
           positions[defender.id] = {
             x: receiver.position.x,
             y: los + 1 // Press coverage, 1 yard on defensive side of LOS
+          };
+        } else {
+          // No receiver to cover - press position at edge
+          const xPos = defender.id === 'CB1' ? 8 :
+                      defender.id === 'CB2' ? 45 :
+                      defender.id === 'CB3' ? 35 : 26.665;
+          positions[defender.id] = {
+            x: xPos,
+            y: los + 1 // Still press depth even without receiver
           };
         }
         break;

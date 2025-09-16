@@ -47,16 +47,6 @@
         "timing": [0, 0.2, 0.9, 1.3],
         "depth": 2
       },
-      "WR4": {
-        "type": "comeback",
-        "waypoints": [
-          { "x": 10, "y": 0 },
-          { "x": 10, "y": 12 },
-          { "x": 10, "y": 10 }
-        ],
-        "timing": [0, 1.2, 1.6],
-        "depth": 10
-      },
       "TE1": {
         "type": "drag",
         "waypoints": [
@@ -144,7 +134,7 @@
     "name": "Mesh",
     "description": "Crossing routes concept with natural picks/rubs through traffic",
     "difficulty": "medium",
-    "formation": "trips-right",
+    "formation": "trips-right-10",
     "routes": {
       "WR1": {
         "type": "dig",
@@ -218,7 +208,7 @@
     "name": "Flood",
     "description": "Three-level vertical stretch to overload zone coverage",
     "difficulty": "medium",
-    "formation": "trips-right",
+    "formation": "trips-right-10",
     "routes": {
       "WR1": {
         "type": "go",
@@ -386,7 +376,7 @@
     "name": "Hitch-Seam",
     "description": "Quick game concept with hitches outside and seams inside to stress zone coverage",
     "difficulty": "easy",
-    "formation": "spread-2x2",
+    "formation": "spread-2x2-11",
     "routes": {
       "WR1": {
         "type": "hitch",
@@ -457,7 +447,7 @@
     "name": "Curl-Flat",
     "description": "High-low concept with curls and flat routes to create zone conflicts",
     "difficulty": "easy",
-    "formation": "trips-right",
+    "formation": "trips-right-10",
     "routes": {
       "WR1": {
         "type": "curl",
@@ -530,7 +520,7 @@
     "name": "All Curls",
     "description": "Simple concept with all receivers running curl routes at 10 yards",
     "difficulty": "easy",
-    "formation": "spread-2x2",
+    "formation": "spread-2x2-11",
     "routes": {
       "WR1": {
         "type": "curl",
@@ -599,7 +589,7 @@
     "name": "Stick",
     "description": "Triangle stretch concept with stick route, flat, and vertical to stress zone coverage",
     "difficulty": "medium",
-    "formation": "trips-right",
+    "formation": "trips-right-10",
     "routes": {
       "WR1": {
         "type": "vertical",
@@ -671,7 +661,7 @@
     "name": "Spacing",
     "description": "Horizontal stretch with multiple speed outs to attack underneath zones",
     "difficulty": "easy",
-    "formation": "trips-right",
+    "formation": "trips-right-10",
     "routes": {
       "WR1": {
         "type": "speed-out",
@@ -745,7 +735,7 @@
     "name": "Drive",
     "description": "Deep drag paired with shallow dig to create high-low stretch on linebackers",
     "difficulty": "medium",
-    "formation": "spread-2x2",
+    "formation": "spread-2x2-11",
     "routes": {
       "WR1": {
         "type": "shallow-drag",
@@ -817,7 +807,7 @@
     "name": "Dagger",
     "description": "High-low read concept with vertical clear-out and crossing routes",
     "difficulty": "hard",
-    "formation": "trips-right",
+    "formation": "trips-right-10",
     "routes": {
       "WR1": {
         "type": "deep-dig",
@@ -890,7 +880,7 @@
     "name": "Mills",
     "description": "Post-dig combination with vertical stretch on safeties",
     "difficulty": "hard",
-    "formation": "spread-2x2",
+    "formation": "spread-2x2-11",
     "routes": {
       "WR1": {
         "type": "post",
@@ -963,7 +953,7 @@
     "name": "Scissors",
     "description": "Crossing vertical routes creating pick/rub action",
     "difficulty": "hard",
-    "formation": "spread-2x2",
+    "formation": "spread-2x2-11",
     "routes": {
       "WR1": {
         "type": "corner",
@@ -1128,7 +1118,7 @@
     "name": "Shallow Cross",
     "description": "Air Raid concept with shallow crossers and deep digs behind",
     "difficulty": "medium",
-    "formation": "spread-2x2",
+    "formation": "spread-2x2-11",
     "routes": {
       "WR1": {
         "type": "shallow-cross",
@@ -1273,7 +1263,7 @@
     "name": "PA Boot Flood",
     "description": "Play Action bootleg with flood concept - multiple routes to one side",
     "difficulty": "intermediate",
-    "formation": "trips-right",
+    "formation": "trips-right-10",
     "playAction": "boot-right",
     "routes": {
       "WR1": {
@@ -1309,17 +1299,6 @@
         "depth": 8,
         "delayedRelease": 1.2
       },
-      "TE1": {
-        "type": "bootleg_comeback",
-        "waypoints": [
-          { "x": 30, "y": 0 },
-          { "x": 30, "y": 16 },
-          { "x": 27, "y": 13 }
-        ],
-        "timing": [0, 2.6, 3.2],
-        "depth": 16,
-        "delayedRelease": 0.8
-      },
       "WR4": {
         "type": "deep_comeback",
         "waypoints": [
@@ -1348,7 +1327,7 @@
     "name": "PA Pocket Seams",
     "description": "Play Action pocket drop with vertical seam routes",
     "difficulty": "intermediate",
-    "formation": "spread-2x2",
+    "formation": "spread-2x2-11",
     "playAction": "pocket-drop",
     "routes": {
       "WR1": {
@@ -1392,17 +1371,6 @@
         "depth": 8,
         "delayedRelease": 0.6
       },
-      "WR4": {
-        "type": "comeback",
-        "waypoints": [
-          { "x": 10, "y": 0 },
-          { "x": 8, "y": 12 },
-          { "x": 8, "y": 10 }
-        ],
-        "timing": [0, 2.0, 2.4],
-        "depth": 10,
-        "delayedRelease": 0.6
-      },
       "RB1": {
         "type": "checkdown",
         "waypoints": [
@@ -1420,7 +1388,7 @@
     "name": "PA Deep Cross",
     "description": "Play Action with crossing routes at multiple levels",
     "difficulty": "advanced",
-    "formation": "singleback",
+    "formation": "i-form-21",
     "playAction": "deep-cross",
     "routes": {
       "WR1": {
@@ -1495,7 +1463,7 @@
     "name": "PA Naked Boot",
     "description": "Play Action naked bootleg with quick developing routes",
     "difficulty": "advanced",
-    "formation": "singleback",
+    "formation": "singleback-12",
     "playAction": "naked-boot",
     "routes": {
       "WR1": {

@@ -7,13 +7,66 @@
       "WR1": { "x": 45, "y": 0 },
       "WR2": { "x": 40, "y": -1 },
       "WR3": { "x": 35, "y": -1 },
-      "WR4": { "x": 10, "y": 0 },
       "TE1": { "x": 18, "y": 0 }
     },
     "personnel": {
       "QB": 1,
       "RB": 1,
+      "WR": 3,
+      "TE": 1,
+      "FB": 0
+    }
+  },
+  "trips-right-10": {
+    "name": "Trips Right (10 Personnel)",
+    "positions": {
+      "QB1": { "x": 26.665, "y": -5 },
+      "RB1": { "x": 26.665, "y": -6 },
+      "WR1": { "x": 45, "y": 0 },
+      "WR2": { "x": 40, "y": -1 },
+      "WR3": { "x": 35, "y": -1 },
+      "WR4": { "x": 10, "y": 0 }
+    },
+    "personnel": {
+      "QB": 1,
+      "RB": 1,
       "WR": 4,
+      "TE": 0,
+      "FB": 0
+    }
+  },
+  "singleback-12": {
+    "name": "Singleback (12 Personnel)",
+    "positions": {
+      "QB1": { "x": 26.665, "y": -5 },
+      "RB1": { "x": 26.665, "y": -7 },
+      "WR1": { "x": 10, "y": 0 },
+      "WR2": { "x": 43, "y": 0 },
+      "TE1": { "x": 32, "y": 0 },
+      "TE2": { "x": 21, "y": 0 }
+    },
+    "personnel": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 2,
+      "TE": 2,
+      "FB": 0
+    }
+  },
+  "singleback-11": {
+    "name": "Singleback (11 Personnel)",
+    "positions": {
+      "QB1": { "x": 26.665, "y": -5 },
+      "RB1": { "x": 26.665, "y": -7 },
+      "WR1": { "x": 10, "y": 0 },
+      "WR2": { "x": 43, "y": 0 },
+      "WR3": { "x": 48, "y": 0 },
+      "TE1": { "x": 32, "y": 0 }
+    },
+    "personnel": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 3,
       "TE": 1,
       "FB": 0
     }
@@ -38,26 +91,43 @@
     }
   },
   "spread-2x2": {
-    "name": "2x2 Spread",
+    "name": "2x2 Spread (10 Personnel)",
     "positions": {
       "QB1": { "x": 26.665, "y": -5 },
       "RB1": { "x": 26.665, "y": -7 },
       "WR1": { "x": 8, "y": 0 },
       "WR2": { "x": 45, "y": 0 },
       "WR3": { "x": 18, "y": -1 },
-      "WR4": { "x": 36, "y": -1 },
-      "TE1": { "x": 38, "y": 0 }
+      "WR4": { "x": 36, "y": -1 }
     },
     "personnel": {
       "QB": 1,
       "RB": 1,
       "WR": 4,
+      "TE": 0,
+      "FB": 0
+    }
+  },
+  "spread-2x2-11": {
+    "name": "2x2 Spread (11 Personnel)",
+    "positions": {
+      "QB1": { "x": 26.665, "y": -5 },
+      "RB1": { "x": 26.665, "y": -7 },
+      "WR1": { "x": 8, "y": 0 },
+      "WR2": { "x": 45, "y": 0 },
+      "WR3": { "x": 18, "y": -1 },
+      "TE1": { "x": 38, "y": 0 }
+    },
+    "personnel": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 3,
       "TE": 1,
       "FB": 0
     }
   },
   "empty": {
-    "name": "Empty Backfield",
+    "name": "Empty Backfield (10 Personnel)",
     "positions": {
       "QB1": { "x": 26.665, "y": -5 },
       "WR1": { "x": 10, "y": 0 },
@@ -73,6 +143,42 @@
       "WR": 5,
       "TE": 1,
       "FB": 0
+    }
+  },
+  "i-form-21": {
+    "name": "I-Formation (21 Personnel)",
+    "positions": {
+      "QB1": { "x": 26.665, "y": -5 },
+      "RB1": { "x": 26.665, "y": -10 },
+      "FB1": { "x": 26.665, "y": -7 },
+      "WR1": { "x": 10, "y": 0 },
+      "WR2": { "x": 43, "y": 0 },
+      "TE1": { "x": 32, "y": 0 }
+    },
+    "personnel": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 2,
+      "TE": 1,
+      "FB": 1
+    }
+  },
+  "strong-22": {
+    "name": "Strong Formation (22 Personnel)",
+    "positions": {
+      "QB1": { "x": 26.665, "y": -5 },
+      "RB1": { "x": 26.665, "y": -7 },
+      "FB1": { "x": 30, "y": -6 },
+      "WR1": { "x": 10, "y": 0 },
+      "TE1": { "x": 35, "y": 0 },
+      "TE2": { "x": 38, "y": 0 }
+    },
+    "personnel": {
+      "QB": 1,
+      "RB": 1,
+      "WR": 1,
+      "TE": 2,
+      "FB": 1
     }
   }
 }

@@ -20,7 +20,8 @@ export interface Player {
   hasMotion: boolean; // player will go in motion pre-snap
   motionPath?: Vector2D[]; // path to follow during motion
   hasMotionBoost: boolean; // temporary speed boost from motion at snap
-  motionBoostTimeLeft: number; // seconds
+  motionBoostTimeLeft: number; // seconds (deprecated - use motionBoostRemaining)
+  motionBoostRemaining?: number; // seconds remaining for motion boost
   isBlocking: boolean; // player is pass protecting (RB/TE/FB)
   blockingTarget?: string; // ID of defender being blocked
   blockingPosition?: Vector2D; // default blocking position when no blitzer
@@ -36,6 +37,7 @@ export interface Player {
   isBackpedaling?: boolean; // for defensive backs
   directionChangeRecoveryTime?: number; // time left to recover from direction change
   timeToTopSpeed?: number; // time needed to reach max speed from current
+  coverageTechnique?: string; // current defensive technique (backpedal, hip-turn, pattern-read, etc.)
 }
 
 export type PlayerType = 'QB' | 'RB' | 'WR' | 'TE' | 'FB' | 'CB' | 'S' | 'LB' | 'NB';
@@ -215,6 +217,7 @@ export interface GameState {
   outcome?: PlayOutcome;
   isShowingDefense: boolean;
   isShowingRoutes: boolean;
+  isShowingDebugOverlay?: boolean;
   audiblesUsed: number;
   maxAudibles: number;
   gameMode: 'free-play' | 'challenge';
@@ -242,7 +245,7 @@ export interface GameState {
 
 export type GamePhase = 'pre-snap' | 'post-snap' | 'ball-thrown' | 'play-over';
 
-export type MotionType = 'fly' | 'orbit' | 'jet' | 'return' | 'shift';
+export type MotionType = 'fly' | 'orbit' | 'jet' | 'return' | 'shift' | 'across' | 'glide';
 
 export interface Motion {
   type: MotionType;

@@ -19,6 +19,8 @@ First down marker 10 yards ahead of the LOS indicated by yellow line
 
 No running, this is a throwing-only simulation meant for Quarterbacks to learn defensive coverage weaknesses thruogh repetition
 
+No 'spy', replace 'spy' with 'hole' to cover middle of field instead. Simulation does not allow scrambles, so no need for a spy.
+
 **Game Mechanics for USER AUTONOMY: IMPORTANT**
 
 Coverage Selection:
@@ -506,3 +508,6 @@ Example research output structure:
   }
 }
 ```
+- FORMATION_NAMING_CONVENTION.md for personnel & formation matching rules
+- PRODUCTION_ROADMAP.md for plan ahead, current progress, and next steps
+- COMPLETED_PHASES.md for completed phases and detailed logging of reputability, problems solved, and infrastructure updates
