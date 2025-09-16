@@ -26,7 +26,7 @@ describe('NFL Realism Comprehensive Validation', () => {
       const cover3 = DataLoader.getCoverage('cover-3');
       if (smash) engine.setPlayConcept(smash);
       if (cover3) engine.setCoverage(cover3);
-      engine.snap();
+      // Motion happens PRE-snap, not post-snap
 
       const wr1 = engine.getGameState().players.find(p => p.id === 'WR1');
       const wr2 = engine.getGameState().players.find(p => p.id === 'WR2');

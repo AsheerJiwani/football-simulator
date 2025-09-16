@@ -4850,6 +4850,9 @@ export class FootballEngine {
         case 'cover-0':
           alignmentPositions = generateCover0Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
           break;
+        case 'cover-1':
+          alignmentPositions = generateCover1Alignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage);
+          break;
         case 'cover-1-bracket':
           alignmentPositions = generateCover1BracketAlignment(offensivePlayers, newDefensivePlayers, this.gameState.lineOfScrimmage, formation);
           break;
