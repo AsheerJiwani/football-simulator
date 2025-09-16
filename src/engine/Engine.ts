@@ -48,6 +48,8 @@ import { CoverageAdjustments } from './coverageAdjustments';
 import { PostSnapRules } from './postSnapRules';
 import { MotionMechanics } from './motionMechanics';
 import { ZoneMovementFluidity } from './zoneMovementFluidity';
+import { DefensiveTimingSystem } from './defensiveTimingSystem';
+import { ZoneDepthCalculator } from './zoneDepthCalculator';
 import { updateDefensiveMovement, calculateDefensiveMovement } from './defensiveMovement';
 import { QuarterbackMovement, type QBMovementConfig } from './quarterbackMovement';
 import { HotRoutesSystem } from './hotRoutes';
@@ -85,6 +87,8 @@ export class FootballEngine {
   private postSnapRules: PostSnapRules;
   private motionMechanics: MotionMechanics;
   private zoneMovementFluidity: ZoneMovementFluidity;
+  private defensiveTimingSystem: DefensiveTimingSystem;
+  private zoneDepthCalculator: ZoneDepthCalculator;
   private hotRoutesSystem: HotRoutesSystem;
   private optionRoutesSystem: OptionRoutesSystem;
   private rubRoutesSystem: RubRoutesSystem;
@@ -112,6 +116,8 @@ export class FootballEngine {
     this.postSnapRules = new PostSnapRules();
     this.motionMechanics = new MotionMechanics();
     this.zoneMovementFluidity = new ZoneMovementFluidity();
+    this.defensiveTimingSystem = new DefensiveTimingSystem();
+    this.zoneDepthCalculator = new ZoneDepthCalculator();
     this.hotRoutesSystem = new HotRoutesSystem();
     this.optionRoutesSystem = new OptionRoutesSystem();
     this.rubRoutesSystem = new RubRoutesSystem();
@@ -375,6 +381,9 @@ export class FootballEngine {
   }
 
   public setLineOfScrimmage(yardLine: number): void {
+    // Store previous LOS for zone depth adjustments
+    const previousLOS = this.gameState.lineOfScrimmage;
+
     // Check for safety (ball at or behind offensive 1-yard line)
     if (yardLine <= 1) {
       console.warn('Safety! Ball would be at or behind offensive 1-yard line. Resetting to offensive 30-yard line.');
@@ -393,6 +402,12 @@ export class FootballEngine {
       // Update ball position
       this.gameState.ball.position.y = this.gameState.lineOfScrimmage;
     }
+
+    // Check if zone depth adjustment is needed
+    const requiresDepthAdjustment = this.zoneDepthCalculator.requiresDepthAdjustment(
+      previousLOS,
+      this.gameState.lineOfScrimmage
+    );
 
     // Re-setup players at new LOS
     if (this.gameState.playConcept) {
@@ -1460,6 +1475,13 @@ export class FootballEngine {
     const originalSide = motionPlayer.position.x < centerX ? 'left' : 'right';
     const motionCrossesFormation = this.doesMotionCrossFormation(motionPlayer, offensePlayers);
 
+    // Get the response type for this coverage
+    const responseType = this.motionMechanics.getCoverageMotionResponse(
+      coverage.type,
+      this.gameState.motion.type,
+      motionCrossesFormation
+    );
+
     // Use enhanced NFL-authentic motion response system
     const defensiveResponses = this.motionMechanics.calculateDefensiveMotionResponse(
       coverage.type,
@@ -1468,11 +1490,17 @@ export class FootballEngine {
       offensePlayers
     );
 
-    // Apply enhanced motion adjustments
+    // Queue timed adjustments for each defender
     defensiveResponses.forEach((newPosition, defenderId) => {
       const defender = defensePlayers.find(d => d.id === defenderId);
       if (defender) {
-        defender.position = newPosition;
+        // Queue the adjustment with realistic timing
+        this.defensiveTimingSystem.queueMotionResponse(
+          coverage.type,
+          responseType,
+          defenderId,
+          newPosition
+        );
       }
     });
 
@@ -1485,7 +1513,7 @@ export class FootballEngine {
       this.gameState.lineOfScrimmage
     );
 
-    // Apply responsibility changes
+    // Apply responsibility changes (these happen immediately for now)
     for (const adjustment of motionAdjustments) {
       const defender = defensePlayers.find(d => d.id === adjustment.defenderId);
       if (defender && adjustment.newResponsibility) {
@@ -3326,6 +3354,9 @@ export class FootballEngine {
     this.gameState.motionPlayer = undefined;
     this.gameState.audiblesUsed = 0;
 
+    // Reset defensive timing system
+    this.defensiveTimingSystem.reset();
+
     // Reset quarterback movement state
     if (this.gameState.qbMovement) {
       this.gameState.qbMovement.isActive = false;
@@ -3463,8 +3494,40 @@ export class FootballEngine {
     }
   }
 
+  private applyTimedDefensiveAdjustments(): void {
+    const defenders = this.gameState.players.filter(p => p.team === 'defense');
+
+    defenders.forEach(defender => {
+      // Get adjusted position from timing system
+      const adjustedPosition = this.defensiveTimingSystem.getAdjustedPosition(
+        defender.id,
+        defender.position
+      );
+
+      // Apply the adjustment
+      if (adjustedPosition.x !== defender.position.x || adjustedPosition.y !== defender.position.y) {
+        defender.position = adjustedPosition;
+      }
+
+      // Check if defender is frozen (play action)
+      if (this.defensiveTimingSystem.isDefenderFrozen(defender.id)) {
+        // Temporarily reduce speed for frozen defenders
+        defender.currentSpeed = 0;
+      }
+    });
+  }
+
   public tick(deltaTime: number): void {
-    if (this.gameState.phase === 'pre-snap' || this.gameState.phase === 'play-over') {
+    if (this.gameState.phase === 'pre-snap') {
+      // Update defensive timing system even in pre-snap for motion responses
+      this.defensiveTimingSystem.tick(deltaTime);
+
+      // Apply timed defensive adjustments
+      this.applyTimedDefensiveAdjustments();
+      return;
+    }
+
+    if (this.gameState.phase === 'play-over') {
       return;
     }
 
@@ -3472,6 +3535,12 @@ export class FootballEngine {
     if (Number.isFinite(deltaTime) && deltaTime >= 0) {
       this.gameState.timeElapsed += deltaTime;
     }
+
+    // Update defensive timing system
+    this.defensiveTimingSystem.tick(deltaTime);
+
+    // Apply timed defensive adjustments
+    this.applyTimedDefensiveAdjustments();
 
     // Update player positions first
     this.updatePlayerPositions(deltaTime);
@@ -4891,15 +4960,26 @@ export class FootballEngine {
           newDefensivePlayers = adjustedResponsibilities.map((responsibility) => {
             const playerType = this.getPlayerTypeFromId(responsibility.defenderId);
 
-            // Adjust zone centers to be relative to current LOS
+            // Adjust zone centers to be relative to current LOS with field-aware depth
             const adjustedResponsibility = { ...responsibility };
             if (adjustedResponsibility.zone) {
+              // Use zone depth calculator for proper field position adjustments
+              const zoneName = adjustedResponsibility.zone.name || '';
+              const baseCenter = {
+                x: adjustedResponsibility.zone.center.x,
+                y: adjustedResponsibility.zone.center.y + this.gameState.lineOfScrimmage
+              };
+
+              const adjustedCenter = this.zoneDepthCalculator.calculateZonePosition(
+                zoneName,
+                { x: baseCenter.x, y: 0 }, // Base position without depth
+                this.gameState.lineOfScrimmage,
+                coverage.type
+              );
+
               adjustedResponsibility.zone = {
                 ...adjustedResponsibility.zone,
-                center: {
-                  x: adjustedResponsibility.zone.center.x,
-                  y: adjustedResponsibility.zone.center.y + this.gameState.lineOfScrimmage
-                }
+                center: adjustedCenter
               };
             }
 

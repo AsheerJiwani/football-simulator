@@ -9,7 +9,14 @@ DO NOT MAKE ANYTHING UP - utilize agents and Playwright MCP with Chromium browse
 
 Mechanics must feel NFL-realistic (routes, coverages, player speeds, motions, audibles, openness at catch, tackle radius).
 
-Movements should be fluid, defender tracking based on man/match/zone concepts highly realistic
+**CRITICAL: Human-Like Movement and Timing**
+- Movements should be fluid and human-like, NOT robotic or instantaneous
+- Defensive adjustments must have realistic recognition delays (0.2-0.3s) and execution times (0.5-1.6s)
+- Defender tracking should feel natural with acceleration/deceleration curves
+- Zone defenders should show realistic "eyes in the backfield" behavior before breaking on routes
+- Man defenders should have realistic hip turn mechanics and recovery speeds
+- All defensive responses to offensive changes (motion, formations, audibles) should occur with human reaction times
+- Play action should cause authentic linebacker "freeze" responses (0.4-0.6s hesitation)
 
 Field should be 120 yards long (100 yards + 10 yards for each endzone) & vertical instead of horizontal
 
